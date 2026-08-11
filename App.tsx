@@ -12,6 +12,24 @@ import {
 } from 'react-native';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
+type AppScreen = 'tabs' | 'casinoCatalog' | 'blackjackSetup';
+
+const difficultyOptions = [
+  { name: '입문', min: 10, max: 100, bets: [10, 25, 50, 100] },
+  { name: '쉬움', min: 50, max: 500, bets: [50, 100, 250, 500] },
+  { name: '보통', min: 100, max: 2000, bets: [100, 500, 1000, 2000] },
+  { name: '어려움', min: 500, max: 10000, bets: [500, 1000, 5000, 10000] },
+  { name: '전문가', min: 1000, max: 50000, bets: [1000, 5000, 10000, 50000] },
+];
+
+const casinoGames = [
+  { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', available: true },
+  { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', available: false },
+  { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', available: false },
+  { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', available: false },
+  { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', available: false },
+  { name: '슬롯', icon: '7', description: '같은 그림 조합을 완성하는 머신 게임', available: false },
+];
 
 const STORAGE_KEYS = {
   coins: 'world-casino.coins',
@@ -47,8 +65,10 @@ const categoryResults = [
 export default function App() {
   const [entered, setEntered] = useState(false);
   const [tab, setTab] = useState<Tab>('홈');
+  const [appScreen, setAppScreen] = useState<AppScreen>('tabs');
   const [coins, setCoins] = useState(10000);
   const [difficulty, setDifficulty] = useState('보통');
+  const [selectedBet, setSelectedBet] = useState(500);
   const [sound, setSound] = useState(true);
   const [vibration, setVibration] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -70,6 +90,8 @@ export default function App() {
 
   const saveDifficulty = async (value: string) => {
     setDifficulty(value);
+    const option = difficultyOptions.find((item) => item.name === value);
+    if (option) setSelectedBet(option.bets[Math.min(1, option.bets.length - 1)]);
     await AsyncStorage.setItem(STORAGE_KEYS.difficulty, value);
   };
 
@@ -107,8 +129,23 @@ export default function App() {
     <SafeAreaView style={styles.app}>
       <StatusBar style="light" />
       <Header coins={coins} />
-      <View style={styles.screen}>{renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration)}</View>
-      <View style={styles.tabBar}>
+      <View style={styles.screen}>
+        {appScreen === 'casinoCatalog' && (
+          <CasinoCatalogScreen onBack={() => setAppScreen('tabs')} onOpenBlackjack={() => setAppScreen('blackjackSetup')} />
+        )}
+        {appScreen === 'blackjackSetup' && (
+          <BlackjackSetupScreen
+            coins={coins}
+            difficulty={difficulty}
+            selectedBet={selectedBet}
+            onBack={() => setAppScreen('casinoCatalog')}
+            onDifficultyChange={saveDifficulty}
+            onBetChange={setSelectedBet}
+          />
+        )}
+        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, () => setAppScreen('casinoCatalog'), () => setAppScreen('blackjackSetup'))}
+      </View>
+      {appScreen === 'tabs' && <View style={styles.tabBar}>
         {tabs.map((item) => {
           const selected = item.name === tab;
           return (
@@ -117,14 +154,17 @@ export default function App() {
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               style={styles.tabItem}
-              onPress={() => setTab(item.name)}
+              onPress={() => {
+                setTab(item.name);
+                setAppScreen('tabs');
+              }}
             >
               <Text style={[styles.tabIcon, selected && styles.tabSelected]}>{item.icon}</Text>
               <Text style={[styles.tabLabel, selected && styles.tabSelected]}>{item.name}</Text>
             </Pressable>
           );
         })}
-      </View>
+      </View>}
       {!loaded && <View style={styles.loadingCover}><Text style={styles.muted}>저장 정보 불러오는 중…</Text></View>}
     </SafeAreaView>
   );
@@ -156,21 +196,23 @@ function renderTab(
   setSound: (value: boolean) => void,
   vibration: boolean,
   setVibration: (value: boolean) => void,
+  onOpenCasino: () => void,
+  onOpenBlackjack: () => void,
 ) {
-  if (tab === '게임') return <GamesScreen />;
+  if (tab === '게임') return <GamesScreen onOpenCasino={onOpenCasino} />;
   if (tab === '지갑') return <WalletScreen />;
   if (tab === '기록') return <RecordsScreen />;
   if (tab === '설정') {
     return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} />;
   }
-  return <HomeScreen difficulty={difficulty} />;
+  return <HomeScreen difficulty={difficulty} onOpenBlackjack={onOpenBlackjack} />;
 }
 
 function Page({ children }: { children: React.ReactNode }) {
   return <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
 }
 
-function HomeScreen({ difficulty }: { difficulty: string }) {
+function HomeScreen({ difficulty, onOpenBlackjack }: { difficulty: string; onOpenBlackjack: () => void }) {
   return (
     <Page>
       <Text style={styles.eyebrow}>오늘도 즐거운 한 판</Text>
@@ -184,7 +226,7 @@ function HomeScreen({ difficulty }: { difficulty: string }) {
           <Text style={styles.cardTitle}>블랙잭</Text>
           <Text style={styles.smallText}>{difficulty} · 베팅 500 WC</Text>
         </View>
-        <Pressable style={styles.smallButton}><Text style={styles.smallButtonText}>계속</Text></Pressable>
+        <Pressable style={styles.smallButton} onPress={onOpenBlackjack}><Text style={styles.smallButtonText}>계속</Text></Pressable>
       </View>
 
       <Text style={styles.sectionTitle}>최근 플레이</Text>
@@ -203,7 +245,7 @@ function HomeScreen({ difficulty }: { difficulty: string }) {
   );
 }
 
-function GamesScreen() {
+function GamesScreen({ onOpenCasino }: { onOpenCasino: () => void }) {
   return (
     <Page>
       <Text style={styles.pageTitle}>게임</Text>
@@ -216,7 +258,13 @@ function GamesScreen() {
       <Text style={styles.sectionTitle}>6개 카테고리</Text>
       <View style={styles.categoryGrid}>
         {categories.map((category, index) => (
-          <Pressable key={category.name} style={styles.categoryCard}>
+          <Pressable
+            key={category.name}
+            style={({ pressed }) => [styles.categoryCard, index === 1 && pressed && styles.pressed]}
+            onPress={index === 1 ? onOpenCasino : undefined}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: index !== 1 }}
+          >
             <Text style={styles.categoryIcon}>{category.icon}</Text>
             <Text style={styles.categoryName}>{category.name}</Text>
             <Text style={styles.categoryDetail}>{category.detail}</Text>
@@ -225,6 +273,122 @@ function GamesScreen() {
         ))}
       </View>
     </Page>
+  );
+}
+
+function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <View style={styles.detailHeader}>
+      <Pressable accessibilityRole="button" style={styles.backButton} onPress={onBack}>
+        <Text style={styles.backButtonText}>‹</Text>
+      </Pressable>
+      <Text style={styles.detailHeaderTitle}>{title}</Text>
+      <View style={styles.backButtonSpacer} />
+    </View>
+  );
+}
+
+function CasinoCatalogScreen({ onBack, onOpenBlackjack }: { onBack: () => void; onOpenBlackjack: () => void }) {
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="카지노" onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <Text style={styles.eyebrow}>CASINO GAMES</Text>
+        <Text style={styles.detailLead}>원하는 게임을 선택하세요</Text>
+        <View style={styles.searchBox}><Text style={styles.muted}>⌕  카지노 게임 검색</Text></View>
+        <View style={styles.catalogList}>
+          {casinoGames.map((game) => (
+            <Pressable
+              key={game.name}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !game.available }}
+              onPress={game.available ? onOpenBlackjack : undefined}
+              style={({ pressed }) => [styles.gameListCard, !game.available && styles.disabledCard, pressed && game.available && styles.pressed]}
+            >
+              <View style={styles.gameListIcon}><Text style={styles.gameListIconText}>{game.icon}</Text></View>
+              <View style={styles.gameListCopy}>
+                <View style={styles.gameTitleRow}>
+                  <Text style={styles.gameListTitle}>{game.name}</Text>
+                  <Text style={game.available ? styles.availableBadge : styles.comingSoonBadge}>{game.available ? '플레이 가능' : '준비 중'}</Text>
+                </View>
+                <Text style={styles.gameListDescription}>{game.description}</Text>
+              </View>
+              <Text style={styles.chevron}>{game.available ? '›' : ''}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function BlackjackSetupScreen(props: {
+  coins: number;
+  difficulty: string;
+  selectedBet: number;
+  onBack: () => void;
+  onDifficultyChange: (value: string) => void;
+  onBetChange: (value: number) => void;
+}) {
+  const selectedDifficulty = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="블랙잭 설정" onBack={props.onBack} />
+      <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <View style={styles.blackjackIntro}>
+          <View style={styles.blackjackIntroCards}><Text style={styles.introCard}>A♠</Text><Text style={styles.introCard}>K♥</Text></View>
+          <View style={styles.blackjackIntroCopy}>
+            <Text style={styles.eyebrow}>BLACKJACK</Text>
+            <Text style={styles.detailLead}>21에 가장 가까이</Text>
+            <Text style={styles.gameListDescription}>딜러보다 21에 가까운 카드 합계를 만드세요.</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>난이도</Text>
+        <View style={styles.setupOptions}>
+          {difficultyOptions.map((option) => {
+            const selected = props.difficulty === option.name;
+            return (
+              <Pressable key={option.name} style={[styles.setupOption, selected && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}>
+                <Text style={[styles.setupOptionTitle, selected && styles.setupOptionTitleActive]}>{option.name}</Text>
+                <Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>베팅 금액</Text>
+        <View style={styles.betGrid}>
+          {selectedDifficulty.bets.map((bet) => {
+            const selected = props.selectedBet === bet;
+            const disabled = bet > props.coins;
+            return (
+              <Pressable
+                key={bet}
+                disabled={disabled}
+                style={[styles.betButton, selected && styles.betButtonActive, disabled && styles.disabledCard]}
+                onPress={() => props.onBetChange(bet)}
+              >
+                <Text style={[styles.betButtonText, selected && styles.betButtonTextActive]}>{bet.toLocaleString()} WC</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.setupSummary}>
+          <Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} />
+          <View style={styles.separator} />
+          <Row title="선택 난이도" value={props.difficulty} />
+          <View style={styles.separator} />
+          <Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} />
+        </View>
+
+        <Pressable disabled style={[styles.primaryButton, styles.fullWidthButton, styles.disabledCard]}>
+          <Text style={styles.primaryButtonText}>게임 시작 · 준비 중</Text>
+        </Pressable>
+        <Text style={styles.setupNotice}>현재는 설정 화면까지 작동합니다. 실제 블랙잭 게임판은 다음 제작 단계에서 연결됩니다.</Text>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -296,9 +460,9 @@ function SettingsScreen(props: {
       <Text style={styles.pageTitle}>설정</Text>
       <Text style={styles.sectionTitle}>기본 난이도</Text>
       <View style={styles.difficultyRow}>
-        {['입문', '쉬움', '보통', '어려움'].map((level) => (
-          <Pressable key={level} style={[styles.difficultyButton, props.difficulty === level && styles.difficultyActive]} onPress={() => props.saveDifficulty(level)}>
-            <Text style={[styles.difficultyText, props.difficulty === level && styles.difficultyActiveText]}>{level}</Text>
+        {difficultyOptions.map((option) => (
+          <Pressable key={option.name} style={[styles.difficultyButton, props.difficulty === option.name && styles.difficultyActive]} onPress={() => props.saveDifficulty(option.name)}>
+            <Text style={[styles.difficultyText, props.difficulty === option.name && styles.difficultyActiveText]}>{option.name}</Text>
           </Pressable>
         ))}
       </View>
@@ -409,6 +573,44 @@ const styles = StyleSheet.create({
   categoryName: { color: colors.text, fontSize: 16, fontWeight: '800' },
   categoryDetail: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 5 },
   comingSoon: { alignSelf: 'flex-start', color: colors.muted, fontSize: 10, marginTop: 9, paddingHorizontal: 7, paddingVertical: 4, backgroundColor: '#252C37', borderRadius: 8 },
+  detailScreen: { flex: 1, backgroundColor: colors.bg },
+  detailHeader: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailHeaderTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  backButtonSpacer: { width: 44, height: 44 },
+  backButtonText: { color: colors.goldLight, fontSize: 36, lineHeight: 38, fontWeight: '400' },
+  detailPage: { padding: 18, paddingBottom: 38 },
+  detailLead: { color: colors.text, fontSize: 25, fontWeight: '900', marginBottom: 18 },
+  catalogList: { gap: 10, marginTop: 16 },
+  gameListCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  disabledCard: { opacity: 0.45 },
+  gameListIcon: { width: 58, height: 66, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#102C26', borderWidth: 1, borderColor: '#285448' },
+  gameListIconText: { color: colors.goldLight, fontSize: 21, fontWeight: '900' },
+  gameListCopy: { flex: 1, marginLeft: 13 },
+  gameTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  gameListTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
+  gameListDescription: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  availableBadge: { color: colors.green, fontSize: 10, fontWeight: '800', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, backgroundColor: '#143329' },
+  comingSoonBadge: { color: colors.muted, fontSize: 10, fontWeight: '700', paddingHorizontal: 7, paddingVertical: 3, borderRadius: 8, backgroundColor: '#252C37' },
+  chevron: { color: colors.gold, fontSize: 25, marginLeft: 6 },
+  blackjackIntro: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 18, backgroundColor: '#0E2B24', borderWidth: 1, borderColor: '#315D50' },
+  blackjackIntroCards: { width: 85, height: 100, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 14, backgroundColor: '#F2E7CF' },
+  introCard: { color: '#181818', fontSize: 22, fontWeight: '900' },
+  blackjackIntroCopy: { flex: 1, marginLeft: 16 },
+  setupOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  setupOption: { width: '31%', minHeight: 64, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  setupOptionActive: { backgroundColor: '#2E2512', borderColor: colors.gold },
+  setupOptionTitle: { color: colors.muted, fontSize: 14, fontWeight: '800' },
+  setupOptionTitleActive: { color: colors.goldLight },
+  setupOptionRange: { color: colors.muted, fontSize: 9, marginTop: 5 },
+  betGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  betButton: { width: '48%', minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  betButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  betButtonText: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  betButtonTextActive: { color: '#171107' },
+  setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  fullWidthButton: { width: '100%', marginTop: 18 },
+  setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
   balanceCard: { minHeight: 235, backgroundColor: '#111A24', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#6D5520' },
   balance: { color: colors.text, fontSize: 32, fontWeight: '900', marginVertical: 8 },
   chart: { height: 100, flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
