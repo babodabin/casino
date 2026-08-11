@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   SafeAreaView,
@@ -10,9 +10,33 @@ import {
   Text,
   View,
 } from 'react-native';
+import {
+  createDeck,
+  dealInitialRound,
+  drawCard,
+  handValue,
+  isBlackjack,
+  netForResult,
+  payoutForResult,
+  playDealer,
+  resolveRound,
+  shuffleDeck,
+  type Card,
+  type RoundResult,
+} from './src/blackjack';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'casinoCatalog' | 'blackjackSetup';
+type AppScreen = 'tabs' | 'casinoCatalog' | 'blackjackSetup' | 'blackjackGame';
+
+type GameRecord = {
+  id: string;
+  game: '블랙잭';
+  result: RoundResult;
+  difficulty: string;
+  bet: number;
+  net: number;
+  playedAt: string;
+};
 
 const difficultyOptions = [
   { name: '입문', min: 10, max: 100, bets: [10, 25, 50, 100] },
@@ -34,6 +58,7 @@ const casinoGames = [
 const STORAGE_KEYS = {
   coins: 'world-casino.coins',
   difficulty: 'world-casino.difficulty',
+  records: 'world-casino.records',
 };
 
 const tabs: { name: Tab; icon: string }[] = [
@@ -69,6 +94,8 @@ export default function App() {
   const [coins, setCoins] = useState(10000);
   const [difficulty, setDifficulty] = useState('보통');
   const [selectedBet, setSelectedBet] = useState(500);
+  const [gameRoundId, setGameRoundId] = useState(0);
+  const [records, setRecords] = useState<GameRecord[]>([]);
   const [sound, setSound] = useState(true);
   const [vibration, setVibration] = useState(true);
   const [loaded, setLoaded] = useState(false);
@@ -77,13 +104,15 @@ export default function App() {
     Promise.all([
       AsyncStorage.getItem(STORAGE_KEYS.coins),
       AsyncStorage.getItem(STORAGE_KEYS.difficulty),
-    ]).then(([savedCoins, savedDifficulty]) => {
+      AsyncStorage.getItem(STORAGE_KEYS.records),
+    ]).then(([savedCoins, savedDifficulty, savedRecords]) => {
       if (savedCoins) {
         setCoins(Number(savedCoins));
       } else {
         AsyncStorage.setItem(STORAGE_KEYS.coins, '10000');
       }
       if (savedDifficulty) setDifficulty(savedDifficulty);
+      if (savedRecords) setRecords(JSON.parse(savedRecords));
       setLoaded(true);
     });
   }, []);
@@ -93,6 +122,39 @@ export default function App() {
     const option = difficultyOptions.find((item) => item.name === value);
     if (option) setSelectedBet(option.bets[Math.min(1, option.bets.length - 1)]);
     await AsyncStorage.setItem(STORAGE_KEYS.difficulty, value);
+  };
+
+  const startBlackjack = async () => {
+    if (selectedBet > coins) return;
+    const nextCoins = coins - selectedBet;
+    setCoins(nextCoins);
+    await AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+    setGameRoundId((value) => value + 1);
+    setAppScreen('blackjackGame');
+  };
+
+  const settleBlackjack = (result: RoundResult) => {
+    const payout = payoutForResult(selectedBet, result);
+    setCoins((currentCoins) => {
+      const nextCoins = currentCoins + payout;
+      AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+      return nextCoins;
+    });
+
+    setRecords((currentRecords) => {
+      const record: GameRecord = {
+        id: `${Date.now()}-${gameRoundId}`,
+        game: '블랙잭',
+        result,
+        difficulty,
+        bet: selectedBet,
+        net: netForResult(selectedBet, result),
+        playedAt: new Date().toISOString(),
+      };
+      const nextRecords = [record, ...currentRecords].slice(0, 100);
+      AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(nextRecords));
+      return nextRecords;
+    });
   };
 
   if (!entered) {
@@ -141,9 +203,21 @@ export default function App() {
             onBack={() => setAppScreen('casinoCatalog')}
             onDifficultyChange={saveDifficulty}
             onBetChange={setSelectedBet}
+            onStart={startBlackjack}
           />
         )}
-        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, () => setAppScreen('casinoCatalog'), () => setAppScreen('blackjackSetup'))}
+        {appScreen === 'blackjackGame' && (
+          <BlackjackGameScreen
+            key={gameRoundId}
+            bet={selectedBet}
+            coins={coins}
+            difficulty={difficulty}
+            onSettle={settleBlackjack}
+            onPlayAgain={startBlackjack}
+            onExit={() => setAppScreen('casinoCatalog')}
+          />
+        )}
+        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, coins, records, () => setAppScreen('casinoCatalog'), () => setAppScreen('blackjackSetup'))}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
         {tabs.map((item) => {
@@ -196,23 +270,36 @@ function renderTab(
   setSound: (value: boolean) => void,
   vibration: boolean,
   setVibration: (value: boolean) => void,
+  coins: number,
+  records: GameRecord[],
   onOpenCasino: () => void,
   onOpenBlackjack: () => void,
 ) {
   if (tab === '게임') return <GamesScreen onOpenCasino={onOpenCasino} />;
-  if (tab === '지갑') return <WalletScreen />;
-  if (tab === '기록') return <RecordsScreen />;
+  if (tab === '지갑') return <WalletScreen coins={coins} records={records} />;
+  if (tab === '기록') return <RecordsScreen records={records} />;
   if (tab === '설정') {
     return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} />;
   }
-  return <HomeScreen difficulty={difficulty} onOpenBlackjack={onOpenBlackjack} />;
+  return <HomeScreen difficulty={difficulty} records={records} onOpenBlackjack={onOpenBlackjack} />;
 }
 
 function Page({ children }: { children: React.ReactNode }) {
   return <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
 }
 
-function HomeScreen({ difficulty, onOpenBlackjack }: { difficulty: string; onOpenBlackjack: () => void }) {
+function resultLabel(result: RoundResult) {
+  if (result === 'blackjack') return '블랙잭';
+  if (result === 'win') return '승리';
+  if (result === 'push') return '무승부';
+  return '패배';
+}
+
+function formatPlayedAt(value: string) {
+  return new Date(value).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: string; records: GameRecord[]; onOpenBlackjack: () => void }) {
   return (
     <Page>
       <Text style={styles.eyebrow}>오늘도 즐거운 한 판</Text>
@@ -231,9 +318,18 @@ function HomeScreen({ difficulty, onOpenBlackjack }: { difficulty: string; onOpe
 
       <Text style={styles.sectionTitle}>최근 플레이</Text>
       <View style={styles.panel}>
-        <Row title="블랙잭" subtitle="오늘 19:42 · 보통" value="+500 WC" positive />
-        <View style={styles.separator} />
-        <Row title="룰렛" subtitle="어제 22:10 · 쉬움" value="-100 WC" />
+        {records.length === 0 && <Text style={styles.emptyText}>아직 완료한 게임이 없습니다.</Text>}
+        {records.slice(0, 2).map((record, index) => (
+          <React.Fragment key={record.id}>
+            <Row
+              title={`블랙잭 · ${resultLabel(record.result)}`}
+              subtitle={`${formatPlayedAt(record.playedAt)} · ${record.difficulty}`}
+              value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
+              positive={record.net > 0}
+            />
+            {index < Math.min(records.length, 2) - 1 && <View style={styles.separator} />}
+          </React.Fragment>
+        ))}
       </View>
 
       <Text style={styles.sectionTitle}>오늘의 미션</Text>
@@ -329,8 +425,10 @@ function BlackjackSetupScreen(props: {
   onBack: () => void;
   onDifficultyChange: (value: string) => void;
   onBetChange: (value: number) => void;
+  onStart: () => void;
 }) {
   const selectedDifficulty = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  const canStart = props.selectedBet <= props.coins;
   return (
     <View style={styles.detailScreen}>
       <ScreenHeader title="블랙잭 설정" onBack={props.onBack} />
@@ -383,35 +481,164 @@ function BlackjackSetupScreen(props: {
           <Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} />
         </View>
 
-        <Pressable disabled style={[styles.primaryButton, styles.fullWidthButton, styles.disabledCard]}>
-          <Text style={styles.primaryButtonText}>게임 시작 · 준비 중</Text>
+        <Pressable disabled={!canStart} onPress={props.onStart} style={[styles.primaryButton, styles.fullWidthButton, !canStart && styles.disabledCard]}>
+          <Text style={styles.primaryButtonText}>게임 시작</Text>
         </Pressable>
-        <Text style={styles.setupNotice}>현재는 설정 화면까지 작동합니다. 실제 블랙잭 게임판은 다음 제작 단계에서 연결됩니다.</Text>
+        <Text style={styles.setupNotice}>베팅 금액은 게임을 시작할 때 차감되고, 결과에 따라 자동 정산됩니다.</Text>
       </ScrollView>
     </View>
   );
 }
 
-function WalletScreen() {
+function PlayingCard({ card, hidden = false }: { card: Card; hidden?: boolean }) {
+  if (hidden) {
+    return <View style={[styles.playingCard, styles.hiddenCard]}><Text style={styles.hiddenCardMark}>◆</Text></View>;
+  }
+  const red = card.suit === '♥' || card.suit === '♦';
+  return (
+    <View style={styles.playingCard}>
+      <Text style={[styles.playingCardRank, red && styles.redCard]}>{card.rank}</Text>
+      <Text style={[styles.playingCardSuit, red && styles.redCard]}>{card.suit}</Text>
+    </View>
+  );
+}
+
+function BlackjackGameScreen(props: {
+  bet: number;
+  coins: number;
+  difficulty: string;
+  onSettle: (result: RoundResult) => void;
+  onPlayAgain: () => void;
+  onExit: () => void;
+}) {
+  const initial = useRef(dealInitialRound(shuffleDeck(createDeck()))).current;
+  const [deck, setDeck] = useState(initial.deck);
+  const [player, setPlayer] = useState(initial.player);
+  const [dealer, setDealer] = useState(initial.dealer);
+  const [phase, setPhase] = useState<'player' | 'result'>('player');
+  const [result, setResult] = useState<RoundResult | null>(null);
+  const settled = useRef(false);
+
+  const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[]) => {
+    const nextResult = resolveRound(nextPlayer, nextDealer);
+    setPlayer(nextPlayer);
+    setDealer(nextDealer);
+    setDeck(nextDeck);
+    setResult(nextResult);
+    setPhase('result');
+    if (!settled.current) {
+      settled.current = true;
+      props.onSettle(nextResult);
+    }
+  };
+
+  useEffect(() => {
+    if (isBlackjack(initial.player) || isBlackjack(initial.dealer)) {
+      completeRound(initial.player, initial.dealer, initial.deck);
+    }
+  }, []);
+
+  const hit = () => {
+    if (phase !== 'player') return;
+    const next = drawCard(deck, player);
+    setDeck(next.deck);
+    setPlayer(next.hand);
+    if (handValue(next.hand) >= 21) {
+      if (handValue(next.hand) > 21) {
+        completeRound(next.hand, dealer, next.deck);
+      } else {
+        const dealerResult = playDealer(next.deck, dealer);
+        completeRound(next.hand, dealerResult.hand, dealerResult.deck);
+      }
+    }
+  };
+
+  const stand = () => {
+    if (phase !== 'player') return;
+    const dealerResult = playDealer(deck, dealer);
+    completeRound(player, dealerResult.hand, dealerResult.deck);
+  };
+
+  const net = result ? netForResult(props.bet, result) : 0;
+  const dealerScore = phase === 'result' ? handValue(dealer) : '?';
+
+  return (
+    <View style={styles.blackjackTable}>
+      <View style={styles.gameTopBar}>
+        <Text style={styles.gameTopTitle}>BLACKJACK</Text>
+        <View style={styles.gameBetPill}><Text style={styles.gameBetText}>베팅 {props.bet.toLocaleString()} WC</Text></View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.handHeader}>
+          <Text style={styles.handTitle}>딜러</Text>
+          <Text style={styles.scoreBadge}>{dealerScore}</Text>
+        </View>
+        <View style={styles.cardRow}>
+          {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} hidden={phase === 'player' && index === 1} />)}
+        </View>
+
+        <View style={styles.tableRule}><Text style={styles.tableRuleText}>딜러는 17 이상에서 멈춥니다</Text></View>
+
+        <View style={styles.handHeader}>
+          <Text style={styles.handTitle}>플레이어</Text>
+          <Text style={styles.scoreBadge}>{handValue(player)}</Text>
+        </View>
+        <View style={styles.cardRow}>
+          {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} />)}
+        </View>
+
+        {phase === 'player' && (
+          <View style={styles.gameActions}>
+            <Pressable style={[styles.gameActionButton, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
+            <Pressable style={[styles.gameActionButton, styles.standButton]} onPress={stand}><Text style={styles.gameActionText}>스탠드</Text><Text style={styles.gameActionSubtext}>멈추기</Text></Pressable>
+          </View>
+        )}
+
+        {phase === 'result' && result && (
+          <View style={styles.resultPanel}>
+            <Text style={styles.resultTitle}>{resultLabel(result)}</Text>
+            <Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text>
+            <Text style={styles.resultDetail}>플레이어 {handValue(player)} · 딜러 {handValue(dealer)}</Text>
+            <Pressable disabled={props.coins < props.bet} style={[styles.primaryButton, styles.fullWidthButton, props.coins < props.bet && styles.disabledCard]} onPress={props.onPlayAgain}>
+              <Text style={styles.primaryButtonText}>같은 금액으로 다시 하기</Text>
+            </Pressable>
+            <Pressable style={styles.exitButton} onPress={props.onExit}><Text style={styles.exitButtonText}>카지노 목록으로</Text></Pressable>
+          </View>
+        )}
+
+        <Text style={styles.gameFooter}>난이도 {props.difficulty} · 게임 전용 가상 코인</Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+function WalletScreen({ coins, records }: { coins: number; records: GameRecord[] }) {
+  const totalNet = records.reduce((sum, record) => sum + record.net, 0);
+  const returnRate = totalNet / 10000 * 100;
+  const categoryComparison = ['카지노', '한국 전통', '포커·카드', '마작', '레이싱', '세계 게임'];
   return (
     <Page>
       <Text style={styles.pageTitle}>지갑</Text>
       <View style={styles.balanceCard}>
         <Text style={styles.muted}>전체 자산</Text>
-        <Text style={styles.balance}>10,000 WC</Text>
-        <Text style={styles.positive}>이번 달 +2,450 WC (+24.5%)</Text>
+        <Text style={styles.balance}>{coins.toLocaleString()} WC</Text>
+        <Text style={totalNet >= 0 ? styles.positive : styles.negative}>누적 {totalNet > 0 ? '+' : ''}{totalNet.toLocaleString()} WC ({returnRate.toFixed(1)}%)</Text>
         <View style={styles.chart}>
           {[30, 42, 36, 55, 48, 72, 64, 88].map((height, index) => <View key={index} style={[styles.chartBar, { height }]} />)}
         </View>
       </View>
       <Text style={styles.sectionTitle}>카테고리별 비교</Text>
       <View style={styles.panel}>
-        {categoryResults.map(([name, value, positive], index) => (
+        {categoryComparison.map((name, index) => {
+          const value = name === '카지노' ? totalNet : 0;
+          return (
           <React.Fragment key={name}>
-            <Row title={name} value={value} positive={positive} />
-            {index < categoryResults.length - 1 && <View style={styles.separator} />}
+            <Row title={name} value={`${value > 0 ? '+' : ''}${value.toLocaleString()} WC`} positive={value > 0} />
+            {index < categoryComparison.length - 1 && <View style={styles.separator} />}
           </React.Fragment>
-        ))}
+          );
+        })}
       </View>
       <Text style={styles.sectionTitle}>분석 메뉴</Text>
       <View style={styles.panel}>
@@ -425,23 +652,47 @@ function WalletScreen() {
   );
 }
 
-function RecordsScreen() {
+function maxWinStreak(records: GameRecord[]) {
+  let current = 0;
+  let maximum = 0;
+  for (const record of [...records].reverse()) {
+    if (record.result === 'win' || record.result === 'blackjack') {
+      current += 1;
+      maximum = Math.max(maximum, current);
+    } else {
+      current = 0;
+    }
+  }
+  return maximum;
+}
+
+function RecordsScreen({ records }: { records: GameRecord[] }) {
+  const wins = records.filter((record) => record.result === 'win' || record.result === 'blackjack').length;
+  const winRate = records.length > 0 ? wins / records.length * 100 : 0;
+  const totalNet = records.reduce((sum, record) => sum + record.net, 0);
   return (
     <Page>
       <Text style={styles.pageTitle}>기록</Text>
       <View style={styles.statsGrid}>
-        <Stat label="전체 플레이" value="12판" />
-        <Stat label="승률" value="58.3%" />
-        <Stat label="최고 연승" value="3연승" />
-        <Stat label="총 손익" value="+2,450" positive />
+        <Stat label="전체 플레이" value={`${records.length}판`} />
+        <Stat label="승률" value={`${winRate.toFixed(1)}%`} />
+        <Stat label="최고 연승" value={`${maxWinStreak(records)}연승`} />
+        <Stat label="총 손익" value={`${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString()}`} positive={totalNet > 0} />
       </View>
       <Text style={styles.sectionTitle}>최근 경기</Text>
       <View style={styles.panel}>
-        <Row title="블랙잭 · 승리" subtitle="보통 · 베팅 500 WC" value="+500 WC" positive />
-        <View style={styles.separator} />
-        <Row title="룰렛 · 패배" subtitle="쉬움 · 베팅 100 WC" value="-100 WC" />
-        <View style={styles.separator} />
-        <Row title="블랙잭 · 승리" subtitle="보통 · 베팅 300 WC" value="+300 WC" positive />
+        {records.length === 0 && <Text style={styles.emptyText}>블랙잭을 완료하면 기록이 여기에 저장됩니다.</Text>}
+        {records.map((record, index) => (
+          <React.Fragment key={record.id}>
+            <Row
+              title={`블랙잭 · ${resultLabel(record.result)}`}
+              subtitle={`${record.difficulty} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
+              value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
+              positive={record.net > 0}
+            />
+            {index < records.length - 1 && <View style={styles.separator} />}
+          </React.Fragment>
+        ))}
       </View>
     </Page>
   );
@@ -558,6 +809,8 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
   rowValue: { color: colors.text, fontSize: 14, fontWeight: '800' },
   positive: { color: colors.green },
+  negative: { color: colors.red },
+  emptyText: { color: colors.muted, fontSize: 13, lineHeight: 20, paddingVertical: 22, textAlign: 'center' },
   separator: { height: 1, backgroundColor: colors.border },
   progressTrack: { height: 7, marginBottom: 16, borderRadius: 4, backgroundColor: '#252D39', overflow: 'hidden' },
   progressValue: { width: '33%', height: '100%', backgroundColor: colors.gold },
@@ -611,6 +864,37 @@ const styles = StyleSheet.create({
   setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
+  blackjackTable: { flex: 1, backgroundColor: '#07251D' },
+  gameTopBar: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
+  gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
+  gameBetPill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 18, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
+  gameBetText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
+  tableContent: { padding: 18, paddingBottom: 38 },
+  handHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 },
+  handTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
+  cardRow: { minHeight: 126, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  playingCard: { width: 72, height: 108, borderRadius: 10, padding: 8, justifyContent: 'space-between', backgroundColor: '#F7F1E3', borderWidth: 1, borderColor: '#D4C9B2' },
+  playingCardRank: { color: '#121212', fontSize: 21, fontWeight: '900' },
+  playingCardSuit: { color: '#121212', fontSize: 29, alignSelf: 'center' },
+  redCard: { color: '#C43A40' },
+  hiddenCard: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#172845', borderWidth: 3, borderColor: '#D4A93F' },
+  hiddenCardMark: { color: colors.gold, fontSize: 30 },
+  tableRule: { alignSelf: 'center', paddingHorizontal: 12, paddingVertical: 7, marginVertical: 12, borderRadius: 15, backgroundColor: '#0D342A' },
+  tableRuleText: { color: '#9DBAAF', fontSize: 11 },
+  gameActions: { flexDirection: 'row', gap: 10, marginTop: 24 },
+  gameActionButton: { flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
+  hitButton: { backgroundColor: colors.gold },
+  standButton: { backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#46658F' },
+  gameActionText: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  gameActionSubtext: { color: '#D6D9DF', fontSize: 10, marginTop: 3 },
+  resultPanel: { marginTop: 22, padding: 18, alignItems: 'center', borderRadius: 20, backgroundColor: '#0D1917', borderWidth: 1, borderColor: '#796126' },
+  resultTitle: { color: colors.goldLight, fontSize: 30, fontWeight: '900' },
+  resultNet: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 7 },
+  resultDetail: { color: colors.muted, fontSize: 12, marginTop: 7 },
+  exitButton: { minHeight: 48, width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  exitButtonText: { color: colors.goldLight, fontSize: 14, fontWeight: '800' },
+  gameFooter: { color: '#7F9E92', fontSize: 11, textAlign: 'center', marginTop: 18 },
   balanceCard: { minHeight: 235, backgroundColor: '#111A24', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#6D5520' },
   balance: { color: colors.text, fontSize: 32, fontWeight: '900', marginVertical: 8 },
   chart: { height: 100, flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
