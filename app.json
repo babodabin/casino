@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "World Casino",
+    "slug": "world-casino",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.worldcasino.app"
+    },
+    "android": {
+      "package": "com.worldcasino.app"
+    },
+    "plugins": [
+      "expo-status-bar"
+    ]
+  }
+}
