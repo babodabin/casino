@@ -50,3 +50,11 @@ test('일반 승리와 블랙잭 보상을 계산한다', () => {
   assert.equal(netForResult(100, 'loss'), -100);
   assert.equal(netForResult(100, 'push'), 0);
 });
+
+test('더블다운은 두 배가 된 전체 베팅으로 정산한다', () => {
+  const doubledBet = 200;
+  assert.equal(payoutForResult(doubledBet, 'win'), 400);
+  assert.equal(netForResult(doubledBet, 'win'), 200);
+  assert.equal(netForResult(doubledBet, 'loss'), -200);
+  assert.equal(netForResult(doubledBet, 'push'), 0);
+});

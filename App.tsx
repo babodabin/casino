@@ -133,8 +133,16 @@ export default function App() {
     setAppScreen('blackjackGame');
   };
 
-  const settleBlackjack = (result: RoundResult) => {
-    const payout = payoutForResult(selectedBet, result);
+  const doubleBlackjack = () => {
+    if (selectedBet > coins) return false;
+    const nextCoins = coins - selectedBet;
+    setCoins(nextCoins);
+    AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+    return true;
+  };
+
+  const settleBlackjack = (result: RoundResult, roundBet = selectedBet) => {
+    const payout = payoutForResult(roundBet, result);
     setCoins((currentCoins) => {
       const nextCoins = currentCoins + payout;
       AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
@@ -147,8 +155,8 @@ export default function App() {
         game: '블랙잭',
         result,
         difficulty,
-        bet: selectedBet,
-        net: netForResult(selectedBet, result),
+        bet: roundBet,
+        net: netForResult(roundBet, result),
         playedAt: new Date().toISOString(),
       };
       const nextRecords = [record, ...currentRecords].slice(0, 100);
@@ -212,6 +220,7 @@ export default function App() {
             bet={selectedBet}
             coins={coins}
             difficulty={difficulty}
+            onDoubleDown={doubleBlackjack}
             onSettle={settleBlackjack}
             onPlayAgain={startBlackjack}
             onExit={() => setAppScreen('casinoCatalog')}
@@ -507,7 +516,8 @@ function BlackjackGameScreen(props: {
   bet: number;
   coins: number;
   difficulty: string;
-  onSettle: (result: RoundResult) => void;
+  onDoubleDown: () => boolean;
+  onSettle: (result: RoundResult, roundBet?: number) => void;
   onPlayAgain: () => void;
   onExit: () => void;
 }) {
@@ -517,18 +527,20 @@ function BlackjackGameScreen(props: {
   const [dealer, setDealer] = useState(initial.dealer);
   const [phase, setPhase] = useState<'player' | 'result'>('player');
   const [result, setResult] = useState<RoundResult | null>(null);
+  const [totalBet, setTotalBet] = useState(props.bet);
   const settled = useRef(false);
 
-  const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[]) => {
+  const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
     const nextResult = resolveRound(nextPlayer, nextDealer);
     setPlayer(nextPlayer);
     setDealer(nextDealer);
     setDeck(nextDeck);
     setResult(nextResult);
+    setTotalBet(roundBet);
     setPhase('result');
     if (!settled.current) {
       settled.current = true;
-      props.onSettle(nextResult);
+      props.onSettle(nextResult, roundBet);
     }
   };
 
@@ -559,14 +571,26 @@ function BlackjackGameScreen(props: {
     completeRound(player, dealerResult.hand, dealerResult.deck);
   };
 
-  const net = result ? netForResult(props.bet, result) : 0;
+  const doubleDown = () => {
+    if (phase !== 'player' || player.length !== 2 || !props.onDoubleDown()) return;
+    const doubledBet = props.bet * 2;
+    const next = drawCard(deck, player);
+    if (handValue(next.hand) > 21) {
+      completeRound(next.hand, dealer, next.deck, doubledBet);
+      return;
+    }
+    const dealerResult = playDealer(next.deck, dealer);
+    completeRound(next.hand, dealerResult.hand, dealerResult.deck, doubledBet);
+  };
+
+  const net = result ? netForResult(totalBet, result) : 0;
   const dealerScore = phase === 'result' ? handValue(dealer) : '?';
 
   return (
     <View style={styles.blackjackTable}>
       <View style={styles.gameTopBar}>
         <Text style={styles.gameTopTitle}>BLACKJACK</Text>
-        <View style={styles.gameBetPill}><Text style={styles.gameBetText}>베팅 {props.bet.toLocaleString()} WC</Text></View>
+        <View style={styles.gameBetPill}><Text style={styles.gameBetText}>베팅 {totalBet.toLocaleString()} WC</Text></View>
       </View>
 
       <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
@@ -589,9 +613,21 @@ function BlackjackGameScreen(props: {
         </View>
 
         {phase === 'player' && (
-          <View style={styles.gameActions}>
+          <View>
+            <View style={styles.gameActions}>
             <Pressable style={[styles.gameActionButton, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
             <Pressable style={[styles.gameActionButton, styles.standButton]} onPress={stand}><Text style={styles.gameActionText}>스탠드</Text><Text style={styles.gameActionSubtext}>멈추기</Text></Pressable>
+            </View>
+            {player.length === 2 && (
+              <Pressable
+                disabled={props.coins < props.bet}
+                style={[styles.doubleButton, props.coins < props.bet && styles.disabledCard]}
+                onPress={doubleDown}
+              >
+                <Text style={styles.doubleButtonText}>더블다운 · {props.bet.toLocaleString()} WC 추가</Text>
+                <Text style={styles.doubleButtonSubtext}>베팅을 두 배로 올리고 카드 한 장만 받기</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
@@ -886,6 +922,9 @@ const styles = StyleSheet.create({
   gameActionButton: { flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 16 },
   hitButton: { backgroundColor: colors.gold },
   standButton: { backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#46658F' },
+  doubleButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#182B24' },
+  doubleButtonText: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  doubleButtonSubtext: { color: colors.muted, fontSize: 11, marginTop: 4 },
   gameActionText: { color: colors.text, fontSize: 18, fontWeight: '900' },
   gameActionSubtext: { color: '#D6D9DF', fontSize: 10, marginTop: 3 },
   resultPanel: { marginTop: 22, padding: 18, alignItems: 'center', borderRadius: 20, backgroundColor: '#0D1917', borderWidth: 1, borderColor: '#796126' },
