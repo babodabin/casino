@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import {
   createDeck,
+  canSplit,
   dealInitialRound,
   drawCard,
   handValue,
@@ -151,7 +152,7 @@ export default function App() {
 
     setRecords((currentRecords) => {
       const record: GameRecord = {
-        id: `${Date.now()}-${gameRoundId}`,
+        id: `${Date.now()}-${gameRoundId}-${currentRecords.length}`,
         game: '블랙잭',
         result,
         difficulty,
@@ -528,6 +529,9 @@ function BlackjackGameScreen(props: {
   const [phase, setPhase] = useState<'player' | 'result'>('player');
   const [result, setResult] = useState<RoundResult | null>(null);
   const [totalBet, setTotalBet] = useState(props.bet);
+  const [splitHand, setSplitHand] = useState<Card[] | null>(null);
+  const [activeHand, setActiveHand] = useState<0 | 1>(0);
+  const [splitResults, setSplitResults] = useState<RoundResult[] | null>(null);
   const settled = useRef(false);
 
   const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
@@ -552,10 +556,19 @@ function BlackjackGameScreen(props: {
 
   const hit = () => {
     if (phase !== 'player') return;
-    const next = drawCard(deck, player);
+    const currentHand = activeHand === 0 ? player : splitHand!;
+    const next = drawCard(deck, currentHand);
     setDeck(next.deck);
-    setPlayer(next.hand);
+    if (activeHand === 0) setPlayer(next.hand); else setSplitHand(next.hand);
     if (handValue(next.hand) >= 21) {
+      if (splitHand) {
+        if (activeHand === 0) {
+          setActiveHand(1);
+        } else {
+          finishSplit(player, next.hand, next.deck);
+        }
+        return;
+      }
       if (handValue(next.hand) > 21) {
         completeRound(next.hand, dealer, next.deck);
       } else {
@@ -567,12 +580,47 @@ function BlackjackGameScreen(props: {
 
   const stand = () => {
     if (phase !== 'player') return;
+    if (splitHand) {
+      if (activeHand === 0) {
+        setActiveHand(1);
+      } else {
+        finishSplit(player, splitHand, deck);
+      }
+      return;
+    }
     const dealerResult = playDealer(deck, dealer);
     completeRound(player, dealerResult.hand, dealerResult.deck);
   };
 
+  const finishSplit = (firstHand: Card[], secondHand: Card[], nextDeck: Card[]) => {
+    const dealerResult = playDealer(nextDeck, dealer);
+    const results = [resolveRound(firstHand, dealerResult.hand), resolveRound(secondHand, dealerResult.hand)];
+    setPlayer(firstHand);
+    setSplitHand(secondHand);
+    setDealer(dealerResult.hand);
+    setDeck(dealerResult.deck);
+    setSplitResults(results);
+    setPhase('result');
+    if (!settled.current) {
+      settled.current = true;
+      props.onSettle(results[0], props.bet);
+      props.onSettle(results[1], props.bet);
+    }
+  };
+
+  const split = () => {
+    if (phase !== 'player' || !canSplit(player) || !props.onDoubleDown()) return;
+    const firstDraw = drawCard(deck, [player[0]]);
+    const secondDraw = drawCard(firstDraw.deck, [player[1]]);
+    setPlayer(firstDraw.hand);
+    setSplitHand(secondDraw.hand);
+    setDeck(secondDraw.deck);
+    setTotalBet(props.bet * 2);
+    setActiveHand(0);
+  };
+
   const doubleDown = () => {
-    if (phase !== 'player' || player.length !== 2 || !props.onDoubleDown()) return;
+    if (phase !== 'player' || splitHand || player.length !== 2 || !props.onDoubleDown()) return;
     const doubledBet = props.bet * 2;
     const next = drawCard(deck, player);
     if (handValue(next.hand) > 21) {
@@ -584,6 +632,7 @@ function BlackjackGameScreen(props: {
   };
 
   const net = result ? netForResult(totalBet, result) : 0;
+  const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
   const dealerScore = phase === 'result' ? handValue(dealer) : '?';
 
   return (
@@ -605,12 +654,24 @@ function BlackjackGameScreen(props: {
         <View style={styles.tableRule}><Text style={styles.tableRuleText}>딜러는 17 이상에서 멈춥니다</Text></View>
 
         <View style={styles.handHeader}>
-          <Text style={styles.handTitle}>플레이어</Text>
+          <Text style={styles.handTitle}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text>
           <Text style={styles.scoreBadge}>{handValue(player)}</Text>
         </View>
         <View style={styles.cardRow}>
           {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} />)}
         </View>
+
+        {splitHand && (
+          <>
+            <View style={styles.handHeader}>
+              <Text style={styles.handTitle}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text>
+              <Text style={styles.scoreBadge}>{handValue(splitHand)}</Text>
+            </View>
+            <View style={styles.cardRow}>
+              {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} />)}
+            </View>
+          </>
+        )}
 
         {phase === 'player' && (
           <View>
@@ -618,7 +679,7 @@ function BlackjackGameScreen(props: {
             <Pressable style={[styles.gameActionButton, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
             <Pressable style={[styles.gameActionButton, styles.standButton]} onPress={stand}><Text style={styles.gameActionText}>스탠드</Text><Text style={styles.gameActionSubtext}>멈추기</Text></Pressable>
             </View>
-            {player.length === 2 && (
+            {!splitHand && player.length === 2 && (
               <Pressable
                 disabled={props.coins < props.bet}
                 style={[styles.doubleButton, props.coins < props.bet && styles.disabledCard]}
@@ -628,10 +689,32 @@ function BlackjackGameScreen(props: {
                 <Text style={styles.doubleButtonSubtext}>베팅을 두 배로 올리고 카드 한 장만 받기</Text>
               </Pressable>
             )}
+            {!splitHand && canSplit(player) && (
+              <Pressable
+                disabled={props.coins < props.bet}
+                style={[styles.splitButton, props.coins < props.bet && styles.disabledCard]}
+                onPress={split}
+              >
+                <Text style={styles.doubleButtonText}>스플릿 · {props.bet.toLocaleString()} WC 추가</Text>
+                <Text style={styles.doubleButtonSubtext}>같은 값의 카드 두 장을 두 손으로 나누기</Text>
+              </Pressable>
+            )}
           </View>
         )}
 
-        {phase === 'result' && result && (
+        {phase === 'result' && splitResults && splitHand && (
+          <View style={styles.resultPanel}>
+            <Text style={styles.resultTitle}>스플릿 결과</Text>
+            <Text style={[styles.resultNet, splitNet > 0 && styles.positive, splitNet < 0 && styles.negative]}>{splitNet > 0 ? '+' : ''}{splitNet.toLocaleString()} WC</Text>
+            <Text style={styles.resultDetail}>손 1 {resultLabel(splitResults[0])} · 손 2 {resultLabel(splitResults[1])}</Text>
+            <Pressable disabled={props.coins < props.bet} style={[styles.primaryButton, styles.fullWidthButton, props.coins < props.bet && styles.disabledCard]} onPress={props.onPlayAgain}>
+              <Text style={styles.primaryButtonText}>새 게임 시작</Text>
+            </Pressable>
+            <Pressable style={styles.exitButton} onPress={props.onExit}><Text style={styles.exitButtonText}>카지노 목록으로</Text></Pressable>
+          </View>
+        )}
+
+        {phase === 'result' && result && !splitResults && (
           <View style={styles.resultPanel}>
             <Text style={styles.resultTitle}>{resultLabel(result)}</Text>
             <Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text>
@@ -923,6 +1006,7 @@ const styles = StyleSheet.create({
   hitButton: { backgroundColor: colors.gold },
   standButton: { backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#46658F' },
   doubleButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#182B24' },
+  splitButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: '#7AA6D8', backgroundColor: '#17283D' },
   doubleButtonText: { color: colors.text, fontSize: 15, fontWeight: '900' },
   doubleButtonSubtext: { color: colors.muted, fontSize: 11, marginTop: 4 },
   gameActionText: { color: colors.text, fontSize: 18, fontWeight: '900' },

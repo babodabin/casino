@@ -52,6 +52,12 @@ export function isBlackjack(cards: Card[]): boolean {
   return cards.length === 2 && handValue(cards) === 21;
 }
 
+export function canSplit(cards: Card[]): boolean {
+  if (cards.length !== 2) return false;
+  const splitValue = (card: Card) => ['10', 'J', 'Q', 'K'].includes(card.rank) ? 10 : card.rank;
+  return splitValue(cards[0]) === splitValue(cards[1]);
+}
+
 export function dealInitialRound(deck: Card[]) {
   if (deck.length < 4) throw new Error('카드가 부족합니다.');
   const remaining = [...deck];

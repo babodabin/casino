@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createDeck,
+  canSplit,
   handValue,
   isBlackjack,
   netForResult,
@@ -57,4 +58,11 @@ test('더블다운은 두 배가 된 전체 베팅으로 정산한다', () => {
   assert.equal(netForResult(doubledBet, 'win'), 200);
   assert.equal(netForResult(doubledBet, 'loss'), -200);
   assert.equal(netForResult(doubledBet, 'push'), 0);
+});
+
+test('같은 값의 첫 두 장만 스플릿할 수 있다', () => {
+  assert.equal(canSplit([card('8'), card('8')]), true);
+  assert.equal(canSplit([card('10'), card('K')]), true);
+  assert.equal(canSplit([card('8'), card('9')]), false);
+  assert.equal(canSplit([card('8'), card('8'), card('8')]), false);
 });
