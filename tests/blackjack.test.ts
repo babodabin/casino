@@ -4,6 +4,8 @@ import {
   createDeck,
   canSplit,
   handValue,
+  insurancePayout,
+  insuranceStake,
   isBlackjack,
   netForResult,
   payoutForResult,
@@ -65,4 +67,11 @@ test('같은 값의 첫 두 장만 스플릿할 수 있다', () => {
   assert.equal(canSplit([card('10'), card('K')]), true);
   assert.equal(canSplit([card('8'), card('9')]), false);
   assert.equal(canSplit([card('8'), card('8'), card('8')]), false);
+});
+
+test('보험은 원래 베팅의 절반이며 딜러 블랙잭이면 2대1 이익을 지급한다', () => {
+  assert.equal(insuranceStake(500), 250);
+  assert.equal(insuranceStake(25), 12);
+  assert.equal(insurancePayout(250, true), 750);
+  assert.equal(insurancePayout(250, false), 0);
 });

@@ -58,6 +58,14 @@ export function canSplit(cards: Card[]): boolean {
   return splitValue(cards[0]) === splitValue(cards[1]);
 }
 
+export function insuranceStake(bet: number): number {
+  return Math.floor(bet / 2);
+}
+
+export function insurancePayout(stake: number, dealerHasBlackjack: boolean): number {
+  return dealerHasBlackjack ? stake * 3 : 0;
+}
+
 export function dealInitialRound(deck: Card[]) {
   if (deck.length < 4) throw new Error('카드가 부족합니다.');
   const remaining = [...deck];

@@ -16,6 +16,8 @@ import {
   dealInitialRound,
   drawCard,
   handValue,
+  insurancePayout,
+  insuranceStake,
   isBlackjack,
   netForResult,
   payoutForResult,
@@ -142,6 +144,27 @@ export default function App() {
     return true;
   };
 
+  const placeInsurance = (stake: number) => {
+    if (stake > coins) return false;
+    setCoins((currentCoins) => {
+      const nextCoins = currentCoins - stake;
+      AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+      return nextCoins;
+    });
+    return true;
+  };
+
+  const settleInsurance = (won: boolean, stake: number) => {
+    const payout = insurancePayout(stake, won);
+    if (payout > 0) {
+      setCoins((currentCoins) => {
+        const nextCoins = currentCoins + payout;
+        AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+        return nextCoins;
+      });
+    }
+  };
+
   const settleBlackjack = (result: RoundResult, roundBet = selectedBet) => {
     const payout = payoutForResult(roundBet, result);
     setCoins((currentCoins) => {
@@ -222,6 +245,8 @@ export default function App() {
             coins={coins}
             difficulty={difficulty}
             onDoubleDown={doubleBlackjack}
+            onPlaceInsurance={placeInsurance}
+            onSettleInsurance={settleInsurance}
             onSettle={settleBlackjack}
             onPlayAgain={startBlackjack}
             onExit={() => setAppScreen('casinoCatalog')}
@@ -518,6 +543,8 @@ function BlackjackGameScreen(props: {
   coins: number;
   difficulty: string;
   onDoubleDown: () => boolean;
+  onPlaceInsurance: (stake: number) => boolean;
+  onSettleInsurance: (won: boolean, stake: number) => void;
   onSettle: (result: RoundResult, roundBet?: number) => void;
   onPlayAgain: () => void;
   onExit: () => void;
@@ -532,6 +559,9 @@ function BlackjackGameScreen(props: {
   const [splitHand, setSplitHand] = useState<Card[] | null>(null);
   const [activeHand, setActiveHand] = useState<0 | 1>(0);
   const [splitResults, setSplitResults] = useState<RoundResult[] | null>(null);
+  const insuranceAmount = insuranceStake(props.bet);
+  const [insuranceOpen, setInsuranceOpen] = useState(initial.dealer[0].rank === 'A');
+  const [insuranceMessage, setInsuranceMessage] = useState<string | null>(null);
   const settled = useRef(false);
 
   const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
@@ -549,10 +579,27 @@ function BlackjackGameScreen(props: {
   };
 
   useEffect(() => {
+    if (initial.dealer[0].rank === 'A') return;
     if (isBlackjack(initial.player) || isBlackjack(initial.dealer)) {
       completeRound(initial.player, initial.dealer, initial.deck);
     }
   }, []);
+
+  const decideInsurance = (takeInsurance: boolean) => {
+    if (!insuranceOpen) return;
+    const dealerBlackjack = isBlackjack(dealer);
+    if (takeInsurance) {
+      if (!props.onPlaceInsurance(insuranceAmount)) return;
+      props.onSettleInsurance(dealerBlackjack, insuranceAmount);
+      setInsuranceMessage(dealerBlackjack ? `보험 적중 · +${(insuranceAmount * 2).toLocaleString()} WC` : `보험 손실 · -${insuranceAmount.toLocaleString()} WC`);
+    } else {
+      setInsuranceMessage('보험을 선택하지 않았습니다');
+    }
+    setInsuranceOpen(false);
+    if (dealerBlackjack || isBlackjack(player)) {
+      completeRound(player, dealer, deck);
+    }
+  };
 
   const hit = () => {
     if (phase !== 'player') return;
@@ -653,6 +700,22 @@ function BlackjackGameScreen(props: {
 
         <View style={styles.tableRule}><Text style={styles.tableRuleText}>딜러는 17 이상에서 멈춥니다</Text></View>
 
+        {insuranceOpen && (
+          <View style={styles.insurancePanel}>
+            <Text style={styles.insuranceTitle}>딜러의 공개 카드가 에이스입니다</Text>
+            <Text style={styles.insuranceText}>보험 {insuranceAmount.toLocaleString()} WC를 걸까요? 딜러가 블랙잭이면 2대1 이익을 받습니다.</Text>
+            <View style={styles.gameActions}>
+              <Pressable
+                disabled={props.coins < insuranceAmount}
+                style={[styles.gameActionButton, styles.insuranceButton, props.coins < insuranceAmount && styles.disabledCard]}
+                onPress={() => decideInsurance(true)}
+              ><Text style={styles.gameActionText}>보험 가입</Text></Pressable>
+              <Pressable style={[styles.gameActionButton, styles.standButton]} onPress={() => decideInsurance(false)}><Text style={styles.gameActionText}>가입 안 함</Text></Pressable>
+            </View>
+          </View>
+        )}
+        {insuranceMessage && <Text style={styles.insuranceMessage}>{insuranceMessage}</Text>}
+
         <View style={styles.handHeader}>
           <Text style={styles.handTitle}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text>
           <Text style={styles.scoreBadge}>{handValue(player)}</Text>
@@ -673,7 +736,7 @@ function BlackjackGameScreen(props: {
           </>
         )}
 
-        {phase === 'player' && (
+        {phase === 'player' && !insuranceOpen && (
           <View>
             <View style={styles.gameActions}>
             <Pressable style={[styles.gameActionButton, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
@@ -1007,6 +1070,11 @@ const styles = StyleSheet.create({
   standButton: { backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#46658F' },
   doubleButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#182B24' },
   splitButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: '#7AA6D8', backgroundColor: '#17283D' },
+  insurancePanel: { marginTop: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#17271F' },
+  insuranceTitle: { color: colors.goldLight, fontSize: 16, fontWeight: '900' },
+  insuranceText: { color: colors.text, fontSize: 12, lineHeight: 19, marginTop: 6 },
+  insuranceButton: { backgroundColor: '#7B5A12', borderWidth: 1, borderColor: colors.gold },
+  insuranceMessage: { color: colors.goldLight, fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 12 },
   doubleButtonText: { color: colors.text, fontSize: 15, fontWeight: '900' },
   doubleButtonSubtext: { color: colors.muted, fontSize: 11, marginTop: 4 },
   gameActionText: { color: colors.text, fontSize: 18, fontWeight: '900' },
