@@ -3,5 +3,6 @@ node_modules/
 dist/
 dist-test/
 dist-web/
+dist-pages-check/
 web-build/
 *.log
