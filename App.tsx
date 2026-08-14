@@ -29,7 +29,10 @@ import {
 } from './src/blackjack';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'casinoCatalog' | 'blackjackSetup' | 'blackjackGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame';
+
+type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
+type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
@@ -49,13 +52,51 @@ const difficultyOptions = [
   { name: '전문가', min: 1000, max: 50000, bets: [1000, 5000, 10000, 50000] },
 ];
 
-const casinoGames = [
-  { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', available: true },
-  { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', available: false },
-  { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', available: false },
-  { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', available: false },
-  { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', available: false },
-  { name: '슬롯', icon: '7', description: '같은 그림 조합을 완성하는 머신 게임', available: false },
+const gameCategories: GameCategory[] = [
+  { name: '한국 전통', icon: '花', detail: '고스톱 · 맞고 · 섰다', eyebrow: 'KOREAN CLASSICS', games: [
+    { name: '고스톱', icon: '花', description: '화투패를 모아 점수를 겨루는 대표 게임', status: 'planned' },
+    { name: '맞고', icon: '二', description: '두 명이 빠르게 즐기는 고스톱', status: 'planned' },
+    { name: '섰다', icon: '光', description: '두 장의 화투 조합으로 승부', status: 'planned' },
+    { name: '도리짓고땡', icon: '十', description: '패를 나누어 두 조합을 완성', status: 'planned' },
+    { name: '민화투', icon: '月', description: '그림과 띠를 모으는 전통 화투', status: 'planned' },
+    { name: '육백', icon: '六', description: '화투 점수를 누적하는 팀 게임', status: 'planned' },
+  ]},
+  { name: '카지노', icon: '◆', detail: '블랙잭 · 룰렛 · 바카라', eyebrow: 'CASINO GAMES', games: [
+    { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
+    { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'planned' },
+    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'planned' },
+    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'planned' },
+    { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'planned' },
+    { name: '슬롯', icon: '7', description: '같은 그림 조합을 완성하는 머신 게임', status: 'planned' },
+  ]},
+  { name: '포커·카드', icon: '♠', detail: '홀덤 · 오마하 · 포커', eyebrow: 'POKER & CARDS', games: [
+    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'planned' },
+    { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'planned' },
+    { name: '세븐 포커', icon: '7♠', description: '일곱 장 중 최고의 다섯 장을 선택', status: 'planned' },
+    { name: '파이브 카드 드로우', icon: '5', description: '카드를 교환해 족보를 완성', status: 'planned' },
+    { name: '비디오 포커', icon: 'VP', description: '기계와 즐기는 빠른 포커', status: 'planned' },
+    { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패를 함께 겨루기', status: 'planned' },
+  ]},
+  { name: '마작', icon: '發', detail: '리치 · 중국식 마작', eyebrow: 'MAHJONG', games: [
+    { name: '리치 마작', icon: '立', description: '일본식 규칙과 역으로 즐기는 마작', status: 'planned' },
+    { name: '중국식 마작', icon: '中', description: '중국 표준 규칙 기반 마작', status: 'planned' },
+    { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 규칙', status: 'planned' },
+    { name: '사천 마작', icon: '川', description: '지역 특색을 살린 사천식 마작', status: 'planned' },
+  ]},
+  { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 경정', eyebrow: 'RACING', games: [
+    { name: '경마', icon: '馬', description: '말과 기수의 순위를 예측', status: 'planned' },
+    { name: '경륜', icon: '輪', description: '자전거 선수의 결승 순위를 예측', status: 'planned' },
+    { name: '경정', icon: '艇', description: '보트 레이스의 결과를 예측', status: 'planned' },
+    { name: '그레이하운드', icon: '犬', description: '견공 레이스 순위를 예측', status: 'planned' },
+  ]},
+  { name: '세계 게임', icon: '◎', detail: '세계 전통 · 주사위 · 복권', eyebrow: 'WORLD GAMES', games: [
+    { name: '식보', icon: '⚂', description: '동아시아의 세 주사위 게임', status: 'planned' },
+    { name: '파이 고우', icon: '牌', description: '중국 전통 도미노 조합 게임', status: 'planned' },
+    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 카드 게임', status: 'planned' },
+    { name: '로또', icon: '⑥', description: '번호 여섯 개를 선택하는 추첨 게임', status: 'planned' },
+    { name: '즉석 복권', icon: '票', description: '바로 결과를 확인하는 가상 복권', status: 'planned' },
+    { name: '홀짝', icon: '±', description: '숫자의 홀수와 짝수를 예측', status: 'planned' },
+  ]},
 ];
 
 const STORAGE_KEYS = {
@@ -72,14 +113,7 @@ const tabs: { name: Tab; icon: string }[] = [
   { name: '설정', icon: '⚙' },
 ];
 
-const categories = [
-  { name: '한국 전통', icon: '花', detail: '고스톱 · 맞고 · 섰다' },
-  { name: '카지노', icon: '◆', detail: '블랙잭 · 룰렛 · 바카라' },
-  { name: '포커·카드', icon: '♠', detail: '홀덤 · 오마하 · 포커' },
-  { name: '마작', icon: '發', detail: '리치 · 중국식 마작' },
-  { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 경정' },
-  { name: '세계 게임', icon: '◎', detail: '세계 전통 게임' },
-];
+const categories = gameCategories.map(({ name, icon, detail }) => ({ name, icon, detail }));
 
 const categoryResults = [
   ['카지노', '+1,800 WC', true],
@@ -102,6 +136,8 @@ export default function App() {
   const [sound, setSound] = useState(true);
   const [vibration, setVibration] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<GameCategory>(gameCategories[1]);
+  const [selectedCatalogGame, setSelectedCatalogGame] = useState<CatalogGame>(gameCategories[1].games[0]);
 
   useEffect(() => {
     Promise.all([
@@ -224,15 +260,25 @@ export default function App() {
       <StatusBar style="light" />
       <Header coins={coins} />
       <View style={styles.screen}>
-        {appScreen === 'casinoCatalog' && (
-          <CasinoCatalogScreen onBack={() => setAppScreen('tabs')} onOpenBlackjack={() => setAppScreen('blackjackSetup')} />
+        {appScreen === 'categoryCatalog' && (
+          <CategoryCatalogScreen
+            category={selectedCategory}
+            onBack={() => setAppScreen('tabs')}
+            onOpenGame={(game) => {
+              setSelectedCatalogGame(game);
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : 'gamePreview');
+            }}
+          />
+        )}
+        {appScreen === 'gamePreview' && (
+          <GamePreviewScreen game={selectedCatalogGame} category={selectedCategory} difficulty={difficulty} onBack={() => setAppScreen('categoryCatalog')} />
         )}
         {appScreen === 'blackjackSetup' && (
           <BlackjackSetupScreen
             coins={coins}
             difficulty={difficulty}
             selectedBet={selectedBet}
-            onBack={() => setAppScreen('casinoCatalog')}
+            onBack={() => setAppScreen('categoryCatalog')}
             onDifficultyChange={saveDifficulty}
             onBetChange={setSelectedBet}
             onStart={startBlackjack}
@@ -249,10 +295,16 @@ export default function App() {
             onSettleInsurance={settleInsurance}
             onSettle={settleBlackjack}
             onPlayAgain={startBlackjack}
-            onExit={() => setAppScreen('casinoCatalog')}
+            onExit={() => setAppScreen('categoryCatalog')}
           />
         )}
-        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, coins, records, () => setAppScreen('casinoCatalog'), () => setAppScreen('blackjackSetup'))}
+        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, coins, records, (category) => {
+          setSelectedCategory(category);
+          setAppScreen('categoryCatalog');
+        }, () => {
+          setSelectedCategory(gameCategories[1]);
+          setAppScreen('blackjackSetup');
+        })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
         {tabs.map((item) => {
@@ -307,10 +359,10 @@ function renderTab(
   setVibration: (value: boolean) => void,
   coins: number,
   records: GameRecord[],
-  onOpenCasino: () => void,
+  onOpenCategory: (category: GameCategory) => void,
   onOpenBlackjack: () => void,
 ) {
-  if (tab === '게임') return <GamesScreen onOpenCasino={onOpenCasino} />;
+  if (tab === '게임') return <GamesScreen onOpenCategory={onOpenCategory} />;
   if (tab === '지갑') return <WalletScreen coins={coins} records={records} />;
   if (tab === '기록') return <RecordsScreen records={records} />;
   if (tab === '설정') {
@@ -376,7 +428,7 @@ function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: stri
   );
 }
 
-function GamesScreen({ onOpenCasino }: { onOpenCasino: () => void }) {
+function GamesScreen({ onOpenCategory }: { onOpenCategory: (category: GameCategory) => void }) {
   return (
     <Page>
       <Text style={styles.pageTitle}>게임</Text>
@@ -388,18 +440,17 @@ function GamesScreen({ onOpenCasino }: { onOpenCasino: () => void }) {
       </View>
       <Text style={styles.sectionTitle}>6개 카테고리</Text>
       <View style={styles.categoryGrid}>
-        {categories.map((category, index) => (
+        {gameCategories.map((category) => (
           <Pressable
             key={category.name}
-            style={({ pressed }) => [styles.categoryCard, index === 1 && pressed && styles.pressed]}
-            onPress={index === 1 ? onOpenCasino : undefined}
+            style={({ pressed }) => [styles.categoryCard, pressed && styles.pressed]}
+            onPress={() => onOpenCategory(category)}
             accessibilityRole="button"
-            accessibilityState={{ disabled: index !== 1 }}
           >
             <Text style={styles.categoryIcon}>{category.icon}</Text>
             <Text style={styles.categoryName}>{category.name}</Text>
             <Text style={styles.categoryDetail}>{category.detail}</Text>
-            {index !== 1 && <Text style={styles.comingSoon}>준비 중</Text>}
+            <Text style={styles.categoryCount}>{category.games.length}개 게임</Text>
           </Pressable>
         ))}
       </View>
@@ -419,32 +470,31 @@ function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) 
   );
 }
 
-function CasinoCatalogScreen({ onBack, onOpenBlackjack }: { onBack: () => void; onOpenBlackjack: () => void }) {
+function CategoryCatalogScreen({ category, onBack, onOpenGame }: { category: GameCategory; onBack: () => void; onOpenGame: (game: CatalogGame) => void }) {
   return (
     <View style={styles.detailScreen}>
-      <ScreenHeader title="카지노" onBack={onBack} />
+      <ScreenHeader title={category.name} onBack={onBack} />
       <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
-        <Text style={styles.eyebrow}>CASINO GAMES</Text>
+        <Text style={styles.eyebrow}>{category.eyebrow}</Text>
         <Text style={styles.detailLead}>원하는 게임을 선택하세요</Text>
-        <View style={styles.searchBox}><Text style={styles.muted}>⌕  카지노 게임 검색</Text></View>
+        <View style={styles.searchBox}><Text style={styles.muted}>⌕  {category.name} 게임 검색</Text></View>
         <View style={styles.catalogList}>
-          {casinoGames.map((game) => (
+          {category.games.map((game) => (
             <Pressable
               key={game.name}
               accessibilityRole="button"
-              accessibilityState={{ disabled: !game.available }}
-              onPress={game.available ? onOpenBlackjack : undefined}
-              style={({ pressed }) => [styles.gameListCard, !game.available && styles.disabledCard, pressed && game.available && styles.pressed]}
+              onPress={() => onOpenGame(game)}
+              style={({ pressed }) => [styles.gameListCard, pressed && styles.pressed]}
             >
               <View style={styles.gameListIcon}><Text style={styles.gameListIconText}>{game.icon}</Text></View>
               <View style={styles.gameListCopy}>
                 <View style={styles.gameTitleRow}>
                   <Text style={styles.gameListTitle}>{game.name}</Text>
-                  <Text style={game.available ? styles.availableBadge : styles.comingSoonBadge}>{game.available ? '플레이 가능' : '준비 중'}</Text>
+                  <Text style={game.status === 'playable' ? styles.availableBadge : styles.comingSoonBadge}>{game.status === 'playable' ? '플레이 가능' : '기본 화면'}</Text>
                 </View>
                 <Text style={styles.gameListDescription}>{game.description}</Text>
               </View>
-              <Text style={styles.chevron}>{game.available ? '›' : ''}</Text>
+              <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
         </View>
@@ -520,6 +570,39 @@ function BlackjackSetupScreen(props: {
           <Text style={styles.primaryButtonText}>게임 시작</Text>
         </Pressable>
         <Text style={styles.setupNotice}>베팅 금액은 게임을 시작할 때 차감되고, 결과에 따라 자동 정산됩니다.</Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+function GamePreviewScreen({ game, category, difficulty, onBack }: { game: CatalogGame; category: GameCategory; difficulty: string; onBack: () => void }) {
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title={game.name} onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <View style={styles.previewHero}>
+          <View style={styles.previewIcon}><Text style={styles.previewIconText}>{game.icon}</Text></View>
+          <Text style={styles.eyebrow}>{category.eyebrow}</Text>
+          <Text style={styles.previewTitle}>{game.name}</Text>
+          <Text style={styles.previewDescription}>{game.description}</Text>
+        </View>
+        <Text style={styles.sectionTitle}>공통 게임 구조</Text>
+        <View style={styles.panel}>
+          <Row title="카테고리" value={category.name} />
+          <View style={styles.separator} />
+          <Row title="기본 난이도" value={difficulty} />
+          <View style={styles.separator} />
+          <Row title="사용 자산" value="통합 WC 코인" />
+          <View style={styles.separator} />
+          <Row title="기록·통계" value="통합 기록에 연결" />
+        </View>
+        <View style={styles.roadmapCard}>
+          <Text style={styles.roadmapTitle}>게임 자리 준비 완료</Text>
+          <Text style={styles.roadmapText}>이 화면에 규칙 엔진과 실제 플레이 테이블을 연결하면 됩니다. 전체 플랫폼을 먼저 완성한 뒤 게임별 기능을 추가합니다.</Text>
+        </View>
+        <Pressable disabled style={[styles.primaryButton, styles.fullWidthButton, styles.disabledCard]}>
+          <Text style={styles.primaryButtonText}>실제 플레이는 다음 단계</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -1007,6 +1090,7 @@ const styles = StyleSheet.create({
   categoryIcon: { color: colors.gold, fontSize: 28, fontWeight: '700', marginBottom: 16 },
   categoryName: { color: colors.text, fontSize: 16, fontWeight: '800' },
   categoryDetail: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 5 },
+  categoryCount: { color: colors.goldLight, fontSize: 10, fontWeight: '800', marginTop: 10 },
   comingSoon: { alignSelf: 'flex-start', color: colors.muted, fontSize: 10, marginTop: 9, paddingHorizontal: 7, paddingVertical: 4, backgroundColor: '#252C37', borderRadius: 8 },
   detailScreen: { flex: 1, backgroundColor: colors.bg },
   detailHeader: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -1017,6 +1101,14 @@ const styles = StyleSheet.create({
   detailPage: { padding: 18, paddingBottom: 38 },
   detailLead: { color: colors.text, fontSize: 25, fontWeight: '900', marginBottom: 18 },
   catalogList: { gap: 10, marginTop: 16 },
+  previewHero: { alignItems: 'center', paddingVertical: 20 },
+  previewIcon: { width: 88, height: 88, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#172B24', borderWidth: 1, borderColor: colors.gold, marginBottom: 18 },
+  previewIconText: { color: colors.goldLight, fontSize: 32, fontWeight: '900' },
+  previewTitle: { color: colors.text, fontSize: 30, fontWeight: '900', marginTop: 6 },
+  previewDescription: { color: colors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 10, maxWidth: 320 },
+  roadmapCard: { marginTop: 20, marginBottom: 18, padding: 18, borderRadius: 18, backgroundColor: '#15263B', borderWidth: 1, borderColor: '#315277' },
+  roadmapTitle: { color: '#A9CFFF', fontSize: 16, fontWeight: '900' },
+  roadmapText: { color: colors.text, fontSize: 12, lineHeight: 20, marginTop: 7 },
   gameListCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   disabledCard: { opacity: 0.45 },
   gameListIcon: { width: 58, height: 66, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#102C26', borderWidth: 1, borderColor: '#285448' },
