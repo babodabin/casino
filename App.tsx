@@ -362,7 +362,7 @@ function renderTab(
   onOpenCategory: (category: GameCategory) => void,
   onOpenBlackjack: () => void,
 ) {
-  if (tab === '게임') return <GamesScreen onOpenCategory={onOpenCategory} />;
+  if (tab === '게임') return <GamesScreen onOpenCategory={onOpenCategory} onOpenBlackjack={onOpenBlackjack} />;
   if (tab === '지갑') return <WalletScreen coins={coins} records={records} />;
   if (tab === '기록') return <RecordsScreen records={records} />;
   if (tab === '설정') {
@@ -428,7 +428,13 @@ function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: stri
   );
 }
 
-function GamesScreen({ onOpenCategory }: { onOpenCategory: (category: GameCategory) => void }) {
+function GamesScreen({
+  onOpenCategory,
+  onOpenBlackjack,
+}: {
+  onOpenCategory: (category: GameCategory) => void;
+  onOpenBlackjack: () => void;
+}) {
   return (
     <Page>
       <Text style={styles.pageTitle}>게임</Text>
@@ -438,6 +444,25 @@ function GamesScreen({ onOpenCategory }: { onOpenCategory: (category: GameCatego
         <View style={styles.chip}><Text style={styles.chipText}>즐겨찾기</Text></View>
         <View style={styles.chip}><Text style={styles.chipText}>플레이 가능</Text></View>
       </View>
+      <Text style={styles.sectionTitle}>바로 플레이</Text>
+      <Pressable
+        accessibilityRole="button"
+        style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]}
+        onPress={onOpenBlackjack}
+      >
+        <View style={styles.blackjackMark}>
+          <Text style={styles.cardSuit}>A♠</Text>
+          <Text style={styles.cardSuit}>K♥</Text>
+        </View>
+        <View style={styles.heroCopy}>
+          <Text style={styles.muted}>지금 플레이 가능</Text>
+          <Text style={styles.cardTitle}>블랙잭</Text>
+          <Text style={styles.smallText}>난이도와 베팅 금액을 선택해 시작</Text>
+        </View>
+        <View style={styles.smallButton}>
+          <Text style={styles.smallButtonText}>시작</Text>
+        </View>
+      </Pressable>
       <Text style={styles.sectionTitle}>6개 카테고리</Text>
       <View style={styles.categoryGrid}>
         {gameCategories.map((category) => (
