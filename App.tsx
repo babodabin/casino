@@ -4,7 +4,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  Image,
   ImageBackground,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -14,6 +16,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
+
+const casinoEntranceAsset = require('./assets/casino-entrance-gold-v1.png');
+const casinoEntranceSource = Platform.OS === 'web'
+  ? { uri: Image.resolveAssetSource(casinoEntranceAsset).uri.replace(/^\//, './') }
+  : casinoEntranceAsset;
 import {
   createDeck,
   canSplit,
@@ -381,7 +388,7 @@ export default function App() {
     return (
       <SafeAreaView style={styles.splash}>
         <StatusBar style="light" />
-        <ImageBackground source={require('./assets/casino-entrance-gold-v1.png')} resizeMode="cover" style={styles.splashBackground}>
+        <ImageBackground source={casinoEntranceSource} resizeMode="cover" style={styles.splashBackground}>
           <View style={styles.splashShade} />
           <View style={styles.splashHeader}>
             <Text style={styles.splashEyebrow}>WELCOME TO</Text>
