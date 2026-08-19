@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
+  ImageBackground,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -380,20 +381,18 @@ export default function App() {
     return (
       <SafeAreaView style={styles.splash}>
         <StatusBar style="light" />
-        <View style={styles.splashSky}>{[12,28,47,66,83].map((left, index) => <View key={left} style={[styles.splashStar, { left: `${left}%`, top: 32 + (index % 3) * 29 }]} />)}<View style={styles.splashMoon} /></View>
-        <View style={styles.splashHeader}><Text style={styles.splashEyebrow}>WELCOME TO</Text><Text style={styles.splashTitle}>WORLD CASINO</Text><Text style={styles.splashSubtitle}>세계의 모든 게임이 시작되는 밤</Text></View>
-        <View style={styles.casinoScene}>
-          <View style={styles.casinoRoof}><Text style={styles.casinoRoofMark}>◆</Text></View>
-          <View style={styles.casinoBuilding}>
-            <View style={styles.casinoMarquee}><Text style={styles.casinoMarqueeText}>WORLD CASINO</Text><Text style={styles.casinoMarqueeSub}>OPEN · 24 HOURS</Text></View>
-            <View style={styles.casinoWindows}>{[0,1,2,3,4].map((item) => <View key={item} style={styles.casinoWindow}><View style={styles.windowGlow} /></View>)}</View>
-            <View style={styles.casinoEntrance}><View style={styles.entranceDoor}><Text style={styles.entranceDoorMark}>♠</Text></View><View style={styles.entranceDoor}><Text style={[styles.entranceDoorMark, styles.redCard]}>♥</Text></View></View>
+        <ImageBackground source={require('./assets/casino-entrance-gold-v1.png')} resizeMode="cover" style={styles.splashBackground}>
+          <View style={styles.splashShade} />
+          <View style={styles.splashHeader}>
+            <Text style={styles.splashEyebrow}>WELCOME TO</Text>
+            <Text style={styles.splashTitle}>WORLD CASINO</Text>
+            <Text style={styles.splashSubtitle}>세계의 모든 게임이 시작되는 밤</Text>
           </View>
-          <View style={styles.redCarpet}><View style={styles.carpetLine} /><View style={styles.carpetLine} /></View>
-          <View style={styles.ropeRow}><Text style={styles.ropePost}>●╲</Text><Text style={styles.ropePost}>╱●</Text></View>
-        </View>
-        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.splashEnterButton, pressed && styles.pressed]} onPress={() => setEntered(true)}><Text style={styles.splashEnterButtonTop}>◆ ENTER ◆</Text><Text style={styles.splashEnterButtonText}>카지노 입장하기</Text></Pressable>
-        <Text style={styles.splashDisclaimer}>WC 게임 전용 코인 · 현금 환전 불가</Text>
+          <View style={styles.splashBottom}>
+            <Pressable accessibilityRole="button" style={({ pressed }) => [styles.splashEnterButton, pressed && styles.pressed]} onPress={() => setEntered(true)}><Text style={styles.splashEnterButtonTop}>◆ ENTER ◆</Text><Text style={styles.splashEnterButtonText}>카지노 입장하기</Text></Pressable>
+            <Text style={styles.splashDisclaimer}>WC 게임 전용 코인 · 현금 환전 불가</Text>
+          </View>
+        </ImageBackground>
       </SafeAreaView>
     );
   }
@@ -1746,35 +1745,18 @@ const colors = {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.bg },
   screen: { flex: 1 },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', backgroundColor: '#040711', paddingHorizontal: 22, paddingTop: 22, overflow: 'hidden' },
-  splashSky: { position: 'absolute', top: 0, left: 0, right: 0, height: 330, backgroundColor: '#080D22' },
-  splashStar: { position: 'absolute', width: 3, height: 3, borderRadius: 2, backgroundColor: '#FFF2B0', shadowColor: '#FFF2B0', shadowOpacity: 1, shadowRadius: 5 },
-  splashMoon: { position: 'absolute', top: 35, right: 31, width: 44, height: 44, borderRadius: 22, backgroundColor: '#F4D98B', opacity: 0.9, shadowColor: '#FFE7A0', shadowOpacity: 0.7, shadowRadius: 16 },
-  splashHeader: { zIndex: 2, alignItems: 'center' },
+  splash: { flex: 1, backgroundColor: '#040711', overflow: 'hidden' },
+  splashBackground: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'space-between' },
+  splashShade: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(3, 3, 8, 0.25)' },
+  splashHeader: { zIndex: 2, alignItems: 'center', width: '100%', paddingTop: 38, paddingBottom: 36, backgroundColor: 'rgba(5, 4, 8, 0.38)' },
   splashEyebrow: { color: colors.gold, letterSpacing: 5, fontSize: 12, fontWeight: '700' },
   splashTitle: { color: '#FFF1B3', fontSize: 36, fontWeight: '900', marginTop: 7, letterSpacing: 1, textShadowColor: '#D99D22', textShadowRadius: 12 },
   splashSubtitle: { color: '#C4B994', fontSize: 13, marginTop: 6 },
-  casinoScene: { width: '100%', height: 470, marginTop: 15, alignItems: 'center', justifyContent: 'flex-end' },
-  casinoRoof: { width: '76%', height: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A2617', borderWidth: 3, borderColor: '#D5A73A', borderTopLeftRadius: 90, borderTopRightRadius: 90 },
-  casinoRoofMark: { color: '#FFE29A', fontSize: 29, textShadowColor: '#FFB52E', textShadowRadius: 10 },
-  casinoBuilding: { width: '94%', height: 275, alignItems: 'center', backgroundColor: '#201A1A', borderWidth: 3, borderColor: '#B88A31', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
-  casinoMarquee: { width: '86%', marginTop: 16, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: '#731A25', borderWidth: 2, borderColor: '#F0C052' },
-  casinoMarqueeText: { color: '#FFF3BA', fontSize: 20, fontWeight: '900', letterSpacing: 2, textShadowColor: '#FF9E2E', textShadowRadius: 8 },
-  casinoMarqueeSub: { color: '#E9BE69', fontSize: 8, fontWeight: '900', letterSpacing: 2, marginTop: 3 },
-  casinoWindows: { width: '88%', flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
-  casinoWindow: { width: 38, height: 52, padding: 5, borderRadius: 20, borderWidth: 2, borderColor: '#9B7938', backgroundColor: '#100D0D' },
-  windowGlow: { flex: 1, borderRadius: 15, backgroundColor: '#E8BD66', opacity: 0.72, shadowColor: '#FFCB62', shadowOpacity: 1, shadowRadius: 8 },
-  casinoEntrance: { position: 'absolute', bottom: 0, width: 132, height: 112, flexDirection: 'row', borderWidth: 3, borderColor: '#D7A83D', borderTopLeftRadius: 65, borderTopRightRadius: 65, overflow: 'hidden', backgroundColor: '#08090C' },
-  entranceDoor: { flex: 1, alignItems: 'center', justifyContent: 'center', borderColor: '#9B762B', borderRightWidth: 1, backgroundColor: '#16151A' },
-  entranceDoorMark: { color: '#F5E7C0', fontSize: 25 },
-  redCarpet: { width: 195, height: 126, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, backgroundColor: '#7D1724', borderLeftWidth: 2, borderRightWidth: 2, borderColor: '#D8A642', transform: [{ perspective: 240 }, { rotateX: '48deg' }], marginTop: -15, marginBottom: -28 },
-  carpetLine: { width: 2, backgroundColor: '#E5B448', opacity: 0.8 },
-  ropeRow: { position: 'absolute', bottom: 23, width: 270, flexDirection: 'row', justifyContent: 'space-between' },
-  ropePost: { color: '#D8AF50', fontSize: 25, fontWeight: '900' },
-  splashEnterButton: { zIndex: 3, width: '88%', minHeight: 66, marginTop: 8, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B88727', borderWidth: 2, borderColor: '#FFE39A', shadowColor: '#E1AD3F', shadowOpacity: 0.75, shadowRadius: 12, elevation: 8 },
+  splashBottom: { zIndex: 2, width: '100%', alignItems: 'center', paddingHorizontal: 22, paddingBottom: 24, paddingTop: 70, backgroundColor: 'rgba(4, 3, 7, 0.28)' },
+  splashEnterButton: { width: '88%', minHeight: 66, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(184, 135, 39, 0.96)', borderWidth: 2, borderColor: '#FFE39A', shadowColor: '#E1AD3F', shadowOpacity: 0.8, shadowRadius: 14, elevation: 8 },
   splashEnterButtonTop: { color: '#4A2D08', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
   splashEnterButtonText: { color: '#170F05', fontSize: 18, fontWeight: '900', marginTop: 2 },
-  splashDisclaimer: { color: '#777C8B', fontSize: 10, marginTop: 12 },
+  splashDisclaimer: { color: '#E4DCC7', fontSize: 10, marginTop: 12, textShadowColor: '#000', textShadowRadius: 4 },
   doors: { flexDirection: 'row', height: 330, width: '86%', marginVertical: 34, borderWidth: 2, borderColor: colors.gold, borderRadius: 140, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden', backgroundColor: '#19140C' },
   door: { flex: 1, backgroundColor: '#241B0F', justifyContent: 'center', borderColor: '#8A6824' },
   leftDoor: { borderRightWidth: 1 },
