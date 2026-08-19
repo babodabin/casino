@@ -1037,12 +1037,17 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
   const draw = () => { const next = exchangeVideoPoker(hand, deck, held); setHand(next.hand); setDeck(next.deck); setPhase('result'); onSettle(selectedBet, next.hand); };
   const reset = () => { setHand([]); setDeck([]); setHeld([false, false, false, false, false]); setPhase('ready'); };
   return <View style={styles.videoPokerScreen}><ScreenHeader title="비디오 포커(Video Poker)" onBack={onBack} /><ScrollView contentContainerStyle={styles.videoPokerPage} showsVerticalScrollIndicator={false}>
-    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>JACKS OR BETTER</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
-    <View style={styles.videoPokerMachine}><Text style={styles.videoPokerPrompt}>{phase === 'ready' ? '카드 5장을 받아보세요' : phase === 'hold' ? '남길 카드를 누른 뒤 교환하세요' : result?.label}</Text><View style={styles.videoPokerHand}>{hand.length ? hand.map((card, index) => <Pressable key={card.id} disabled={phase !== 'hold'} onPress={() => setHeld((current) => current.map((value, cardIndex) => cardIndex === index ? !value : value))} style={[styles.videoPokerCardWrap, held[index] && styles.videoPokerHeld]}><PlayingCard card={card} compact /><Text style={[styles.videoPokerHoldLabel, held[index] && styles.videoPokerHoldActive]}>{held[index] ? '보관' : phase === 'hold' ? '교환' : ' '}</Text></Pressable>) : [0,1,2,3,4].map((index) => <View key={index} style={[styles.playingCard, styles.compactPlayingCard, styles.hiddenCard, styles.videoPokerEmpty]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View>{result && <View style={styles.videoPokerResult}><Text style={styles.resultTitle}>{result.label}</Text><Text style={[styles.resultNet, result.multiplier > 0 ? styles.positive : styles.negative]}>{result.multiplier > 0 ? `+${videoPokerPayout(selectedBet, hand).toLocaleString()} WC 지급` : `-${selectedBet.toLocaleString()} WC`}</Text></View>}</View>
-    {phase === 'ready' && <Pressable disabled={selectedBet > coins} onPress={deal} style={[styles.primaryButton, styles.rouletteSpinButton, selectedBet > coins && styles.disabledCard]}><Text style={styles.primaryButtonText}>카드 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>}
-    {phase === 'hold' && <Pressable onPress={draw} style={[styles.primaryButton, styles.rouletteSpinButton]}><Text style={styles.primaryButtonText}>선택하지 않은 카드 교환</Text></Pressable>}
-    {phase === 'result' && <Pressable onPress={reset} style={[styles.primaryButton, styles.rouletteSpinButton]}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
-    <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>Jacks or Better 배당</Text><Text style={styles.slotRuleText}>잭 이상 원 페어 1배 · 투 페어 2배 · 트리플 3배</Text><Text style={styles.slotRuleText}>스트레이트 4배 · 플러시 6배 · 풀하우스 9배</Text><Text style={styles.slotRuleText}>포카드 25배 · 스트레이트 플러시 50배 · 로열 플러시 250배</Text></View>
+    <View style={styles.videoPokerCabinet}>
+      <View style={styles.videoPokerMarquee}><View style={styles.marqueeBulb} /><View><Text style={styles.videoPokerMarqueeSmall}>WORLD CASINO</Text><Text style={styles.videoPokerMarqueeTitle}>JACKS OR BETTER</Text></View><View style={styles.marqueeBulb} /></View>
+      <View style={styles.videoPokerGlass}>
+        <View style={styles.videoPokerMiniPaytable}><Text style={styles.videoPokerPayline}>ROYAL 250× · STRAIGHT FLUSH 50× · FOUR 25×</Text><Text style={styles.videoPokerPayline}>FULL HOUSE 9× · FLUSH 6× · STRAIGHT 4×</Text><Text style={styles.videoPokerPayline}>THREE 3× · TWO PAIR 2× · JACKS+ 1×</Text></View>
+        <View style={styles.videoPokerMeters}><View><Text style={styles.videoPokerMeterLabel}>CREDIT</Text><Text style={styles.videoPokerMeterValue}>{coins.toLocaleString()}</Text></View><View><Text style={styles.videoPokerMeterLabel}>BET</Text><Text style={styles.videoPokerMeterValue}>{selectedBet.toLocaleString()}</Text></View><View><Text style={styles.videoPokerMeterLabel}>WIN</Text><Text style={styles.videoPokerMeterValue}>{result && result.multiplier > 0 ? videoPokerPayout(selectedBet, hand).toLocaleString() : '0'}</Text></View></View>
+        <Text style={styles.videoPokerPrompt}>{phase === 'ready' ? '카드 5장을 받아보세요' : phase === 'hold' ? '카드를 눌러 HOLD' : result?.label}</Text><View style={styles.videoPokerHand}>{hand.length ? hand.map((card, index) => <Pressable key={card.id} disabled={phase !== 'hold'} onPress={() => setHeld((current) => current.map((value, cardIndex) => cardIndex === index ? !value : value))} style={[styles.videoPokerCardWrap, held[index] && styles.videoPokerHeld]}><PlayingCard card={card} compact /><Text style={[styles.videoPokerHoldLabel, held[index] && styles.videoPokerHoldActive]}>{held[index] ? 'HOLD' : phase === 'hold' ? '선택' : ' '}</Text></Pressable>) : [0,1,2,3,4].map((index) => <View key={index} style={[styles.playingCard, styles.compactPlayingCard, styles.hiddenCard, styles.videoPokerEmpty]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View>{result && <View style={styles.videoPokerResult}><Text style={styles.resultTitle}>{result.label}</Text><Text style={[styles.resultNet, result.multiplier > 0 ? styles.positive : styles.negative]}>{result.multiplier > 0 ? `+${videoPokerPayout(selectedBet, hand).toLocaleString()} WC 지급` : `-${selectedBet.toLocaleString()} WC`}</Text></View>}
+      </View>
+      <View style={styles.videoPokerControlDeck}><View style={styles.videoPokerCoinSlot}><Text style={styles.videoPokerCoinSlotText}>WC</Text></View>{phase === 'ready' && <Pressable disabled={selectedBet > coins} onPress={deal} style={[styles.videoPokerDealButton, selectedBet > coins && styles.disabledCard]}><Text style={styles.videoPokerDealText}>DEAL</Text><Text style={styles.videoPokerDealSub}>카드 받기</Text></Pressable>}{phase === 'hold' && <Pressable onPress={draw} style={styles.videoPokerDealButton}><Text style={styles.videoPokerDealText}>DRAW</Text><Text style={styles.videoPokerDealSub}>카드 교환</Text></Pressable>}{phase === 'result' && <Pressable onPress={reset} style={styles.videoPokerDealButton}><Text style={styles.videoPokerDealText}>NEW GAME</Text><Text style={styles.videoPokerDealSub}>다시 베팅</Text></Pressable>}<View style={styles.videoPokerSpeaker}><Text style={styles.videoPokerSpeakerText}>••••</Text></View></View>
+      <View style={styles.videoPokerBase}><Text style={styles.videoPokerBaseText}>INSERT WORLD COIN · TOUCH SCREEN</Text></View>
+    </View>
+    <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>게임 방법</Text><Text style={styles.slotRuleText}>실제 비디오 포커 기계처럼 카드 화면을 눌러 HOLD할 카드를 고릅니다.</Text><Text style={styles.slotRuleText}>DEAL로 시작하고 DRAW를 누르면 선택하지 않은 카드만 한 번 교환됩니다.</Text></View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>첫 5장을 받은 뒤 한 번만 교환합니다 · 게임 전용 가상 코인</Text>
   </ScrollView></View>;
 }
@@ -1980,8 +1985,18 @@ const styles = StyleSheet.create({
   sicboOdds: { color: '#C9BDC2', fontSize: 8, marginTop: 4 },
   videoPokerScreen: { flex: 1, backgroundColor: '#071A2A' },
   videoPokerPage: { padding: 18, paddingBottom: 48 },
-  videoPokerMachine: { marginTop: 16, paddingVertical: 22, paddingHorizontal: 10, borderRadius: 22, backgroundColor: '#14395A', borderWidth: 3, borderColor: '#D8B451', alignItems: 'center' },
-  videoPokerPrompt: { color: '#FFF1C4', fontSize: 16, fontWeight: '900', marginBottom: 18, textAlign: 'center' },
+  videoPokerCabinet: { borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
+  videoPokerMarquee: { minHeight: 84, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#A6202D', borderBottomWidth: 4, borderBottomColor: '#F0C35A' },
+  marqueeBulb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFF3A3', borderWidth: 2, borderColor: '#F8D24E', shadowColor: '#FFF0A0', shadowOpacity: 1, shadowRadius: 8 },
+  videoPokerMarqueeSmall: { color: '#FFD767', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 3 },
+  videoPokerMarqueeTitle: { color: '#FFFFFF', fontSize: 23, fontWeight: '900', textAlign: 'center', letterSpacing: 1, textShadowColor: '#FFB02E', textShadowRadius: 9 },
+  videoPokerGlass: { paddingVertical: 17, paddingHorizontal: 10, backgroundColor: '#071D3A', borderBottomWidth: 5, borderBottomColor: '#B4832B', alignItems: 'center' },
+  videoPokerMiniPaytable: { width: '100%', padding: 8, borderRadius: 8, backgroundColor: '#102E59', borderWidth: 1, borderColor: '#4D81B2' },
+  videoPokerPayline: { color: '#FFE47E', fontSize: 8, lineHeight: 14, fontWeight: '900', textAlign: 'center' },
+  videoPokerMeters: { width: '100%', marginTop: 10, paddingHorizontal: 9, paddingVertical: 7, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 7, backgroundColor: '#030B12', borderWidth: 1, borderColor: '#31516A' },
+  videoPokerMeterLabel: { color: '#7FA9C2', fontSize: 7, fontWeight: '900', textAlign: 'center' },
+  videoPokerMeterValue: { color: '#FFDD66', fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  videoPokerPrompt: { color: '#FFF1C4', fontSize: 16, fontWeight: '900', marginTop: 14, marginBottom: 18, textAlign: 'center' },
   videoPokerHand: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 3 },
   videoPokerCardWrap: { alignItems: 'center', borderRadius: 11, padding: 2 },
   videoPokerHeld: { backgroundColor: '#D8B451' },
@@ -1990,6 +2005,16 @@ const styles = StyleSheet.create({
   videoPokerEmpty: { opacity: 0.7 },
   videoPokerResult: { marginTop: 18, alignItems: 'center' },
   videoPokerPaytable: { marginTop: 18, padding: 16, borderRadius: 16, backgroundColor: '#102C45', borderWidth: 1, borderColor: '#456781' },
+  videoPokerControlDeck: { minHeight: 94, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#42101A', borderTopWidth: 2, borderTopColor: '#F1CD70' },
+  videoPokerDealButton: { width: 132, minHeight: 62, borderRadius: 31, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D32D35', borderWidth: 5, borderColor: '#F3C656', shadowColor: '#FFB733', shadowOpacity: 0.8, shadowRadius: 7, elevation: 8 },
+  videoPokerDealText: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', letterSpacing: 1 },
+  videoPokerDealSub: { color: '#FFE69A', fontSize: 9, fontWeight: '800' },
+  videoPokerCoinSlot: { width: 42, height: 54, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#171719', borderWidth: 2, borderColor: '#9D854C' },
+  videoPokerCoinSlotText: { color: '#E8C865', fontSize: 10, fontWeight: '900', transform: [{ rotate: '-90deg' }] },
+  videoPokerSpeaker: { width: 43, height: 43, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#210910', borderWidth: 1, borderColor: '#7C4650' },
+  videoPokerSpeakerText: { color: '#8F5D65', fontSize: 12, letterSpacing: -1 },
+  videoPokerBase: { paddingVertical: 10, backgroundColor: '#250A10', borderTopWidth: 1, borderTopColor: '#7F4B2A' },
+  videoPokerBaseText: { color: '#B98E55', fontSize: 8, fontWeight: '900', textAlign: 'center', letterSpacing: 1.5 },
   baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
   crapsSetupHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#183324', borderWidth: 1, borderColor: '#53705E' },
   crapsHeroDice: { color: colors.goldLight, fontSize: 48, marginBottom: 8 },
