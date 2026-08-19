@@ -700,7 +700,7 @@ function CoinStack({ amount, compact = false }: { amount: number; compact?: bool
     <View style={[styles.coinStack, compact && styles.coinStackCompact]} accessibilityLabel={`${amount.toLocaleString()} 월드코인 베팅`}>
       {layers.map((_, index) => (
         <View key={index} style={[styles.worldCoinChip, compact && styles.worldCoinChipCompact, { bottom: index * (compact ? 3 : 5), zIndex: index + 1 }]}>
-          {index === layerCount - 1 && <><Text style={[styles.worldCoinAmount, compact && styles.worldCoinAmountCompact]}>{amount.toLocaleString()}</Text><Text style={[styles.worldCoinUnit, compact && styles.worldCoinUnitCompact]}>WC</Text></>}
+          {index === layerCount - 1 && <View style={[styles.worldCoinCenter, compact && styles.worldCoinCenterCompact]}><Text style={[styles.worldCoinAmount, compact && styles.worldCoinAmountCompact]}>{amount.toLocaleString()}</Text><Text style={[styles.worldCoinUnit, compact && styles.worldCoinUnitCompact]}>WC</Text></View>}
         </View>
       ))}
     </View>
@@ -1664,10 +1664,12 @@ const styles = StyleSheet.create({
   betButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold },
   betButtonText: { color: colors.text, fontSize: 14, fontWeight: '800' },
   betButtonTextActive: { color: '#171107' },
-  coinStack: { width: 76, height: 62, alignSelf: 'center', position: 'relative' },
-  coinStackCompact: { width: 48, height: 39, marginBottom: 2 },
-  worldCoinChip: { position: 'absolute', left: 3, width: 70, height: 38, borderRadius: 35, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9A928', borderWidth: 3, borderColor: '#FFE69A', shadowColor: '#000000', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } },
-  worldCoinChipCompact: { left: 2, width: 44, height: 25, borderRadius: 22, borderWidth: 2 },
+  coinStack: { width: 68, height: 78, alignSelf: 'center', position: 'relative' },
+  coinStackCompact: { width: 44, height: 49, marginBottom: 2 },
+  worldCoinChip: { position: 'absolute', left: 6, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9A928', borderWidth: 4, borderColor: '#FFE69A', shadowColor: '#000000', shadowOpacity: 0.45, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } },
+  worldCoinChipCompact: { left: 3, width: 38, height: 38, borderRadius: 19, borderWidth: 3 },
+  worldCoinCenter: { width: 39, height: 39, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E9C653', borderWidth: 2, borderColor: '#7A5710', borderStyle: 'dashed' },
+  worldCoinCenterCompact: { width: 26, height: 26, borderRadius: 13, borderWidth: 1 },
   worldCoinAmount: { color: '#241803', fontSize: 13, fontWeight: '900', lineHeight: 14 },
   worldCoinAmountCompact: { fontSize: 9, lineHeight: 10 },
   worldCoinUnit: { color: '#493306', fontSize: 8, fontWeight: '900', lineHeight: 9 },
