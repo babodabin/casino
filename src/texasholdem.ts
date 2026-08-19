@@ -1,6 +1,6 @@
 import { createDeck, shuffleDeck, type Card, type Rank } from './blackjack.ts';
 
-export type PokerHand = { category: number; label: string; tiebreak: number[] };
+export type PokerHand = { category: number; label: string; tiebreak: number[]; cards: Card[] };
 const rankValue: Record<Rank, number> = { A: 14, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, J: 11, Q: 12, K: 13 };
 
 export function evaluateFive(cards: Card[]): PokerHand {
@@ -10,15 +10,15 @@ export function evaluateFive(cards: Card[]): PokerHand {
   const flush = new Set(cards.map((card) => card.suit)).size === 1;
   const unique = [...new Set(values)]; const wheel = unique.join(',') === '14,5,4,3,2';
   const straight = unique.length === 5 && (wheel || unique[0] - unique[4] === 4); const highStraight = wheel ? 5 : unique[0];
-  if (flush && straight) return { category: 8, label: highStraight === 14 ? '로열 플러시' : '스트레이트 플러시', tiebreak: [highStraight] };
-  if (groups[0][1] === 4) return { category: 7, label: '포카드', tiebreak: [groups[0][0], groups[1][0]] };
-  if (groups[0][1] === 3 && groups[1][1] === 2) return { category: 6, label: '풀하우스', tiebreak: [groups[0][0], groups[1][0]] };
-  if (flush) return { category: 5, label: '플러시', tiebreak: values };
-  if (straight) return { category: 4, label: '스트레이트', tiebreak: [highStraight] };
-  if (groups[0][1] === 3) return { category: 3, label: '트리플', tiebreak: [groups[0][0], ...groups.slice(1).map((g) => g[0]).sort((a,b) => b-a)] };
-  if (groups[0][1] === 2 && groups[1][1] === 2) { const pairs=[groups[0][0],groups[1][0]].sort((a,b)=>b-a); return { category: 2, label: '투 페어', tiebreak: [...pairs, groups[2][0]] }; }
-  if (groups[0][1] === 2) return { category: 1, label: '원 페어', tiebreak: [groups[0][0], ...groups.slice(1).map((g)=>g[0]).sort((a,b)=>b-a)] };
-  return { category: 0, label: '하이 카드', tiebreak: values };
+  if (flush && straight) return { category: 8, label: highStraight === 14 ? '로열 플러시' : '스트레이트 플러시', tiebreak: [highStraight], cards };
+  if (groups[0][1] === 4) return { category: 7, label: '포카드', tiebreak: [groups[0][0], groups[1][0]], cards };
+  if (groups[0][1] === 3 && groups[1][1] === 2) return { category: 6, label: '풀하우스', tiebreak: [groups[0][0], groups[1][0]], cards };
+  if (flush) return { category: 5, label: '플러시', tiebreak: values, cards };
+  if (straight) return { category: 4, label: '스트레이트', tiebreak: [highStraight], cards };
+  if (groups[0][1] === 3) return { category: 3, label: '트리플', tiebreak: [groups[0][0], ...groups.slice(1).map((g) => g[0]).sort((a,b) => b-a)], cards };
+  if (groups[0][1] === 2 && groups[1][1] === 2) { const pairs=[groups[0][0],groups[1][0]].sort((a,b)=>b-a); return { category: 2, label: '투 페어', tiebreak: [...pairs, groups[2][0]], cards }; }
+  if (groups[0][1] === 2) return { category: 1, label: '원 페어', tiebreak: [groups[0][0], ...groups.slice(1).map((g)=>g[0]).sort((a,b)=>b-a)], cards };
+  return { category: 0, label: '하이 카드', tiebreak: values, cards };
 }
 
 const combinations = (cards: Card[]) => { const result: Card[][]=[]; for(let a=0;a<3;a++)for(let b=a+1;b<4;b++)for(let c=b+1;c<5;c++)for(let d=c+1;d<6;d++)for(let e=d+1;e<7;e++)result.push([cards[a],cards[b],cards[c],cards[d],cards[e]]); return result; };
