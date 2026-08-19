@@ -27,6 +27,14 @@ export function evaluateFive(cards: Card[]): PokerHand {
 const combinations = (cards: Card[]) => { const result: Card[][]=[]; for(let a=0;a<3;a++)for(let b=a+1;b<4;b++)for(let c=b+1;c<5;c++)for(let d=c+1;d<6;d++)for(let e=d+1;e<7;e++)result.push([cards[a],cards[b],cards[c],cards[d],cards[e]]); return result; };
 export function compareHands(a: PokerHand, b: PokerHand) { if (a.category !== b.category) return Math.sign(a.category-b.category); const length=Math.max(a.tiebreak.length,b.tiebreak.length); for(let i=0;i<length;i++){ const diff=(a.tiebreak[i]??0)-(b.tiebreak[i]??0); if(diff) return Math.sign(diff); } return 0; }
 export function evaluateHoldem(cards: Card[]): PokerHand { if(cards.length!==7) throw new Error('홀덤 판정에는 7장이 필요합니다.'); return combinations(cards).map(evaluateFive).sort((a,b)=>compareHands(b,a))[0]; }
+export function madeHandCards(hand: PokerHand): Card[] {
+  if (hand.category === 7) return hand.cards.slice(0, 4);
+  if (hand.category === 3) return hand.cards.slice(0, 3);
+  if (hand.category === 2) return hand.cards.slice(0, 4);
+  if (hand.category === 1) return hand.cards.slice(0, 2);
+  if (hand.category === 0) return hand.cards.slice(0, 1);
+  return hand.cards;
+}
 export function dealHoldem(random:()=>number=Math.random){ const deck=shuffleDeck(createDeck(),random); return { player:deck.slice(0,2), opponent:deck.slice(2,4), community:deck.slice(4,9) }; }
 export function resolveHoldem(player:Card[],opponent:Card[],community:Card[]){ const playerHand=evaluateHoldem([...player,...community]); const opponentHand=evaluateHoldem([...opponent,...community]); return { result: compareHands(playerHand,opponentHand)>0?'win' as const:compareHands(playerHand,opponentHand)<0?'loss' as const:'push' as const, playerHand, opponentHand }; }
 
