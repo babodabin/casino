@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -108,6 +110,8 @@ const gameCategories: GameCategory[] = [
     { name: '홀짝', icon: '±', description: '숫자의 홀수와 짝수를 예측', status: 'planned' },
   ]},
 ];
+
+const europeanWheelOrder = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
 
 const STORAGE_KEYS = {
   coins: 'world-casino.coins',
@@ -1031,7 +1035,7 @@ function RouletteGameScreen({
   const [bet, setBet] = useState<RouletteBet>({ type: 'red' });
   const [phase, setPhase] = useState<'betting' | 'spinning' | 'result'>('betting');
   const [resultNumber, setResultNumber] = useState<number | null>(null);
-  const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wheelProgress = useRef(new Animated.Value(0)).current;
   const difficultyOption = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const outsideBets: { label: string; bet: RouletteBet; color?: string }[] = [
     { label: '빨강', bet: { type: 'red' }, color: '#A8323A' },
@@ -1047,21 +1051,30 @@ function RouletteGameScreen({
   const betLabel = bet.type === 'straight' ? `숫자 ${bet.number}` : outsideBets.find((item) => item.bet.type === bet.type)?.label ?? '';
   const won = resultNumber !== null && rouletteBetWins(bet, resultNumber);
 
-  useEffect(() => () => {
-    if (spinTimer.current) clearTimeout(spinTimer.current);
-  }, []);
+  useEffect(() => () => wheelProgress.stopAnimation(), [wheelProgress]);
 
   const spin = () => {
     if (phase === 'spinning' || !onPlaceBet(selectedBet)) return;
+    const number = spinRoulette();
+    const pocketIndex = europeanWheelOrder.indexOf(number);
+    const target = 1800 + (360 - pocketIndex * (360 / europeanWheelOrder.length));
+    wheelProgress.setValue(0);
     setPhase('spinning');
     setResultNumber(null);
-    spinTimer.current = setTimeout(() => {
-      const number = spinRoulette();
+    Animated.timing(wheelProgress, {
+      toValue: target,
+      duration: 1800,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (!finished) return;
       setResultNumber(number);
       setPhase('result');
       onSettle(bet, selectedBet, number, betLabel);
-    }, 900);
+    });
   };
+
+  const wheelRotation = wheelProgress.interpolate({ inputRange: [0, 2160], outputRange: ['0deg', '2160deg'] });
 
   return (
     <View style={styles.detailScreen}>
@@ -1072,10 +1085,29 @@ function RouletteGameScreen({
           <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View>
         </View>
 
-        <View style={[styles.rouletteWheel, phase === 'spinning' && styles.rouletteWheelSpinning]}>
-          <View style={styles.rouletteWheelInner}>
-            <Text style={[styles.rouletteResultNumber, resultNumber !== null && rouletteColor(resultNumber) === 'red' && styles.rouletteRedText]}>{phase === 'spinning' ? '•••' : resultNumber ?? '◎'}</Text>
-            <Text style={styles.rouletteWheelLabel}>{phase === 'spinning' ? '회전 중' : resultNumber === null ? '베팅을 선택하세요' : rouletteColor(resultNumber) === 'green' ? 'GREEN' : rouletteColor(resultNumber).toUpperCase()}</Text>
+        <View style={styles.rouletteStage}>
+          <View style={styles.rouletteMarker} />
+          <View style={[styles.rouletteWheel, phase === 'spinning' && styles.rouletteWheelSpinning]}>
+            <Animated.View style={[styles.rouletteWheelRing, { transform: [{ rotate: wheelRotation }] }]}>
+              {europeanWheelOrder.map((number, index) => {
+                const angle = index * (360 / europeanWheelOrder.length);
+                const radians = angle * Math.PI / 180;
+                const radius = 103;
+                const left = 125 + Math.sin(radians) * radius - 12;
+                const top = 125 - Math.cos(radians) * radius - 12;
+                const color = rouletteColor(number);
+                return (
+                  <View key={number} style={[styles.roulettePocket, { left, top, transform: [{ rotate: `${angle}deg` }] }, color === 'red' ? styles.roulettePocketRed : color === 'black' ? styles.roulettePocketBlack : styles.roulettePocketGreen]}>
+                    <Text style={styles.roulettePocketText}>{number}</Text>
+                  </View>
+                );
+              })}
+            </Animated.View>
+            <View style={styles.rouletteBowl}>
+              <View style={styles.rouletteHub} />
+              <Text style={[styles.rouletteResultNumber, resultNumber !== null && rouletteColor(resultNumber) === 'red' && styles.rouletteRedText]}>{phase === 'spinning' ? '•' : resultNumber ?? '◎'}</Text>
+              <Text style={styles.rouletteWheelLabel}>{phase === 'spinning' ? '회전 중' : resultNumber === null ? '베팅 선택' : rouletteColor(resultNumber).toUpperCase()}</Text>
+            </View>
           </View>
         </View>
 
@@ -1430,10 +1462,19 @@ const styles = StyleSheet.create({
   rouletteBalance: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 3 },
   difficultyBadge: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: '#2E2512', borderWidth: 1, borderColor: colors.gold },
   difficultyBadgeText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
-  rouletteWheel: { width: 190, height: 190, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 22, borderRadius: 95, backgroundColor: '#171B20', borderWidth: 14, borderColor: '#9A7829' },
-  rouletteWheelSpinning: { borderColor: colors.gold, backgroundColor: '#253D34' },
-  rouletteWheelInner: { width: 125, height: 125, alignItems: 'center', justifyContent: 'center', borderRadius: 63, backgroundColor: '#0B251D', borderWidth: 2, borderColor: '#E0C276' },
-  rouletteResultNumber: { color: colors.text, fontSize: 44, fontWeight: '900' },
+  rouletteStage: { height: 300, alignItems: 'center', justifyContent: 'center' },
+  rouletteMarker: { position: 'absolute', zIndex: 5, top: 4, width: 0, height: 0, borderLeftWidth: 11, borderRightWidth: 11, borderTopWidth: 22, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: colors.goldLight },
+  rouletteWheel: { width: 270, height: 270, alignItems: 'center', justifyContent: 'center', borderRadius: 135, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 16, shadowOffset: { width: 0, height: 9 } },
+  rouletteWheelSpinning: { borderColor: '#FFE39A' },
+  rouletteWheelRing: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#17201D', borderWidth: 2, borderColor: '#E0C276' },
+  roulettePocket: { position: 'absolute', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 4, borderWidth: 0.5, borderColor: '#E8D9AA' },
+  roulettePocketRed: { backgroundColor: '#A72F39' },
+  roulettePocketBlack: { backgroundColor: '#1A1D21' },
+  roulettePocketGreen: { backgroundColor: '#14754F' },
+  roulettePocketText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
+  rouletteBowl: { width: 142, height: 142, alignItems: 'center', justifyContent: 'center', borderRadius: 71, backgroundColor: '#0A392B', borderWidth: 8, borderColor: '#B68D33' },
+  rouletteHub: { position: 'absolute', top: 18, width: 22, height: 22, borderRadius: 11, backgroundColor: '#E9CD7A', borderWidth: 4, borderColor: '#725619' },
+  rouletteResultNumber: { color: colors.text, fontSize: 38, fontWeight: '900', marginTop: 12 },
   rouletteRedText: { color: '#FF6973' },
   rouletteWheelLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', marginTop: 2 },
   rouletteResultCard: { padding: 15, borderRadius: 16, borderWidth: 1, marginBottom: 2 },
