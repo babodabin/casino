@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Image,
   ImageBackground,
   Platform,
   Pressable,
@@ -19,7 +18,7 @@ import {
 
 const casinoEntranceAsset = require('./assets/casino-entrance-gold-v1.png');
 const casinoEntranceSource = Platform.OS === 'web'
-  ? { uri: Image.resolveAssetSource(casinoEntranceAsset).uri.replace(/^\//, './') }
+  ? { uri: './casino-entrance-gold-v1.png' }
   : casinoEntranceAsset;
 import {
   createDeck,
