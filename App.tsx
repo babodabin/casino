@@ -433,7 +433,11 @@ function renderTab(
   if (tab === '설정') {
     return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} />;
   }
-  return <HomeScreen difficulty={difficulty} records={records} onOpenBlackjack={onOpenBlackjack} />;
+  return <HomeScreen difficulty={difficulty} records={records} onContinue={(gameName) => {
+    const casinoCategory = gameCategories[1];
+    const game = casinoCategory.games.find((item) => item.name === gameName) ?? casinoCategory.games[0];
+    onOpenCatalogGame(casinoCategory, game);
+  }} />;
 }
 
 function Page({ children }: { children: React.ReactNode }) {
@@ -451,7 +455,11 @@ function formatPlayedAt(value: string) {
   return new Date(value).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: string; records: GameRecord[]; onOpenBlackjack: () => void }) {
+function HomeScreen({ difficulty, records, onContinue }: { difficulty: string; records: GameRecord[]; onContinue: (game: GameRecord['game']) => void }) {
+  const recentGame = records[0];
+  const continueGame = recentGame?.game ?? '블랙잭';
+  const continueDifficulty = recentGame?.difficulty ?? difficulty;
+  const continueBet = recentGame?.bet ?? 500;
   return (
     <Page>
       <Text style={styles.eyebrow}>오늘도 즐거운 한 판</Text>
@@ -459,13 +467,13 @@ function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: stri
 
       <Text style={styles.sectionTitle}>이어서 하기</Text>
       <View style={styles.heroCard}>
-        <View style={styles.blackjackMark}><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></View>
+        <View style={styles.blackjackMark}>{continueGame === '룰렛' ? <Text style={styles.rouletteContinueMark}>◎</Text> : <><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></>}</View>
         <View style={styles.heroCopy}>
           <Text style={styles.muted}>최근 플레이</Text>
-          <Text style={styles.cardTitle}>블랙잭</Text>
-          <Text style={styles.smallText}>{difficulty} · 베팅 500 WC</Text>
+          <Text style={styles.cardTitle}>{continueGame}</Text>
+          <Text style={styles.smallText}>{continueDifficulty} · 베팅 {continueBet.toLocaleString()} WC</Text>
         </View>
-        <Pressable style={styles.smallButton} onPress={onOpenBlackjack}><Text style={styles.smallButtonText}>계속</Text></Pressable>
+        <Pressable style={styles.smallButton} onPress={() => onContinue(continueGame)}><Text style={styles.smallButtonText}>계속</Text></Pressable>
       </View>
 
       <Text style={styles.sectionTitle}>최근 플레이</Text>
@@ -1353,6 +1361,7 @@ const styles = StyleSheet.create({
   heroCard: { minHeight: 128, flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', borderRadius: 18 },
   blackjackMark: { width: 72, height: 92, borderRadius: 12, backgroundColor: '#10372C', alignItems: 'center', justifyContent: 'center', gap: 3 },
   cardSuit: { color: '#F2E6CB', fontSize: 19, fontWeight: '800' },
+  rouletteContinueMark: { color: colors.goldLight, fontSize: 46, fontWeight: '900' },
   heroCopy: { flex: 1, marginLeft: 14 },
   cardTitle: { color: colors.text, fontSize: 21, fontWeight: '800', marginVertical: 4 },
   muted: { color: colors.muted, fontSize: 13 },
