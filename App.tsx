@@ -47,16 +47,17 @@ import {
   type BaccaratWinner,
 } from './src/baccarat';
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
+import { spinSlot, type SlotResult, type SlotSymbol } from './src/slot';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -88,7 +89,7 @@ const gameCategories: GameCategory[] = [
     { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
     { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
     { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'planned' },
-    { name: '슬롯', icon: '7', description: '같은 그림 조합을 완성하는 머신 게임', status: 'planned' },
+    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
   ]},
   { name: '포커·카드', icon: '♠', detail: '홀덤 · 오마하 · 포커', eyebrow: 'POKER & CARDS', games: [
     { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'planned' },
@@ -335,6 +336,15 @@ export default function App() {
     });
   };
 
+  const settleSlot = (stake: number, result: SlotResult, usedFreeSpin: boolean) => {
+    if (result.payout > 0) setCoins((current) => { const next = current + result.payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    const net = result.payout - (usedFreeSpin ? 0 : stake);
+    setRecords((current) => {
+      const record: GameRecord = { id: `${Date.now()}-slot-${current.length}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeSpin ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `${result.reels.join(' ')} · ${result.label}` };
+      const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next;
+    });
+  };
+
   if (!entered) {
     return (
       <SafeAreaView style={styles.splash}>
@@ -376,7 +386,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : 'gamePreview');
             }}
           />
         )}
@@ -435,6 +445,8 @@ export default function App() {
         )}
         {appScreen === 'crapsSetup' && <CrapsSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('crapsGame')} />}
         {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleCraps} />}
+        {appScreen === 'slotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('slotGame')} />}
+        {appScreen === 'slotGame' && <SlotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSlot} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -444,7 +456,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -852,6 +864,50 @@ function GamePreviewScreen({ game, category, difficulty, onBack }: { game: Catal
       </ScrollView>
     </View>
   );
+}
+
+function SlotRules({ compact = false }: { compact?: boolean }) {
+  return <View style={[styles.slotRules, compact && styles.slotRulesCompact]}><Text style={styles.slotRulesTitle}>당첨 규칙</Text><Text style={styles.slotRuleText}>같은 그림 2개 · 베팅의 1.5배 작은 보너스</Text><Text style={styles.slotRuleText}>같은 그림 3개 · 그림별 4~50배 당첨</Text><Text style={styles.slotRuleText}>🃏 조커 · 다른 그림을 대신하는 와일드</Text><Text style={styles.slotRuleText}>⭐ 별 3개 · 무료 회전 5회</Text><Text style={styles.slotRuleText}>👑 왕관 3개 · 50배 잭팟</Text></View>;
+}
+
+function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onDifficultyChange: (value: string) => void; onBetChange: (value: number) => void; onStart: () => void }) {
+  const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  return <View style={styles.detailScreen}><ScreenHeader title="슬롯 설정" onBack={props.onBack} /><ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.slotSetupHero}><Text style={styles.slotLogo}>7</Text><View style={styles.slotSetupCopy}><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.detailLead}>그림을 맞추고 보너스에 도전</Text><Text style={styles.gameListDescription}>한 번 회전이 한 판이며, 무료 회전이 나오면 계속 이어집니다.</Text></View></View>
+    <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><View style={[styles.slotModeCard, styles.slotModeActive]}><Text style={styles.slotModeTitleActive}>클래식 슬롯</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></View><View style={[styles.slotModeCard, styles.disabledCard]}><Text style={styles.slotModeTitle}>일본식 파치슬롯</Text><Text style={styles.slotModeText}>직접 릴 정지 · 다음 단계</Text></View></View>
+    <SlotRules />
+    <Text style={styles.sectionTitle}>난이도</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{item.name}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
+    <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="선택 모드" value="클래식 슬롯" /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
+    <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>클래식 슬롯 시작</Text></Pressable>
+  </ScrollView></View>;
+}
+
+function SlotGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, result: SlotResult, usedFreeSpin: boolean) => void }) {
+  const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
+  const [reels, setReels] = useState<[SlotSymbol, SlotSymbol, SlotSymbol]>(['🍒', '🔔', '👑']);
+  const [result, setResult] = useState<SlotResult | null>(null);
+  const [freeSpins, setFreeSpins] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const spin = () => {
+    if (spinning) return;
+    const usedFreeSpin = freeSpins > 0;
+    if (!usedFreeSpin && !onPlaceBet(selectedBet)) return;
+    if (usedFreeSpin) setFreeSpins((value) => value - 1);
+    setSpinning(true); setResult(null);
+    const ticker = setInterval(() => setReels([spinSlot(1).reels[0], spinSlot(1).reels[1], spinSlot(1).reels[2]]), 90);
+    setTimeout(() => {
+      clearInterval(ticker);
+      const next = spinSlot(selectedBet); setReels(next.reels); setResult(next); setFreeSpins((value) => value + next.freeSpins); setSpinning(false); onSettle(selectedBet, next, usedFreeSpin);
+    }, 720);
+  };
+  return <View style={styles.slotScreen}><ScreenHeader title="클래식 슬롯" onBack={onBack} /><ScrollView contentContainerStyle={styles.slotPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View>
+    <View style={styles.slotMachine}><Text style={styles.slotJackpot}>◆ JACKPOT · x50 ◆</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, Boolean(result?.multiplier) && styles.slotReelWin]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '회전 중…' : result?.label ?? 'SPIN을 눌러 시작하세요'}</Text>{result && <Text style={[styles.slotPayout, result.payout > 0 ? styles.positive : styles.muted]}>{result.payout > 0 ? `+${result.payout.toLocaleString()} WC 지급` : '당첨 없음'}</Text>}{freeSpins > 0 && <Text style={styles.freeSpinBadge}>무료 회전 {freeSpins}회 남음</Text>}</View>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={spinning || freeSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
+    <Pressable disabled={spinning || (freeSpins === 0 && selectedBet > coins)} style={[styles.slotSpinButton, (spinning || (freeSpins === 0 && selectedBet > coins)) && styles.disabledCard]} onPress={spin}><Text style={styles.slotSpinText}>{spinning ? '회전 중…' : freeSpins > 0 ? `무료 SPIN · ${freeSpins}회` : `SPIN · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
+    <SlotRules compact /><Text style={styles.disclaimer}>게임 전용 가상 코인 · 현금 환전 불가</Text>
+  </ScrollView></View>;
 }
 
 function PlayingCard({ card, hidden = false }: { card: Card; hidden?: boolean }) {
@@ -1727,6 +1783,33 @@ const styles = StyleSheet.create({
   exitButton: { minHeight: 48, width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   exitButtonText: { color: colors.goldLight, fontSize: 14, fontWeight: '800' },
   gameFooter: { color: '#7F9E92', fontSize: 11, textAlign: 'center', marginTop: 18 },
+  slotSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 18, borderRadius: 20, backgroundColor: '#311326', borderWidth: 1, borderColor: '#8D4B72' },
+  slotLogo: { width: 78, color: '#FFDF75', fontSize: 68, lineHeight: 72, fontWeight: '900', textAlign: 'center', textShadowColor: '#D52D51', textShadowRadius: 6 },
+  slotSetupCopy: { flex: 1, marginLeft: 12 },
+  slotModeRow: { flexDirection: 'row', gap: 9 },
+  slotModeCard: { flex: 1, minHeight: 82, padding: 12, justifyContent: 'center', borderRadius: 15, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  slotModeActive: { backgroundColor: '#38270D', borderColor: colors.gold },
+  slotModeTitle: { color: colors.muted, fontSize: 13, fontWeight: '900' },
+  slotModeTitleActive: { color: colors.goldLight, fontSize: 13, fontWeight: '900' },
+  slotModeText: { color: colors.muted, fontSize: 10, lineHeight: 15, marginTop: 5 },
+  slotRules: { marginTop: 18, padding: 16, borderRadius: 17, backgroundColor: '#1C1625', borderWidth: 1, borderColor: '#65476F' },
+  slotRulesCompact: { marginTop: 22 },
+  slotRulesTitle: { color: colors.goldLight, fontSize: 15, fontWeight: '900', marginBottom: 7 },
+  slotRuleText: { color: '#D8D3DF', fontSize: 11, lineHeight: 19 },
+  slotScreen: { flex: 1, backgroundColor: '#130914' },
+  slotPage: { padding: 18, paddingBottom: 44 },
+  slotMachine: { minHeight: 310, alignItems: 'center', marginTop: 18, padding: 18, borderRadius: 28, backgroundColor: '#5A1735', borderWidth: 6, borderColor: '#D9AE3D', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } },
+  slotJackpot: { color: '#FFE588', fontSize: 17, fontWeight: '900', letterSpacing: 1.5, marginBottom: 20 },
+  slotReels: { width: '100%', flexDirection: 'row', gap: 7, padding: 8, borderRadius: 16, backgroundColor: '#24101B', borderWidth: 2, borderColor: '#F0D178' },
+  slotReel: { flex: 1, aspectRatio: 0.78, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 10, backgroundColor: '#FFF8E8', borderWidth: 2, borderColor: '#C9B989' },
+  slotReelWin: { borderColor: '#FFE04F', backgroundColor: '#FFF2B5' },
+  slotSymbol: { fontSize: 47 },
+  slotPayline: { position: 'absolute', left: 20, right: 20, top: 143, height: 2, backgroundColor: '#F43C61', opacity: 0.8 },
+  slotMachineLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '900', textAlign: 'center', marginTop: 18 },
+  slotPayout: { fontSize: 14, fontWeight: '900', marginTop: 7 },
+  freeSpinBadge: { color: '#281900', fontSize: 12, fontWeight: '900', marginTop: 10, paddingHorizontal: 14, paddingVertical: 7, overflow: 'hidden', borderRadius: 14, backgroundColor: '#FFD65A' },
+  slotSpinButton: { minHeight: 72, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 36, backgroundColor: '#D82D52', borderWidth: 4, borderColor: '#FFD96B', shadowColor: '#FF5372', shadowOpacity: 0.5, shadowRadius: 8 },
+  slotSpinText: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', letterSpacing: 1 },
   baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
   crapsSetupHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#183324', borderWidth: 1, borderColor: '#53705E' },
   crapsHeroDice: { color: colors.goldLight, fontSize: 48, marginBottom: 8 },
