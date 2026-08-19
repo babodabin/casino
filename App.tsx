@@ -789,7 +789,10 @@ function BlackjackSetupScreen(props: {
                 style={[styles.betButton, selected && styles.betButtonActive, disabled && styles.disabledCard]}
                 onPress={() => props.onBetChange(bet)}
               >
-                <Text style={[styles.betButtonText, selected && styles.betButtonTextActive]}>{bet.toLocaleString()} WC</Text>
+                <View style={[styles.betCoinCenter, selected && styles.betCoinCenterActive]}>
+                  <Text style={[styles.betButtonText, selected && styles.betButtonTextActive]}>{bet.toLocaleString()}</Text>
+                  <Text style={[styles.betButtonUnit, selected && styles.betButtonTextActive]}>WC</Text>
+                </View>
               </Pressable>
             );
           })}
@@ -1659,11 +1662,14 @@ const styles = StyleSheet.create({
   setupOptionTitle: { color: colors.muted, fontSize: 14, fontWeight: '800' },
   setupOptionTitleActive: { color: colors.goldLight },
   setupOptionRange: { color: colors.muted, fontSize: 9, marginTop: 5 },
-  betGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  betButton: { width: '48%', minHeight: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
-  betButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  betGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 7 },
+  betButton: { width: '23%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999, backgroundColor: '#6E5518', borderWidth: 4, borderColor: '#D8AC3B', shadowColor: '#000000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 4, elevation: 5 },
+  betButtonActive: { backgroundColor: '#E1B63F', borderColor: '#FFE99A', shadowColor: colors.goldLight, shadowOpacity: 0.65 },
+  betCoinCenter: { width: '72%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: '#F0CE70' },
+  betCoinCenterActive: { borderColor: '#5B410B', borderWidth: 2 },
   betButtonText: { color: colors.text, fontSize: 14, fontWeight: '800' },
   betButtonTextActive: { color: '#171107' },
+  betButtonUnit: { color: colors.goldLight, fontSize: 8, fontWeight: '900', marginTop: 1 },
   coinStack: { width: 68, height: 78, alignSelf: 'center', position: 'relative' },
   coinStackCompact: { width: 44, height: 49, marginBottom: 2 },
   worldCoinChip: { position: 'absolute', left: 6, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9A928', borderWidth: 4, borderColor: '#FFE69A', shadowColor: '#000000', shadowOpacity: 0.45, shadowRadius: 4, shadowOffset: { width: 0, height: 3 } },
