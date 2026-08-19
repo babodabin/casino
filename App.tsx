@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import {
@@ -304,6 +305,10 @@ export default function App() {
         }, () => {
           setSelectedCategory(gameCategories[1]);
           setAppScreen('blackjackSetup');
+        }, (category, game) => {
+          setSelectedCategory(category);
+          setSelectedCatalogGame(game);
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -361,8 +366,9 @@ function renderTab(
   records: GameRecord[],
   onOpenCategory: (category: GameCategory) => void,
   onOpenBlackjack: () => void,
+  onOpenCatalogGame: (category: GameCategory, game: CatalogGame) => void,
 ) {
-  if (tab === '게임') return <GamesScreen onOpenCategory={onOpenCategory} onOpenBlackjack={onOpenBlackjack} />;
+  if (tab === '게임') return <GamesScreen onOpenCategory={onOpenCategory} onOpenBlackjack={onOpenBlackjack} onOpenCatalogGame={onOpenCatalogGame} />;
   if (tab === '지갑') return <WalletScreen coins={coins} records={records} />;
   if (tab === '기록') return <RecordsScreen records={records} />;
   if (tab === '설정') {
@@ -431,54 +437,101 @@ function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: stri
 function GamesScreen({
   onOpenCategory,
   onOpenBlackjack,
+  onOpenCatalogGame,
 }: {
   onOpenCategory: (category: GameCategory) => void;
   onOpenBlackjack: () => void;
+  onOpenCatalogGame: (category: GameCategory, game: CatalogGame) => void;
 }) {
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'favorites' | 'playable'>('all');
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const allGames = gameCategories.flatMap((category) => category.games.map((game) => ({ category, game })));
+  const visibleGames = allGames.filter(({ game }) => {
+    const matchesQuery = game.name.toLowerCase().includes(query.trim().toLowerCase());
+    const matchesFilter = filter === 'all' || (filter === 'playable' && game.status === 'playable') || (filter === 'favorites' && favorites.includes(game.name));
+    return matchesQuery && matchesFilter;
+  });
+
+  useEffect(() => {
+    AsyncStorage.getItem('world-casino.favorites').then((saved) => {
+      if (saved) setFavorites(JSON.parse(saved));
+    });
+  }, []);
+
+  const toggleFavorite = (gameName: string) => {
+    setFavorites((current) => {
+      const next = current.includes(gameName) ? current.filter((name) => name !== gameName) : [...current, gameName];
+      AsyncStorage.setItem('world-casino.favorites', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const showGameResults = query.trim().length > 0 || filter !== 'all';
+
   return (
     <Page>
       <Text style={styles.pageTitle}>게임</Text>
-      <View style={styles.searchBox}><Text style={styles.muted}>⌕  게임 이름 검색</Text></View>
-      <View style={styles.chipRow}>
-        <View style={[styles.chip, styles.chipActive]}><Text style={styles.chipActiveText}>전체</Text></View>
-        <View style={styles.chip}><Text style={styles.chipText}>즐겨찾기</Text></View>
-        <View style={styles.chip}><Text style={styles.chipText}>플레이 가능</Text></View>
+      <View style={styles.searchBox}>
+        <Text style={styles.searchIcon}>⌕</Text>
+        <TextInput
+          accessibilityLabel="게임 이름 검색"
+          style={styles.searchInput}
+          placeholder="게임 이름 검색"
+          placeholderTextColor={colors.muted}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+        />
+        {query.length > 0 && <Pressable accessibilityRole="button" accessibilityLabel="검색어 지우기" onPress={() => setQuery('')}><Text style={styles.clearSearch}>×</Text></Pressable>}
       </View>
-      <Text style={styles.sectionTitle}>바로 플레이</Text>
-      <Pressable
-        accessibilityRole="button"
-        style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]}
-        onPress={onOpenBlackjack}
-      >
-        <View style={styles.blackjackMark}>
-          <Text style={styles.cardSuit}>A♠</Text>
-          <Text style={styles.cardSuit}>K♥</Text>
-        </View>
-        <View style={styles.heroCopy}>
-          <Text style={styles.muted}>지금 플레이 가능</Text>
-          <Text style={styles.cardTitle}>블랙잭</Text>
-          <Text style={styles.smallText}>난이도와 베팅 금액을 선택해 시작</Text>
-        </View>
-        <View style={styles.smallButton}>
-          <Text style={styles.smallButtonText}>시작</Text>
-        </View>
-      </Pressable>
-      <Text style={styles.sectionTitle}>6개 카테고리</Text>
-      <View style={styles.categoryGrid}>
-        {gameCategories.map((category) => (
-          <Pressable
-            key={category.name}
-            style={({ pressed }) => [styles.categoryCard, pressed && styles.pressed]}
-            onPress={() => onOpenCategory(category)}
-            accessibilityRole="button"
-          >
-            <Text style={styles.categoryIcon}>{category.icon}</Text>
-            <Text style={styles.categoryName}>{category.name}</Text>
-            <Text style={styles.categoryDetail}>{category.detail}</Text>
-            <Text style={styles.categoryCount}>{category.games.length}개 게임</Text>
+      <View style={styles.chipRow}>
+        {([
+          ['all', '전체'],
+          ['favorites', `즐겨찾기 ${favorites.length}`],
+          ['playable', '플레이 가능'],
+        ] as const).map(([value, label]) => (
+          <Pressable key={value} accessibilityRole="button" onPress={() => setFilter(value)} style={[styles.chip, filter === value && styles.chipActive]}>
+            <Text style={filter === value ? styles.chipActiveText : styles.chipText}>{label}</Text>
           </Pressable>
         ))}
       </View>
+      {!showGameResults ? <>
+        <Text style={styles.sectionTitle}>바로 플레이</Text>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]} onPress={onOpenBlackjack}>
+          <View style={styles.blackjackMark}><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></View>
+          <View style={styles.heroCopy}><Text style={styles.muted}>지금 플레이 가능</Text><Text style={styles.cardTitle}>블랙잭</Text><Text style={styles.smallText}>난이도와 베팅 금액을 선택해 시작</Text></View>
+          <View style={styles.smallButton}><Text style={styles.smallButtonText}>시작</Text></View>
+        </Pressable>
+        <Text style={styles.sectionTitle}>6개 카테고리</Text>
+        <View style={styles.categoryGrid}>
+          {gameCategories.map((category) => (
+            <Pressable key={category.name} style={({ pressed }) => [styles.categoryCard, pressed && styles.pressed]} onPress={() => onOpenCategory(category)} accessibilityRole="button">
+              <Text style={styles.categoryIcon}>{category.icon}</Text><Text style={styles.categoryName}>{category.name}</Text><Text style={styles.categoryDetail}>{category.detail}</Text><Text style={styles.categoryCount}>{category.games.length}개 게임</Text>
+            </Pressable>
+          ))}
+        </View>
+      </> : <>
+        <Text style={styles.sectionTitle}>{visibleGames.length}개 게임</Text>
+        <View style={styles.catalogList}>
+          {visibleGames.map(({ category, game }) => (
+            <View key={`${category.name}-${game.name}`} style={styles.gameListCard}>
+              <Pressable accessibilityRole="button" style={styles.resultOpenArea} onPress={() => onOpenCatalogGame(category, game)}>
+                <View style={styles.gameListIcon}><Text style={styles.gameListIconText}>{game.icon}</Text></View>
+                <View style={styles.gameListCopy}>
+                  <Text style={styles.resultCategory}>{category.name}</Text>
+                  <Text style={styles.gameListTitle}>{game.name}</Text>
+                  <Text style={styles.gameListDescription}>{game.description}</Text>
+                </View>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${game.name} 즐겨찾기`} style={styles.favoriteButton} onPress={() => toggleFavorite(game.name)}>
+                <Text style={[styles.favoriteIcon, favorites.includes(game.name) && styles.favoriteIconActive]}>{favorites.includes(game.name) ? '★' : '☆'}</Text>
+              </Pressable>
+            </View>
+          ))}
+          {visibleGames.length === 0 && <View style={styles.panel}><Text style={styles.emptyText}>{filter === 'favorites' ? '즐겨찾기한 게임이 없습니다.' : '검색 결과가 없습니다.'}</Text></View>}
+        </View>
+      </>}
     </Page>
   );
 }
@@ -1104,7 +1157,10 @@ const styles = StyleSheet.create({
   separator: { height: 1, backgroundColor: colors.border },
   progressTrack: { height: 7, marginBottom: 16, borderRadius: 4, backgroundColor: '#252D39', overflow: 'hidden' },
   progressValue: { width: '33%', height: '100%', backgroundColor: colors.gold },
-  searchBox: { height: 48, borderRadius: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, justifyContent: 'center', paddingHorizontal: 15 },
+  searchBox: { height: 48, flexDirection: 'row', alignItems: 'center', borderRadius: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 15 },
+  searchIcon: { color: colors.muted, fontSize: 20, marginRight: 8 },
+  searchInput: { flex: 1, height: '100%', color: colors.text, fontSize: 15 },
+  clearSearch: { color: colors.muted, fontSize: 25, paddingHorizontal: 6 },
   chipRow: { flexDirection: 'row', gap: 8, marginVertical: 14 },
   chip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 14, borderRadius: 19, borderWidth: 1, borderColor: colors.border },
   chipActive: { backgroundColor: colors.gold, borderColor: colors.gold },
@@ -1135,6 +1191,11 @@ const styles = StyleSheet.create({
   roadmapTitle: { color: '#A9CFFF', fontSize: 16, fontWeight: '900' },
   roadmapText: { color: colors.text, fontSize: 12, lineHeight: 20, marginTop: 7 },
   gameListCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  resultOpenArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  resultCategory: { color: colors.gold, fontSize: 10, fontWeight: '800', marginBottom: 3 },
+  favoriteButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  favoriteIcon: { color: colors.muted, fontSize: 25 },
+  favoriteIconActive: { color: colors.gold },
   disabledCard: { opacity: 0.45 },
   gameListIcon: { width: 58, height: 66, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#102C26', borderWidth: 1, borderColor: '#285448' },
   gameListIconText: { color: colors.goldLight, fontSize: 21, fontWeight: '900' },
