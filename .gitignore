@@ -4,5 +4,6 @@ dist/
 dist-test/
 dist-web/
 dist-pages-check/
+dist-*-check/
 web-build/
 *.log

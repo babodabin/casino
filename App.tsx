@@ -28,21 +28,30 @@ import {
   type Card,
   type RoundResult,
 } from './src/blackjack';
+import {
+  rouletteBetWins,
+  rouletteColor,
+  rouletteNet,
+  roulettePayout,
+  spinRoulette,
+  type RouletteBet,
+} from './src/roulette';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭';
+  game: '블랙잭' | '룰렛';
   result: RoundResult;
   difficulty: string;
   bet: number;
   net: number;
   playedAt: string;
+  detail?: string;
 };
 
 const difficultyOptions = [
@@ -65,7 +74,7 @@ const gameCategories: GameCategory[] = [
   { name: '카지노', icon: '◆', detail: '블랙잭 · 룰렛 · 바카라', eyebrow: 'CASINO GAMES', games: [
     { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
     { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'planned' },
-    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'planned' },
+    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
     { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'planned' },
     { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'planned' },
     { name: '슬롯', icon: '7', description: '같은 그림 조합을 완성하는 머신 게임', status: 'planned' },
@@ -226,6 +235,41 @@ export default function App() {
     });
   };
 
+  const placeRouletteBet = (stake: number) => {
+    if (stake > coins) return false;
+    const nextCoins = coins - stake;
+    setCoins(nextCoins);
+    AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+    return true;
+  };
+
+  const settleRoulette = (bet: RouletteBet, stake: number, number: number, label: string) => {
+    const payout = roulettePayout(bet, stake, number);
+    const won = rouletteBetWins(bet, number);
+    if (payout > 0) {
+      setCoins((currentCoins) => {
+        const nextCoins = currentCoins + payout;
+        AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+        return nextCoins;
+      });
+    }
+    setRecords((currentRecords) => {
+      const record: GameRecord = {
+        id: `${Date.now()}-roulette-${currentRecords.length}`,
+        game: '룰렛',
+        result: won ? 'win' : 'loss',
+        difficulty,
+        bet: stake,
+        net: rouletteNet(bet, stake, number),
+        playedAt: new Date().toISOString(),
+        detail: `${label} · 결과 ${number}`,
+      };
+      const nextRecords = [record, ...currentRecords].slice(0, 100);
+      AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(nextRecords));
+      return nextRecords;
+    });
+  };
+
   if (!entered) {
     return (
       <SafeAreaView style={styles.splash}>
@@ -267,7 +311,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : 'gamePreview');
             }}
           />
         )}
@@ -299,6 +343,17 @@ export default function App() {
             onExit={() => setAppScreen('categoryCatalog')}
           />
         )}
+        {appScreen === 'rouletteGame' && (
+          <RouletteGameScreen
+            coins={coins}
+            difficulty={difficulty}
+            selectedBet={selectedBet}
+            onBack={() => setAppScreen('categoryCatalog')}
+            onBetChange={setSelectedBet}
+            onPlaceBet={placeRouletteBet}
+            onSettle={settleRoulette}
+          />
+        )}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -308,7 +363,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -415,8 +470,8 @@ function HomeScreen({ difficulty, records, onOpenBlackjack }: { difficulty: stri
         {records.slice(0, 2).map((record, index) => (
           <React.Fragment key={record.id}>
             <Row
-              title={`블랙잭 · ${resultLabel(record.result)}`}
-              subtitle={`${formatPlayedAt(record.playedAt)} · ${record.difficulty}`}
+              title={`${record.game} · ${resultLabel(record.result)}`}
+              subtitle={`${record.detail ? `${record.detail} · ` : ''}${formatPlayedAt(record.playedAt)} · ${record.difficulty}`}
               value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
               positive={record.net > 0}
             />
@@ -956,6 +1011,112 @@ function BlackjackGameScreen(props: {
   );
 }
 
+function RouletteGameScreen({
+  coins,
+  difficulty,
+  selectedBet,
+  onBack,
+  onBetChange,
+  onPlaceBet,
+  onSettle,
+}: {
+  coins: number;
+  difficulty: string;
+  selectedBet: number;
+  onBack: () => void;
+  onBetChange: (value: number) => void;
+  onPlaceBet: (stake: number) => boolean;
+  onSettle: (bet: RouletteBet, stake: number, number: number, label: string) => void;
+}) {
+  const [bet, setBet] = useState<RouletteBet>({ type: 'red' });
+  const [phase, setPhase] = useState<'betting' | 'spinning' | 'result'>('betting');
+  const [resultNumber, setResultNumber] = useState<number | null>(null);
+  const spinTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const difficultyOption = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
+  const outsideBets: { label: string; bet: RouletteBet; color?: string }[] = [
+    { label: '빨강', bet: { type: 'red' }, color: '#A8323A' },
+    { label: '검정', bet: { type: 'black' }, color: '#20242B' },
+    { label: '홀수', bet: { type: 'odd' } },
+    { label: '짝수', bet: { type: 'even' } },
+    { label: '1–18', bet: { type: 'low' } },
+    { label: '19–36', bet: { type: 'high' } },
+    { label: '1번째 12', bet: { type: 'dozen1' } },
+    { label: '2번째 12', bet: { type: 'dozen2' } },
+    { label: '3번째 12', bet: { type: 'dozen3' } },
+  ];
+  const betLabel = bet.type === 'straight' ? `숫자 ${bet.number}` : outsideBets.find((item) => item.bet.type === bet.type)?.label ?? '';
+  const won = resultNumber !== null && rouletteBetWins(bet, resultNumber);
+
+  useEffect(() => () => {
+    if (spinTimer.current) clearTimeout(spinTimer.current);
+  }, []);
+
+  const spin = () => {
+    if (phase === 'spinning' || !onPlaceBet(selectedBet)) return;
+    setPhase('spinning');
+    setResultNumber(null);
+    spinTimer.current = setTimeout(() => {
+      const number = spinRoulette();
+      setResultNumber(number);
+      setPhase('result');
+      onSettle(bet, selectedBet, number, betLabel);
+    }, 900);
+  };
+
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="유럽식 룰렛" onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.roulettePage} showsVerticalScrollIndicator={false}>
+        <View style={styles.rouletteStatusRow}>
+          <View><Text style={styles.eyebrow}>ROULETTE</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
+          <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View>
+        </View>
+
+        <View style={[styles.rouletteWheel, phase === 'spinning' && styles.rouletteWheelSpinning]}>
+          <View style={styles.rouletteWheelInner}>
+            <Text style={[styles.rouletteResultNumber, resultNumber !== null && rouletteColor(resultNumber) === 'red' && styles.rouletteRedText]}>{phase === 'spinning' ? '•••' : resultNumber ?? '◎'}</Text>
+            <Text style={styles.rouletteWheelLabel}>{phase === 'spinning' ? '회전 중' : resultNumber === null ? '베팅을 선택하세요' : rouletteColor(resultNumber) === 'green' ? 'GREEN' : rouletteColor(resultNumber).toUpperCase()}</Text>
+          </View>
+        </View>
+
+        {phase === 'result' && resultNumber !== null && (
+          <View style={[styles.rouletteResultCard, won ? styles.rouletteWinCard : styles.rouletteLossCard]}>
+            <Text style={styles.rouletteResultTitle}>{won ? '적중!' : '아쉽게 빗나갔습니다'}</Text>
+            <Text style={styles.smallText}>{betLabel} · {won ? `+${rouletteNet(bet, selectedBet, resultNumber).toLocaleString()} WC` : `-${selectedBet.toLocaleString()} WC`}</Text>
+          </View>
+        )}
+
+        <Text style={styles.sectionTitle}>바깥 베팅</Text>
+        <View style={styles.rouletteBetGrid}>
+          {outsideBets.map((item) => {
+            const active = bet.type === item.bet.type;
+            return <Pressable key={item.bet.type} disabled={phase === 'spinning'} onPress={() => { setBet(item.bet); setPhase('betting'); }} style={[styles.rouletteBetButton, item.color ? { backgroundColor: item.color } : null, active && styles.rouletteBetActive]}><Text style={styles.rouletteBetText}>{item.label}</Text><Text style={styles.rouletteOdds}>{item.bet.type.startsWith('dozen') ? '2:1' : '1:1'}</Text></Pressable>;
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>숫자 하나 선택 · 35:1</Text>
+        <View style={styles.numberGrid}>
+          {Array.from({ length: 37 }, (_, number) => {
+            const active = bet.type === 'straight' && bet.number === number;
+            const color = rouletteColor(number);
+            return <Pressable key={number} disabled={phase === 'spinning'} onPress={() => { setBet({ type: 'straight', number }); setPhase('betting'); }} style={[styles.numberCell, color === 'red' ? styles.numberRed : color === 'black' ? styles.numberBlack : styles.numberGreen, active && styles.numberActive]}><Text style={styles.numberText}>{number}</Text></Pressable>;
+          })}
+        </View>
+
+        <Text style={styles.sectionTitle}>베팅 금액</Text>
+        <View style={styles.setupOptions}>
+          {difficultyOption.bets.map((amount) => <Pressable key={amount} disabled={phase === 'spinning'} style={[styles.rouletteChip, selectedBet === amount && styles.rouletteChipActive]} onPress={() => onBetChange(amount)}><Text style={[styles.setupOptionTitle, selectedBet === amount && styles.setupOptionTitleActive]}>{amount.toLocaleString()}</Text><Text style={styles.rouletteChipUnit}>WC</Text></Pressable>)}
+        </View>
+
+        <Pressable accessibilityRole="button" disabled={phase === 'spinning' || selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, (phase === 'spinning' || selectedBet > coins) && styles.disabledCard]} onPress={spin}>
+          <Text style={styles.primaryButtonText}>{phase === 'spinning' ? '회전 중…' : `${betLabel}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text>
+        </Pressable>
+        <Text style={styles.disclaimer}>유럽식 단일 0 룰렛 · 게임 전용 코인</Text>
+      </ScrollView>
+    </View>
+  );
+}
+
 function WalletScreen({ coins, records }: { coins: number; records: GameRecord[] }) {
   const totalNet = records.reduce((sum, record) => sum + record.net, 0);
   const returnRate = totalNet / 10000 * 100;
@@ -1024,12 +1185,12 @@ function RecordsScreen({ records }: { records: GameRecord[] }) {
       </View>
       <Text style={styles.sectionTitle}>최근 경기</Text>
       <View style={styles.panel}>
-        {records.length === 0 && <Text style={styles.emptyText}>블랙잭을 완료하면 기록이 여기에 저장됩니다.</Text>}
+        {records.length === 0 && <Text style={styles.emptyText}>게임을 완료하면 기록이 여기에 저장됩니다.</Text>}
         {records.map((record, index) => (
           <React.Fragment key={record.id}>
             <Row
-              title={`블랙잭 · ${resultLabel(record.result)}`}
-              subtitle={`${record.difficulty} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
+              title={`${record.game} · ${resultLabel(record.result)}`}
+              subtitle={`${record.detail ? `${record.detail} · ` : ''}${record.difficulty} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
               value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
               positive={record.net > 0}
             />
@@ -1264,6 +1425,37 @@ const styles = StyleSheet.create({
   exitButton: { minHeight: 48, width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   exitButtonText: { color: colors.goldLight, fontSize: 14, fontWeight: '800' },
   gameFooter: { color: '#7F9E92', fontSize: 11, textAlign: 'center', marginTop: 18 },
+  roulettePage: { padding: 18, paddingBottom: 44 },
+  rouletteStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  rouletteBalance: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 3 },
+  difficultyBadge: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: '#2E2512', borderWidth: 1, borderColor: colors.gold },
+  difficultyBadgeText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
+  rouletteWheel: { width: 190, height: 190, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 22, borderRadius: 95, backgroundColor: '#171B20', borderWidth: 14, borderColor: '#9A7829' },
+  rouletteWheelSpinning: { borderColor: colors.gold, backgroundColor: '#253D34' },
+  rouletteWheelInner: { width: 125, height: 125, alignItems: 'center', justifyContent: 'center', borderRadius: 63, backgroundColor: '#0B251D', borderWidth: 2, borderColor: '#E0C276' },
+  rouletteResultNumber: { color: colors.text, fontSize: 44, fontWeight: '900' },
+  rouletteRedText: { color: '#FF6973' },
+  rouletteWheelLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', marginTop: 2 },
+  rouletteResultCard: { padding: 15, borderRadius: 16, borderWidth: 1, marginBottom: 2 },
+  rouletteWinCard: { backgroundColor: '#12382D', borderColor: colors.green },
+  rouletteLossCard: { backgroundColor: '#3A1B20', borderColor: colors.red },
+  rouletteResultTitle: { color: colors.text, fontSize: 18, fontWeight: '900', marginBottom: 4 },
+  rouletteBetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  rouletteBetButton: { width: '31%', minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  rouletteBetActive: { borderColor: colors.goldLight, borderWidth: 3 },
+  rouletteBetText: { color: colors.text, fontSize: 13, fontWeight: '900' },
+  rouletteOdds: { color: '#CDD3D8', fontSize: 9, marginTop: 3 },
+  numberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  numberCell: { width: '12%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#59616A' },
+  numberRed: { backgroundColor: '#9D3038' },
+  numberBlack: { backgroundColor: '#20242B' },
+  numberGreen: { backgroundColor: '#16714D' },
+  numberActive: { borderColor: colors.goldLight, borderWidth: 3 },
+  numberText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  rouletteChip: { width: '23%', minHeight: 62, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#232A34', borderWidth: 2, borderColor: '#4B5563' },
+  rouletteChipActive: { backgroundColor: '#4A3812', borderColor: colors.goldLight },
+  rouletteChipUnit: { color: colors.muted, fontSize: 9, marginTop: 2 },
+  rouletteSpinButton: { width: '100%', marginTop: 24 },
   balanceCard: { minHeight: 235, backgroundColor: '#111A24', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#6D5520' },
   balance: { color: colors.text, fontSize: 32, fontWeight: '900', marginVertical: 8 },
   chart: { height: 100, flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
