@@ -49,16 +49,17 @@ import {
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
 import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
+import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -107,7 +108,7 @@ const gameCategories: GameCategory[] = [
     { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'planned' },
     { name: '세븐 포커', icon: '7♠', description: '일곱 장 중 최고의 다섯 장을 선택', status: 'planned' },
     { name: '파이브 카드 드로우', icon: '5', description: '카드를 교환해 족보를 완성', status: 'planned' },
-    { name: '비디오 포커', icon: 'VP', description: '기계와 즐기는 빠른 포커', status: 'planned' },
+    { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
     { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패를 함께 겨루기', status: 'planned' },
   ]},
   { name: '마작', icon: '發', detail: '리치 · 중국식 마작', eyebrow: 'MAHJONG', games: [
@@ -369,6 +370,12 @@ export default function App() {
     setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-sicbo-${current.length}`, game: '식보', result: net > 0 ? 'win' : 'loss', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${sicBoBetLabel(bet)} · ${dice.join('·')} · 합계 ${dice[0] + dice[1] + dice[2]}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
   };
 
+  const settleVideoPoker = (stake: number, hand: Card[]) => {
+    const result = evaluateVideoPoker(hand); const payout = videoPokerPayout(stake, hand); const net = videoPokerNet(stake, hand);
+    if (payout > 0) setCoins((current) => { const next = current + payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-video-poker-${current.length}`, game: '비디오 포커', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${result.label} · ${hand.map((card) => `${card.rank}${card.suit}`).join(' ')}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
+  };
+
   if (!entered) {
     return (
       <SafeAreaView style={styles.splash}>
@@ -410,7 +417,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : 'gamePreview');
             }}
           />
         )}
@@ -474,6 +481,7 @@ export default function App() {
         {appScreen === 'pachislotGame' && <PachislotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settlePachislot} />}
         {appScreen === 'sicboSetup' && <SicBoSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sicboGame')} />}
         {appScreen === 'sicboGame' && <SicBoGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSicBo} />}
+        {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleVideoPoker} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -483,7 +491,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -1021,13 +1029,31 @@ function SicBoGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, 
   </ScrollView></View>;
 }
 
-function PlayingCard({ card, hidden = false }: { card: Card; hidden?: boolean }) {
+function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, hand: Card[]) => void }) {
+  const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
+  const [hand, setHand] = useState<Card[]>([]); const [deck, setDeck] = useState<Card[]>([]); const [held, setHeld] = useState([false, false, false, false, false]); const [phase, setPhase] = useState<'ready' | 'hold' | 'result'>('ready');
+  const result = phase === 'result' ? evaluateVideoPoker(hand) : null;
+  const deal = () => { if (!onPlaceBet(selectedBet)) return; const next = dealVideoPoker(); setHand(next.hand); setDeck(next.deck); setHeld([false, false, false, false, false]); setPhase('hold'); };
+  const draw = () => { const next = exchangeVideoPoker(hand, deck, held); setHand(next.hand); setDeck(next.deck); setPhase('result'); onSettle(selectedBet, next.hand); };
+  const reset = () => { setHand([]); setDeck([]); setHeld([false, false, false, false, false]); setPhase('ready'); };
+  return <View style={styles.videoPokerScreen}><ScreenHeader title="비디오 포커(Video Poker)" onBack={onBack} /><ScrollView contentContainerStyle={styles.videoPokerPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>JACKS OR BETTER</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
+    <View style={styles.videoPokerMachine}><Text style={styles.videoPokerPrompt}>{phase === 'ready' ? '카드 5장을 받아보세요' : phase === 'hold' ? '남길 카드를 누른 뒤 교환하세요' : result?.label}</Text><View style={styles.videoPokerHand}>{hand.length ? hand.map((card, index) => <Pressable key={card.id} disabled={phase !== 'hold'} onPress={() => setHeld((current) => current.map((value, cardIndex) => cardIndex === index ? !value : value))} style={[styles.videoPokerCardWrap, held[index] && styles.videoPokerHeld]}><PlayingCard card={card} compact /><Text style={[styles.videoPokerHoldLabel, held[index] && styles.videoPokerHoldActive]}>{held[index] ? '보관' : phase === 'hold' ? '교환' : ' '}</Text></Pressable>) : [0,1,2,3,4].map((index) => <View key={index} style={[styles.playingCard, styles.compactPlayingCard, styles.hiddenCard, styles.videoPokerEmpty]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View>{result && <View style={styles.videoPokerResult}><Text style={styles.resultTitle}>{result.label}</Text><Text style={[styles.resultNet, result.multiplier > 0 ? styles.positive : styles.negative]}>{result.multiplier > 0 ? `+${videoPokerPayout(selectedBet, hand).toLocaleString()} WC 지급` : `-${selectedBet.toLocaleString()} WC`}</Text></View>}</View>
+    {phase === 'ready' && <Pressable disabled={selectedBet > coins} onPress={deal} style={[styles.primaryButton, styles.rouletteSpinButton, selectedBet > coins && styles.disabledCard]}><Text style={styles.primaryButtonText}>카드 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>}
+    {phase === 'hold' && <Pressable onPress={draw} style={[styles.primaryButton, styles.rouletteSpinButton]}><Text style={styles.primaryButtonText}>선택하지 않은 카드 교환</Text></Pressable>}
+    {phase === 'result' && <Pressable onPress={reset} style={[styles.primaryButton, styles.rouletteSpinButton]}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
+    <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>Jacks or Better 배당</Text><Text style={styles.slotRuleText}>잭 이상 원 페어 1배 · 투 페어 2배 · 트리플 3배</Text><Text style={styles.slotRuleText}>스트레이트 4배 · 플러시 6배 · 풀하우스 9배</Text><Text style={styles.slotRuleText}>포카드 25배 · 스트레이트 플러시 50배 · 로열 플러시 250배</Text></View>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>첫 5장을 받은 뒤 한 번만 교환합니다 · 게임 전용 가상 코인</Text>
+  </ScrollView></View>;
+}
+
+function PlayingCard({ card, hidden = false, compact = false }: { card: Card; hidden?: boolean; compact?: boolean }) {
   if (hidden) {
-    return <View style={[styles.playingCard, styles.hiddenCard]}><Text style={styles.hiddenCardMark}>◆</Text></View>;
+    return <View style={[styles.playingCard, compact && styles.compactPlayingCard, styles.hiddenCard]}><Text style={styles.hiddenCardMark}>◆</Text></View>;
   }
   const red = card.suit === '♥' || card.suit === '♦';
   return (
-    <View style={styles.playingCard}>
+    <View style={[styles.playingCard, compact && styles.compactPlayingCard]}>
       <Text style={[styles.playingCardRank, red && styles.redCard]}>{card.rank}</Text>
       <Text style={[styles.playingCardSuit, red && styles.redCard]}>{card.suit}</Text>
     </View>
@@ -1870,6 +1896,7 @@ const styles = StyleSheet.create({
   scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
   cardRow: { minHeight: 126, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   playingCard: { width: 72, height: 108, borderRadius: 10, padding: 8, justifyContent: 'space-between', backgroundColor: '#F7F1E3', borderWidth: 1, borderColor: '#D4C9B2' },
+  compactPlayingCard: { width: 58, height: 88, padding: 6 },
   playingCardRank: { color: '#121212', fontSize: 21, fontWeight: '900' },
   playingCardSuit: { color: '#121212', fontSize: 29, alignSelf: 'center' },
   redCard: { color: '#C43A40' },
@@ -1951,6 +1978,18 @@ const styles = StyleSheet.create({
   sicboBetActive: { borderWidth: 3, borderColor: colors.goldLight, backgroundColor: '#53301A' },
   sicboBetTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', textAlign: 'center' },
   sicboOdds: { color: '#C9BDC2', fontSize: 8, marginTop: 4 },
+  videoPokerScreen: { flex: 1, backgroundColor: '#071A2A' },
+  videoPokerPage: { padding: 18, paddingBottom: 48 },
+  videoPokerMachine: { marginTop: 16, paddingVertical: 22, paddingHorizontal: 10, borderRadius: 22, backgroundColor: '#14395A', borderWidth: 3, borderColor: '#D8B451', alignItems: 'center' },
+  videoPokerPrompt: { color: '#FFF1C4', fontSize: 16, fontWeight: '900', marginBottom: 18, textAlign: 'center' },
+  videoPokerHand: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 3 },
+  videoPokerCardWrap: { alignItems: 'center', borderRadius: 11, padding: 2 },
+  videoPokerHeld: { backgroundColor: '#D8B451' },
+  videoPokerHoldLabel: { color: '#9EB3C5', fontSize: 10, fontWeight: '900', marginTop: 5 },
+  videoPokerHoldActive: { color: '#FFF1C4' },
+  videoPokerEmpty: { opacity: 0.7 },
+  videoPokerResult: { marginTop: 18, alignItems: 'center' },
+  videoPokerPaytable: { marginTop: 18, padding: 16, borderRadius: 16, backgroundColor: '#102C45', borderWidth: 1, borderColor: '#456781' },
   baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
   crapsSetupHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#183324', borderWidth: 1, borderColor: '#53705E' },
   crapsHeroDice: { color: colors.goldLight, fontSize: 48, marginBottom: 8 },
