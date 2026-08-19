@@ -607,6 +607,20 @@ function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) 
   );
 }
 
+function CoinStack({ amount, compact = false }: { amount: number; compact?: boolean }) {
+  const layerCount = amount >= 5000 ? 5 : amount >= 1000 ? 4 : amount >= 500 ? 3 : 2;
+  const layers = Array.from({ length: layerCount });
+  return (
+    <View style={[styles.coinStack, compact && styles.coinStackCompact]} accessibilityLabel={`${amount.toLocaleString()} 월드코인 베팅`}>
+      {layers.map((_, index) => (
+        <View key={index} style={[styles.worldCoinChip, compact && styles.worldCoinChipCompact, { bottom: index * (compact ? 3 : 5), zIndex: index + 1 }]}>
+          {index === layerCount - 1 && <><Text style={[styles.worldCoinAmount, compact && styles.worldCoinAmountCompact]}>{amount.toLocaleString()}</Text><Text style={[styles.worldCoinUnit, compact && styles.worldCoinUnitCompact]}>WC</Text></>}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function CategoryCatalogScreen({ category, onBack, onOpenGame }: { category: GameCategory; onBack: () => void; onOpenGame: (game: CatalogGame) => void }) {
   return (
     <View style={styles.detailScreen}>
@@ -693,6 +707,12 @@ function BlackjackSetupScreen(props: {
               </Pressable>
             );
           })}
+        </View>
+
+        <View style={styles.blackjackBetSpot}>
+          <Text style={styles.blackjackBetSpotLabel}>BET</Text>
+          <CoinStack amount={props.selectedBet} />
+          <Text style={styles.blackjackBetSpotCaption}>{props.selectedBet.toLocaleString()} 월드코인을 테이블에 올렸습니다</Text>
         </View>
 
         <View style={styles.setupSummary}>
@@ -906,7 +926,7 @@ function BlackjackGameScreen(props: {
     <View style={styles.blackjackTable}>
       <View style={styles.gameTopBar}>
         <Text style={styles.gameTopTitle}>BLACKJACK</Text>
-        <View style={styles.gameBetPill}><Text style={styles.gameBetText}>베팅 {totalBet.toLocaleString()} WC</Text></View>
+        <View style={styles.gameBetPill}><CoinStack amount={totalBet} compact /><Text style={styles.gameBetText}>베팅 중</Text></View>
       </View>
 
       <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
@@ -1122,7 +1142,7 @@ function RouletteGameScreen({
         <View style={styles.rouletteBetGrid}>
           {outsideBets.map((item) => {
             const active = bet.type === item.bet.type;
-            return <Pressable key={item.bet.type} disabled={phase === 'spinning'} onPress={() => { setBet(item.bet); setPhase('betting'); }} style={[styles.rouletteBetButton, item.color ? { backgroundColor: item.color } : null, active && styles.rouletteBetActive]}><Text style={styles.rouletteBetText}>{item.label}</Text><Text style={styles.rouletteOdds}>{item.bet.type.startsWith('dozen') ? '2:1' : '1:1'}</Text></Pressable>;
+            return <Pressable key={item.bet.type} disabled={phase === 'spinning'} onPress={() => { setBet(item.bet); setPhase('betting'); }} style={[styles.rouletteBetButton, item.color ? { backgroundColor: item.color } : null, active && styles.rouletteBetActive]}>{active && <CoinStack amount={selectedBet} compact />}<Text style={styles.rouletteBetText}>{item.label}</Text><Text style={styles.rouletteOdds}>{item.bet.type.startsWith('dozen') ? '2:1' : '1:1'}</Text></Pressable>;
           })}
         </View>
 
@@ -1131,7 +1151,7 @@ function RouletteGameScreen({
           {Array.from({ length: 37 }, (_, number) => {
             const active = bet.type === 'straight' && bet.number === number;
             const color = rouletteColor(number);
-            return <Pressable key={number} disabled={phase === 'spinning'} onPress={() => { setBet({ type: 'straight', number }); setPhase('betting'); }} style={[styles.numberCell, color === 'red' ? styles.numberRed : color === 'black' ? styles.numberBlack : styles.numberGreen, active && styles.numberActive]}><Text style={styles.numberText}>{number}</Text></Pressable>;
+            return <Pressable key={number} disabled={phase === 'spinning'} onPress={() => { setBet({ type: 'straight', number }); setPhase('betting'); }} style={[styles.numberCell, color === 'red' ? styles.numberRed : color === 'black' ? styles.numberBlack : styles.numberGreen, active && styles.numberActive]}>{active && <View style={styles.numberCoin}><Text style={styles.numberCoinText}>{selectedBet.toLocaleString()}</Text><Text style={styles.numberCoinUnit}>WC</Text></View>}<Text style={[styles.numberText, active && styles.numberTextWithCoin]}>{number}</Text></Pressable>;
           })}
         </View>
 
@@ -1414,13 +1434,24 @@ const styles = StyleSheet.create({
   betButtonActive: { backgroundColor: colors.gold, borderColor: colors.gold },
   betButtonText: { color: colors.text, fontSize: 14, fontWeight: '800' },
   betButtonTextActive: { color: '#171107' },
+  coinStack: { width: 76, height: 62, alignSelf: 'center', position: 'relative' },
+  coinStackCompact: { width: 48, height: 39, marginBottom: 2 },
+  worldCoinChip: { position: 'absolute', left: 3, width: 70, height: 38, borderRadius: 35, alignItems: 'center', justifyContent: 'center', backgroundColor: '#D9A928', borderWidth: 3, borderColor: '#FFE69A', shadowColor: '#000000', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } },
+  worldCoinChipCompact: { left: 2, width: 44, height: 25, borderRadius: 22, borderWidth: 2 },
+  worldCoinAmount: { color: '#241803', fontSize: 13, fontWeight: '900', lineHeight: 14 },
+  worldCoinAmountCompact: { fontSize: 9, lineHeight: 10 },
+  worldCoinUnit: { color: '#493306', fontSize: 8, fontWeight: '900', lineHeight: 9 },
+  worldCoinUnitCompact: { fontSize: 6, lineHeight: 7 },
+  blackjackBetSpot: { minHeight: 132, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingTop: 12, paddingBottom: 10, borderRadius: 66, backgroundColor: '#0B3026', borderWidth: 2, borderColor: '#B58A2E' },
+  blackjackBetSpotLabel: { position: 'absolute', top: 10, color: '#8DAB9F', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
+  blackjackBetSpotCaption: { color: colors.goldLight, fontSize: 11, fontWeight: '800', marginTop: 5 },
   setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
   blackjackTable: { flex: 1, backgroundColor: '#07251D' },
   gameTopBar: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
-  gameBetPill: { minHeight: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 18, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
+  gameBetPill: { minWidth: 82, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, borderRadius: 24, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
   gameBetText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
   tableContent: { padding: 18, paddingBottom: 38 },
   handHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 },
@@ -1482,17 +1513,21 @@ const styles = StyleSheet.create({
   rouletteLossCard: { backgroundColor: '#3A1B20', borderColor: colors.red },
   rouletteResultTitle: { color: colors.text, fontSize: 18, fontWeight: '900', marginBottom: 4 },
   rouletteBetGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  rouletteBetButton: { width: '31%', minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  rouletteBetButton: { width: '31%', minHeight: 78, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
   rouletteBetActive: { borderColor: colors.goldLight, borderWidth: 3 },
   rouletteBetText: { color: colors.text, fontSize: 13, fontWeight: '900' },
   rouletteOdds: { color: '#CDD3D8', fontSize: 9, marginTop: 3 },
   numberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  numberCell: { width: '12%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#59616A' },
+  numberCell: { width: '12%', aspectRatio: 0.82, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#59616A' },
   numberRed: { backgroundColor: '#9D3038' },
   numberBlack: { backgroundColor: '#20242B' },
   numberGreen: { backgroundColor: '#16714D' },
   numberActive: { borderColor: colors.goldLight, borderWidth: 3 },
   numberText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  numberTextWithCoin: { position: 'absolute', bottom: 2, fontSize: 9 },
+  numberCoin: { width: 32, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#D9A928', borderWidth: 2, borderColor: '#FFE69A' },
+  numberCoinText: { color: '#241803', fontSize: 7, fontWeight: '900', lineHeight: 8 },
+  numberCoinUnit: { color: '#493306', fontSize: 5, fontWeight: '900', lineHeight: 6 },
   rouletteChip: { width: '23%', minHeight: 62, alignItems: 'center', justifyContent: 'center', borderRadius: 31, backgroundColor: '#232A34', borderWidth: 2, borderColor: '#4B5563' },
   rouletteChipActive: { backgroundColor: '#4A3812', borderColor: colors.goldLight },
   rouletteChipUnit: { color: colors.muted, fontSize: 9, marginTop: 2 },
