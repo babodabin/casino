@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/blackjack.test.ts tests/roulette.test.ts tests/baccarat.test.ts tests/craps.test.ts tests/slot.test.ts"
+    "test": "node --experimental-strip-types --test tests/blackjack.test.ts tests/roulette.test.ts tests/baccarat.test.ts tests/craps.test.ts tests/slot.test.ts tests/sicbo.test.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.9",
