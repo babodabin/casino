@@ -722,11 +722,24 @@ function CoinStack({ amount, compact = false }: { amount: number; compact?: bool
   );
 }
 
-function BetOptionCoin({ amount, level, selected, disabled = false, onPress }: { amount: number; level: number; selected: boolean; disabled?: boolean; onPress: () => void }) {
+function betCoinLayerCount(amount: number) {
+  if (amount >= 50000) return 12;
+  if (amount >= 10000) return 10;
+  if (amount >= 5000) return 8;
+  if (amount >= 2000) return 7;
+  if (amount >= 1000) return 6;
+  if (amount >= 500) return 5;
+  if (amount >= 250) return 4;
+  if (amount >= 100) return 2;
+  return 1;
+}
+
+function BetOptionCoin({ amount, selected, disabled = false, onPress }: { amount: number; level?: number; selected: boolean; disabled?: boolean; onPress: () => void }) {
+  const level = betCoinLayerCount(amount);
   return (
     <Pressable disabled={disabled} onPress={onPress} style={[styles.betOptionCoin, disabled && styles.disabledCard]} accessibilityLabel={`${amount.toLocaleString()} WC 베팅`}>
       {Array.from({ length: level }).map((_, index) => (
-        <View key={index} style={[styles.betOptionCoinLayer, selected && styles.betOptionCoinLayerActive, { bottom: 3 + index * 9, zIndex: index + 1 }]}>
+        <View key={index} style={[styles.betOptionCoinLayer, selected && styles.betOptionCoinLayerActive, { bottom: 3 + index * 7, zIndex: index + 1 }]}>
           {index === level - 1 && <View style={[styles.betOptionCoinCenter, selected && styles.betOptionCoinCenterActive]}><Text style={[styles.betButtonText, selected && styles.betButtonTextActive]}>{amount.toLocaleString()}</Text><Text style={[styles.betButtonUnit, selected && styles.betButtonTextActive]}>WC</Text></View>}
         </View>
       ))}
@@ -806,10 +819,10 @@ function BlackjackSetupScreen(props: {
 
         <Text style={styles.sectionTitle}>베팅 금액</Text>
         <View style={styles.betGrid}>
-          {selectedDifficulty.bets.map((bet, index) => {
+          {selectedDifficulty.bets.map((bet) => {
             const selected = props.selectedBet === bet;
             const disabled = bet > props.coins;
-            return <BetOptionCoin key={bet} amount={bet} level={index + 1} selected={selected} disabled={disabled} onPress={() => props.onBetChange(bet)} />;
+            return <BetOptionCoin key={bet} amount={bet} selected={selected} disabled={disabled} onPress={() => props.onBetChange(bet)} />;
           })}
         </View>
 
@@ -880,7 +893,7 @@ function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet
     <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><View style={[styles.slotModeCard, styles.slotModeActive]}><Text style={styles.slotModeTitleActive}>클래식 슬롯</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></View><View style={[styles.slotModeCard, styles.disabledCard]}><Text style={styles.slotModeTitle}>일본식 파치슬롯</Text><Text style={styles.slotModeText}>직접 릴 정지 · 다음 단계</Text></View></View>
     <SlotRules />
     <Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
-    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
     <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="선택 모드" value="클래식 슬롯" /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
     <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>클래식 슬롯 시작</Text></Pressable>
   </ScrollView></View>;
@@ -907,7 +920,7 @@ function SlotGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, o
   return <View style={styles.slotScreen}><ScreenHeader title="클래식 슬롯" onBack={onBack} /><ScrollView contentContainerStyle={styles.slotPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
     <View style={styles.slotMachine}><Text style={styles.slotJackpot}>◆ JACKPOT · x50 ◆</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, Boolean(result?.multiplier) && styles.slotReelWin]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '회전 중…' : result?.label ?? 'SPIN을 눌러 시작하세요'}</Text>{result && <Text style={[styles.slotPayout, result.payout > 0 ? styles.positive : styles.muted]}>{result.payout > 0 ? `+${result.payout.toLocaleString()} WC 지급` : '당첨 없음'}</Text>}{freeSpins > 0 && <Text style={styles.freeSpinBadge}>무료 회전 {freeSpins}회 남음</Text>}</View>
-    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={spinning || freeSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={spinning || freeSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
     <Pressable disabled={spinning || (freeSpins === 0 && selectedBet > coins)} style={[styles.slotSpinButton, (spinning || (freeSpins === 0 && selectedBet > coins)) && styles.disabledCard]} onPress={spin}><Text style={styles.slotSpinText}>{spinning ? '회전 중…' : freeSpins > 0 ? `무료 SPIN · ${freeSpins}회` : `SPIN · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
     <SlotRules compact /><Text style={styles.disclaimer}>게임 전용 가상 코인 · 현금 환전 불가</Text>
   </ScrollView></View>;
@@ -1235,7 +1248,7 @@ function BaccaratSetupScreen(props: {
         <View style={styles.setupOptions}>{difficultyOptions.map((option) => <Pressable key={option.name} style={[styles.setupOption, props.difficulty === option.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}><Text style={[styles.setupOptionTitle, props.difficulty === option.name && styles.setupOptionTitleActive]}>{betTierName(option.name)}</Text><Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text></Pressable>)}</View>
 
         <Text style={styles.sectionTitle}>시작 베팅 금액</Text>
-        <View style={styles.betGrid}>{difficultyOption.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View>
+        <View style={styles.betGrid}>{difficultyOption.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View>
 
         <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="베팅 등급" value={betTierName(props.difficulty)} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
         <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>바카라 시작</Text></Pressable>
@@ -1310,7 +1323,7 @@ function BaccaratGameScreen({
 
         <Text style={styles.sectionTitle}>베팅 금액</Text>
         <View style={styles.setupOptions}>
-          {difficultyOption.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} />)}
+          {difficultyOption.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} />)}
         </View>
 
         {round ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton]} onPress={() => setRound(null)}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable> : <Pressable disabled={selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, selectedBet > coins && styles.disabledCard]} onPress={deal}><Text style={styles.primaryButtonText}>{labels[bet]}에 {selectedBet.toLocaleString()} WC 베팅</Text></Pressable>}
@@ -1442,7 +1455,7 @@ function RouletteGameScreen({
 
         <Text style={styles.sectionTitle}>베팅 금액</Text>
         <View style={styles.setupOptions}>
-          {difficultyOption.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={phase === 'spinning'} onPress={() => onBetChange(amount)} />)}
+          {difficultyOption.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase === 'spinning'} onPress={() => onBetChange(amount)} />)}
         </View>
 
         <Pressable accessibilityRole="button" disabled={phase === 'spinning' || selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, (phase === 'spinning' || selectedBet > coins) && styles.disabledCard]} onPress={spin}>
@@ -1722,7 +1735,7 @@ const styles = StyleSheet.create({
   setupOptionTitleActive: { color: colors.goldLight },
   setupOptionRange: { color: colors.muted, fontSize: 9, marginTop: 5 },
   betGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 7 },
-  betOptionCoin: { width: '23%', height: 88, alignItems: 'center', justifyContent: 'flex-end' },
+  betOptionCoin: { width: '23%', height: 126, alignItems: 'center', justifyContent: 'flex-end' },
   betOptionCoinLayer: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#6E5518', borderWidth: 3, borderColor: '#D8AC3B', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.32, shadowRadius: 3, elevation: 4 },
   betOptionCoinLayerActive: { backgroundColor: '#E1B63F', borderColor: '#FFE99A', shadowColor: colors.goldLight, shadowOpacity: 0.65 },
   betOptionCoinCenter: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#F0CE70' },
