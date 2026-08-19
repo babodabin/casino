@@ -57,16 +57,17 @@ import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type 
 import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
 import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
+import { dealHoldem, resolveHoldem } from './src/texasholdem';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -111,7 +112,7 @@ const gameCategories: GameCategory[] = [
     { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
   ]},
   { name: '포커·카드', icon: '♠', detail: '홀덤 · 오마하 · 포커', eyebrow: 'POKER & CARDS', games: [
-    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'planned' },
+    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
     { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'planned' },
     { name: '세븐 포커', icon: '7♠', description: '일곱 장 중 최고의 다섯 장을 선택', status: 'planned' },
     { name: '파이브 카드 드로우', icon: '5', description: '카드를 교환해 족보를 완성', status: 'planned' },
@@ -383,6 +384,12 @@ export default function App() {
     setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-video-poker-${current.length}`, game: '비디오 포커', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${result.label} · ${hand.map((card) => `${card.rank}${card.suit}`).join(' ')}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
   };
 
+  const settleHoldem = (stake: number, result: 'win' | 'loss' | 'push', detail: string) => {
+    const payout = result === 'win' ? stake * 2 : result === 'push' ? stake : 0;
+    if (payout) setCoins((current) => { const next=current+payout; AsyncStorage.setItem(STORAGE_KEYS.coins,String(next)); return next; });
+    setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-holdem-${current.length}`, game:'텍사스 홀덤', result, difficulty, bet:stake, net:result==='win'?stake:result==='push'?0:-stake, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next)); return next; });
+  };
+
   if (!entered) {
     return (
       <SafeAreaView style={styles.splash}>
@@ -414,7 +421,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : 'gamePreview');
             }}
           />
         )}
@@ -479,6 +486,8 @@ export default function App() {
         {appScreen === 'sicboSetup' && <SicBoSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sicboGame')} />}
         {appScreen === 'sicboGame' && <SicBoGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSicBo} />}
         {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleVideoPoker} />}
+        {appScreen === 'holdemSetup' && <HoldemSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('holdemGame')} />}
+        {appScreen === 'holdemGame' && <HoldemGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onPlaceBet={placeRouletteBet} onSettle={settleHoldem} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -488,7 +497,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -1047,6 +1056,20 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
     <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>게임 방법</Text><Text style={styles.slotRuleText}>실제 비디오 포커 기계처럼 카드 화면을 눌러 HOLD할 카드를 고릅니다.</Text><Text style={styles.slotRuleText}>DEAL로 시작하고 DRAW를 누르면 선택하지 않은 카드만 한 번 교환됩니다.</Text></View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>첫 5장을 받은 뒤 한 번만 교환합니다 · 게임 전용 가상 코인</Text>
   </ScrollView></View>;
+}
+
+function HoldemSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
+  const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
+  return <View style={styles.detailScreen}><ScreenHeader title="텍사스 홀덤(Texas Hold’em) 준비" onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage}><View style={styles.holdemGuide}><Text style={styles.detailLead}>두 장과 공용 카드로 승부</Text><Text style={styles.slotRuleText}>내 카드 2장과 공용 카드 5장, 총 7장 중 가장 강한 5장 족보를 만듭니다.</Text><Text style={styles.slotRuleText}>플랍 3장 → 턴 1장 → 리버 1장 순서로 공개됩니다.</Text><Text style={styles.slotRuleText}>처음에는 컴퓨터 한 명과 대결합니다.</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>테이블 입장</Text></Pressable></ScrollView></View>;
+}
+
+function HoldemGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+  const [round,setRound]=useState<ReturnType<typeof dealHoldem>|null>(null); const [stage,setStage]=useState(0); const [totalBet,setTotalBet]=useState(0); const [outcome,setOutcome]=useState('');
+  const start=()=>{ if(!onPlaceBet(selectedBet))return; setRound(dealHoldem()); setStage(1); setTotalBet(selectedBet); setOutcome(''); };
+  const finish=(fold=false)=>{ if(!round)return; if(fold){ setOutcome('폴드 · 패배'); onSettle(totalBet,'loss','리버 전 폴드'); setStage(5); return; } const resolved=resolveHoldem(round.player,round.opponent,round.community); setOutcome(`${resolved.result==='win'?'승리':resolved.result==='loss'?'패배':'무승부'} · ${resolved.playerHand.label} vs ${resolved.opponentHand.label}`); onSettle(totalBet,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`); setStage(5); };
+  const next=()=>{ if(stage<4)setStage(stage+1); else finish(); }; const raise=()=>{ if(onPlaceBet(selectedBet)){setTotalBet((v)=>v+selectedBet); next();} };
+  const shown=stage===1?0:stage===2?3:stage===3?4:5;
+  return <View style={styles.detailScreen}><ScreenHeader title="텍사스 홀덤(Texas Hold’em)" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={styles.holdemTable}><Text style={styles.holdemSeat}>컴퓨터</Text><View style={styles.holdemCards}>{round?round.opponent.map((c)=><PlayingCard key={c.id} card={c} hidden={stage<5} compact/>):null}</View><Text style={styles.holdemPot}>POT {(totalBet*2).toLocaleString()} WC</Text><View style={styles.holdemCommunity}>{round?.community.slice(0,shown).map((c)=><PlayingCard key={c.id} card={c} compact/>)}{Array.from({length:5-shown},(_,i)=><View key={i} style={[styles.playingCard,styles.compactPlayingCard,styles.hiddenCard]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View><Text style={styles.holdemSeat}>나</Text><View style={styles.holdemCards}>{round?.player.map((c)=><PlayingCard key={c.id} card={c} compact/>)}</View>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}</View>{stage===0||stage===5?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':'카드 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={()=>finish(true)}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable style={styles.holdemAction} onPress={next}><Text style={styles.primaryButtonText}>체크/콜</Text></Pressable><Pressable disabled={selectedBet>coins} style={styles.holdemAction} onPress={raise}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet}</Text></Pressable></View>}<Text style={styles.disclaimer}>현재 단계: {['대기','프리플랍','플랍','턴','리버','결과'][stage]}</Text></ScrollView></View>;
 }
 
 function PlayingCard({ card, hidden = false, compact = false }: { card: Card; hidden?: boolean; compact?: boolean }) {
@@ -1905,6 +1928,18 @@ const styles = StyleSheet.create({
   scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
   cardRow: { minHeight: 126, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   playingCard: { width: 72, height: 108, borderRadius: 10, padding: 8, justifyContent: 'space-between', backgroundColor: '#F7F1E3', borderWidth: 1, borderColor: '#D4C9B2' },
+  holdemGuide: { padding: 18, borderRadius: 18, backgroundColor: '#18251F', borderWidth: 1, borderColor: '#3D7658', gap: 8 },
+  holdemPage: { padding: 16, paddingBottom: 42, gap: 16 },
+  holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 110, backgroundColor: '#075332', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
+  holdemSeat: { color: '#F8E6B0', fontSize: 14, fontWeight: '900' },
+  holdemCards: { minHeight: 90, flexDirection: 'row', justifyContent: 'center', gap: 7 },
+  holdemCommunity: { minHeight: 90, flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  holdemPot: { color: '#FFE080', fontSize: 16, fontWeight: '900', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
+  holdemOutcome: { color: '#FFF4C7', fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  holdemActions: { flexDirection: 'row', gap: 8 },
+  holdemAction: { flex: 1, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold },
+  holdemFold: { flex: 0.7, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#762A31' },
+  holdemActionText: { color: '#FFF', fontWeight: '900' },
   compactPlayingCard: { width: 58, height: 88, padding: 6 },
   playingCardRank: { color: '#121212', fontSize: 21, fontWeight: '900' },
   playingCardSuit: { color: '#121212', fontSize: 29, alignSelf: 'center' },
