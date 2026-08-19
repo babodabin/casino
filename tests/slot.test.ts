@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { evaluateSlot, randomSlotSymbol } from '../src/slot.ts';
+import { evaluatePachislot, evaluateSlot, randomSlotSymbol, spinPachislotReels } from '../src/slot.ts';
 
 test('난수로 슬롯 그림을 선택한다', () => {
   assert.equal(randomSlotSymbol(() => 0), '🍒');
@@ -24,4 +24,17 @@ test('조커는 다른 그림을 대신한다', () => {
 
 test('별 3개는 무료 회전 5회를 준다', () => {
   assert.equal(evaluateSlot(['⭐', '⭐', '⭐'], 100).freeSpins, 5);
+});
+
+test('파치슬롯 릴 3개를 만든다', () => {
+  assert.deepEqual(spinPachislotReels(() => 0), ['🍒', '🍒', '🍒']);
+});
+
+test('파치슬롯 리플레이는 다음 회전을 무료로 만든다', () => {
+  assert.equal(evaluatePachislot(['🔁', '🔁', '🔁'], 100).replay, true);
+});
+
+test('파치슬롯 BIG과 REGULAR 보너스를 판정한다', () => {
+  assert.equal(evaluatePachislot(['7️⃣', '7️⃣', '7️⃣'], 100).bonusSpins, 8);
+  assert.equal(evaluatePachislot(['🔔', '🔔', '🔔'], 100).bonusSpins, 4);
 });

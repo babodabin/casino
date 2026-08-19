@@ -47,10 +47,10 @@ import {
   type BaccaratWinner,
 } from './src/baccarat';
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
-import { spinSlot, type SlotResult, type SlotSymbol } from './src/slot';
+import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
@@ -166,6 +166,7 @@ export default function App() {
   const [loaded, setLoaded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<GameCategory>(gameCategories[1]);
   const [selectedCatalogGame, setSelectedCatalogGame] = useState<CatalogGame>(gameCategories[1].games[0]);
+  const [slotMode, setSlotMode] = useState<'classic' | 'pachislot'>('classic');
 
   useEffect(() => {
     Promise.all([
@@ -348,6 +349,12 @@ export default function App() {
     });
   };
 
+  const settlePachislot = (stake: number, result: PachislotResult, usedFreeGame: boolean) => {
+    if (result.payout > 0) setCoins((current) => { const next = current + result.payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    const net = result.payout - (usedFreeGame ? 0 : stake);
+    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-pachislot-${current.length}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeGame ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `파치슬롯 · ${result.reels.join(' ')} · ${result.label}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
+  };
+
   if (!entered) {
     return (
       <SafeAreaView style={styles.splash}>
@@ -448,8 +455,9 @@ export default function App() {
         )}
         {appScreen === 'crapsSetup' && <CrapsSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('crapsGame')} />}
         {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleCraps} />}
-        {appScreen === 'slotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('slotGame')} />}
+        {appScreen === 'slotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} mode={slotMode} onModeChange={setSlotMode} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen(slotMode === 'classic' ? 'slotGame' : 'pachislotGame')} />}
         {appScreen === 'slotGame' && <SlotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSlot} />}
+        {appScreen === 'pachislotGame' && <PachislotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settlePachislot} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -886,16 +894,16 @@ function SlotRules({ compact = false }: { compact?: boolean }) {
   return <View style={[styles.slotRules, compact && styles.slotRulesCompact]}><Text style={styles.slotRulesTitle}>당첨 규칙</Text><Text style={styles.slotRuleText}>같은 그림 2개 · 베팅의 1.5배 작은 보너스</Text><Text style={styles.slotRuleText}>같은 그림 3개 · 그림별 4~50배 당첨</Text><Text style={styles.slotRuleText}>🃏 조커 · 다른 그림을 대신하는 와일드</Text><Text style={styles.slotRuleText}>⭐ 별 3개 · 무료 회전 5회</Text><Text style={styles.slotRuleText}>👑 왕관 3개 · 50배 잭팟</Text></View>;
 }
 
-function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onDifficultyChange: (value: string) => void; onBetChange: (value: number) => void; onStart: () => void }) {
+function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet: number; mode: 'classic' | 'pachislot'; onModeChange: (value: 'classic' | 'pachislot') => void; onBack: () => void; onDifficultyChange: (value: string) => void; onBetChange: (value: number) => void; onStart: () => void }) {
   const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
   return <View style={styles.detailScreen}><ScreenHeader title="슬롯 설정" onBack={props.onBack} /><ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
     <View style={styles.slotSetupHero}><Text style={styles.slotLogo}>7</Text><View style={styles.slotSetupCopy}><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.detailLead}>그림을 맞추고 보너스에 도전</Text><Text style={styles.gameListDescription}>한 번 회전이 한 판이며, 무료 회전이 나오면 계속 이어집니다.</Text></View></View>
-    <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><View style={[styles.slotModeCard, styles.slotModeActive]}><Text style={styles.slotModeTitleActive}>클래식 슬롯</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></View><View style={[styles.slotModeCard, styles.disabledCard]}><Text style={styles.slotModeTitle}>일본식 파치슬롯</Text><Text style={styles.slotModeText}>직접 릴 정지 · 다음 단계</Text></View></View>
+    <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><Pressable onPress={() => props.onModeChange('classic')} style={[styles.slotModeCard, props.mode === 'classic' && styles.slotModeActive]}><Text style={props.mode === 'classic' ? styles.slotModeTitleActive : styles.slotModeTitle}>클래식 슬롯</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></Pressable><Pressable onPress={() => props.onModeChange('pachislot')} style={[styles.slotModeCard, props.mode === 'pachislot' && styles.slotModeActive]}><Text style={props.mode === 'pachislot' ? styles.slotModeTitleActive : styles.slotModeTitle}>일본식 파치슬롯</Text><Text style={styles.slotModeText}>레버 시작 · 릴 3개 직접 정지</Text></Pressable></View>
     <SlotRules />
     <Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
-    <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="선택 모드" value="클래식 슬롯" /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
-    <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>클래식 슬롯 시작</Text></Pressable>
+    <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="선택 모드" value={props.mode === 'classic' ? '클래식 슬롯' : '일본식 파치슬롯'} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
+    <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{props.mode === 'classic' ? '클래식 슬롯 시작' : '파치슬롯 시작'}</Text></Pressable>
   </ScrollView></View>;
 }
 
@@ -923,6 +931,51 @@ function SlotGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, o
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={spinning || freeSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
     <Pressable disabled={spinning || (freeSpins === 0 && selectedBet > coins)} style={[styles.slotSpinButton, (spinning || (freeSpins === 0 && selectedBet > coins)) && styles.disabledCard]} onPress={spin}><Text style={styles.slotSpinText}>{spinning ? '회전 중…' : freeSpins > 0 ? `무료 SPIN · ${freeSpins}회` : `SPIN · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
     <SlotRules compact /><Text style={styles.disclaimer}>게임 전용 가상 코인 · 현금 환전 불가</Text>
+  </ScrollView></View>;
+}
+
+function PachislotGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, result: PachislotResult, usedFreeGame: boolean) => void }) {
+  const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
+  const [reels, setReels] = useState<[PachislotSymbol, PachislotSymbol, PachislotSymbol]>(['🍒', '🔔', '7️⃣']);
+  const [target, setTarget] = useState<[PachislotSymbol, PachislotSymbol, PachislotSymbol]>(reels);
+  const [stopped, setStopped] = useState<[boolean, boolean, boolean]>([true, true, true]);
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState<PachislotResult | null>(null);
+  const [replay, setReplay] = useState(false);
+  const [bonusSpins, setBonusSpins] = useState(0);
+  const roundFreeRef = useRef(false);
+
+  useEffect(() => {
+    if (!spinning) return;
+    const timer = setInterval(() => setReels((current) => current.map((symbol, index) => stopped[index] ? symbol : pachislotSymbols[Math.floor(Math.random() * pachislotSymbols.length)]) as [PachislotSymbol, PachislotSymbol, PachislotSymbol]), 90);
+    return () => clearInterval(timer);
+  }, [spinning, stopped]);
+
+  const pullLever = () => {
+    if (spinning) return;
+    const free = replay || bonusSpins > 0;
+    if (!free && !onPlaceBet(selectedBet)) return;
+    if (replay) setReplay(false); else if (bonusSpins > 0) setBonusSpins((value) => value - 1);
+    roundFreeRef.current = free; setTarget(spinPachislotReels()); setStopped([false, false, false]); setResult(null); setSpinning(true);
+  };
+
+  const stopReel = (index: number) => {
+    if (!spinning || stopped[index]) return;
+    const nextStopped: [boolean, boolean, boolean] = [...stopped] as [boolean, boolean, boolean]; nextStopped[index] = true;
+    const nextReels: [PachislotSymbol, PachislotSymbol, PachislotSymbol] = [...reels] as [PachislotSymbol, PachislotSymbol, PachislotSymbol]; nextReels[index] = target[index];
+    setStopped(nextStopped); setReels(nextReels);
+    if (nextStopped.every(Boolean)) {
+      const next = evaluatePachislot(target, selectedBet); setResult(next); setSpinning(false); setReplay(next.replay); setBonusSpins((value) => value + next.bonusSpins); onSettle(selectedBet, next, roundFreeRef.current);
+    }
+  };
+
+  return <View style={styles.pachislotScreen}><ScreenHeader title="일본식 파치슬롯" onBack={onBack} /><ScrollView contentContainerStyle={styles.slotPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>PACHISLOT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
+    <View style={[styles.slotMachine, styles.pachislotMachine]}><Text style={styles.slotJackpot}>BIG BONUS · 7️⃣ 7️⃣ 7️⃣</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, stopped[index] && Boolean(result?.payout) ? styles.slotReelWin : null]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '정지 버튼을 하나씩 누르세요' : result?.label ?? '레버를 당겨 시작하세요'}</Text>{result?.payout ? <Text style={[styles.slotPayout, styles.positive]}>+{result.payout.toLocaleString()} WC 지급</Text> : null}{replay && <Text style={styles.freeSpinBadge}>REPLAY · 다음 게임 무료</Text>}{bonusSpins > 0 && <Text style={styles.bigBonusBadge}>BONUS {bonusSpins}게임 남음</Text>}</View>
+    <View style={styles.stopButtonRow}>{[0, 1, 2].map((index) => <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={[styles.stopButton, (!spinning || stopped[index]) && styles.stopButtonStopped]}><Text style={styles.stopButtonText}>{stopped[index] ? 'STOP' : `${index + 1} 정지`}</Text></Pressable>)}</View>
+    <Pressable disabled={spinning || (!replay && bonusSpins === 0 && selectedBet > coins)} onPress={pullLever} style={[styles.pachiLever, (spinning || (!replay && bonusSpins === 0 && selectedBet > coins)) && styles.disabledCard]}><Text style={styles.pachiLeverIcon}>●</Text><Text style={styles.pachiLeverText}>{spinning ? '릴 회전 중' : replay ? 'REPLAY 시작' : bonusSpins > 0 ? `보너스 게임 시작 · ${bonusSpins}회` : `레버 당기기 · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={spinning || replay || bonusSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
+    <View style={styles.slotRules}><Text style={styles.slotRulesTitle}>파치슬롯 규칙</Text><Text style={styles.slotRuleText}>레버를 당긴 뒤 세 정지 버튼을 원하는 순서로 누릅니다.</Text><Text style={styles.slotRuleText}>🔁 3개는 리플레이 · 🔔 3개는 REGULAR 4게임</Text><Text style={styles.slotRuleText}>7️⃣ 3개는 BIG BONUS 8게임과 10배 당첨</Text></View>
   </ScrollView></View>;
 }
 
@@ -1826,6 +1879,16 @@ const styles = StyleSheet.create({
   freeSpinBadge: { color: '#281900', fontSize: 12, fontWeight: '900', marginTop: 10, paddingHorizontal: 14, paddingVertical: 7, overflow: 'hidden', borderRadius: 14, backgroundColor: '#FFD65A' },
   slotSpinButton: { minHeight: 72, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 36, backgroundColor: '#D82D52', borderWidth: 4, borderColor: '#FFD96B', shadowColor: '#FF5372', shadowOpacity: 0.5, shadowRadius: 8 },
   slotSpinText: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', letterSpacing: 1 },
+  pachislotScreen: { flex: 1, backgroundColor: '#090D19' },
+  pachislotMachine: { backgroundColor: '#17305B', borderColor: '#D74C58' },
+  stopButtonRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  stopButton: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: '#D72F42', borderWidth: 3, borderColor: '#FFE48B' },
+  stopButtonStopped: { backgroundColor: '#303746', borderColor: '#697283' },
+  stopButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  pachiLever: { minHeight: 66, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 14, borderRadius: 18, backgroundColor: '#19283F', borderWidth: 2, borderColor: '#7B9BC9' },
+  pachiLeverIcon: { color: '#E84252', fontSize: 34, lineHeight: 38 },
+  pachiLeverText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  bigBonusBadge: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', marginTop: 10, paddingHorizontal: 14, paddingVertical: 7, overflow: 'hidden', borderRadius: 14, backgroundColor: '#C62E40' },
   baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
   crapsSetupHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#183324', borderWidth: 1, borderColor: '#53705E' },
   crapsHeroDice: { color: colors.goldLight, fontSize: 48, marginBottom: 8 },
