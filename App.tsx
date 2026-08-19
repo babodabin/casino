@@ -380,28 +380,20 @@ export default function App() {
     return (
       <SafeAreaView style={styles.splash}>
         <StatusBar style="light" />
-        <View style={styles.splashGlow} />
-        <Text style={styles.splashEyebrow}>WELCOME TO</Text>
-        <Text style={styles.splashTitle}>WORLD CASINO</Text>
-        <Text style={styles.splashSubtitle}>하나의 코인으로 즐기는 세계의 게임</Text>
-        <View style={styles.doors}>
-          <View style={[styles.door, styles.leftDoor]}>
-            <View style={styles.doorLine} />
-            <View style={styles.doorHandle} />
+        <View style={styles.splashSky}>{[12,28,47,66,83].map((left, index) => <View key={left} style={[styles.splashStar, { left: `${left}%`, top: 32 + (index % 3) * 29 }]} />)}<View style={styles.splashMoon} /></View>
+        <View style={styles.splashHeader}><Text style={styles.splashEyebrow}>WELCOME TO</Text><Text style={styles.splashTitle}>WORLD CASINO</Text><Text style={styles.splashSubtitle}>세계의 모든 게임이 시작되는 밤</Text></View>
+        <View style={styles.casinoScene}>
+          <View style={styles.casinoRoof}><Text style={styles.casinoRoofMark}>◆</Text></View>
+          <View style={styles.casinoBuilding}>
+            <View style={styles.casinoMarquee}><Text style={styles.casinoMarqueeText}>WORLD CASINO</Text><Text style={styles.casinoMarqueeSub}>OPEN · 24 HOURS</Text></View>
+            <View style={styles.casinoWindows}>{[0,1,2,3,4].map((item) => <View key={item} style={styles.casinoWindow}><View style={styles.windowGlow} /></View>)}</View>
+            <View style={styles.casinoEntrance}><View style={styles.entranceDoor}><Text style={styles.entranceDoorMark}>♠</Text></View><View style={styles.entranceDoor}><Text style={[styles.entranceDoorMark, styles.redCard]}>♥</Text></View></View>
           </View>
-          <View style={[styles.door, styles.rightDoor]}>
-            <View style={styles.doorLine} />
-            <View style={styles.doorHandle} />
-          </View>
+          <View style={styles.redCarpet}><View style={styles.carpetLine} /><View style={styles.carpetLine} /></View>
+          <View style={styles.ropeRow}><Text style={styles.ropePost}>●╲</Text><Text style={styles.ropePost}>╱●</Text></View>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
-          onPress={() => setEntered(true)}
-        >
-          <Text style={styles.primaryButtonText}>입장하기</Text>
-        </Pressable>
-        <Text style={styles.disclaimer}>게임 전용 코인 · 현금 환전 불가</Text>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.splashEnterButton, pressed && styles.pressed]} onPress={() => setEntered(true)}><Text style={styles.splashEnterButtonTop}>◆ ENTER ◆</Text><Text style={styles.splashEnterButtonText}>카지노 입장하기</Text></Pressable>
+        <Text style={styles.splashDisclaimer}>WC 게임 전용 코인 · 현금 환전 불가</Text>
       </SafeAreaView>
     );
   }
@@ -559,9 +551,9 @@ function renderTab(
     return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} onRefillCoins={onRefillCoins} />;
   }
   return <HomeScreen difficulty={difficulty} records={records} onContinue={(gameName) => {
-    const casinoCategory = gameCategories[1];
-    const game = casinoCategory.games.find((item) => item.name === gameName) ?? casinoCategory.games[0];
-    onOpenCatalogGame(casinoCategory, game);
+    const category = gameCategories.find((item) => item.games.some((game) => game.name === gameName)) ?? gameCategories[1];
+    const game = category.games.find((item) => item.name === gameName) ?? category.games[0];
+    onOpenCatalogGame(category, game);
   }} />;
 }
 
@@ -592,10 +584,10 @@ function HomeScreen({ difficulty, records, onContinue }: { difficulty: string; r
 
       <Text style={styles.sectionTitle}>이어서 하기</Text>
       <View style={styles.heroCard}>
-        <View style={styles.blackjackMark}>{continueGame === '룰렛' ? <Text style={styles.rouletteContinueMark}>◎</Text> : continueGame === '바카라' ? <Text style={styles.rouletteContinueMark}>◆</Text> : continueGame === '크랩스' ? <Text style={styles.rouletteContinueMark}>⚄</Text> : <><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></>}</View>
+        <View style={styles.blackjackMark}>{continueGame === '룰렛' ? <Text style={styles.rouletteContinueMark}>◎</Text> : continueGame === '바카라' ? <Text style={styles.rouletteContinueMark}>◆</Text> : continueGame === '크랩스' ? <Text style={styles.rouletteContinueMark}>⚄</Text> : continueGame === '식보' ? <Text style={styles.rouletteContinueMark}>⚂</Text> : continueGame === '슬롯' ? <Text style={styles.rouletteContinueMark}>7</Text> : continueGame === '비디오 포커' ? <Text style={styles.rouletteContinueMark}>VP</Text> : <><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></>}</View>
         <View style={styles.heroCopy}>
           <Text style={styles.muted}>최근 플레이</Text>
-          <Text style={styles.cardTitle}>{continueGame}</Text>
+          <Text style={styles.cardTitle}>{gameDisplayName(continueGame)}</Text>
           <Text style={styles.smallText}>{continueDifficulty} · 베팅 {continueBet.toLocaleString()} WC</Text>
         </View>
         <Pressable style={styles.smallButton} onPress={() => onContinue(continueGame)}><Text style={styles.smallButtonText}>계속</Text></Pressable>
@@ -1754,11 +1746,35 @@ const colors = {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.bg },
   screen: { flex: 1 },
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, paddingHorizontal: 28, overflow: 'hidden' },
-  splashGlow: { position: 'absolute', top: 150, width: 300, height: 300, borderRadius: 150, backgroundColor: '#2A1E08', opacity: 0.55 },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'flex-start', backgroundColor: '#040711', paddingHorizontal: 22, paddingTop: 22, overflow: 'hidden' },
+  splashSky: { position: 'absolute', top: 0, left: 0, right: 0, height: 330, backgroundColor: '#080D22' },
+  splashStar: { position: 'absolute', width: 3, height: 3, borderRadius: 2, backgroundColor: '#FFF2B0', shadowColor: '#FFF2B0', shadowOpacity: 1, shadowRadius: 5 },
+  splashMoon: { position: 'absolute', top: 35, right: 31, width: 44, height: 44, borderRadius: 22, backgroundColor: '#F4D98B', opacity: 0.9, shadowColor: '#FFE7A0', shadowOpacity: 0.7, shadowRadius: 16 },
+  splashHeader: { zIndex: 2, alignItems: 'center' },
   splashEyebrow: { color: colors.gold, letterSpacing: 5, fontSize: 12, fontWeight: '700' },
-  splashTitle: { color: colors.goldLight, fontSize: 35, fontWeight: '800', marginTop: 10, letterSpacing: 1 },
-  splashSubtitle: { color: colors.muted, fontSize: 14, marginTop: 8 },
+  splashTitle: { color: '#FFF1B3', fontSize: 36, fontWeight: '900', marginTop: 7, letterSpacing: 1, textShadowColor: '#D99D22', textShadowRadius: 12 },
+  splashSubtitle: { color: '#C4B994', fontSize: 13, marginTop: 6 },
+  casinoScene: { width: '100%', height: 470, marginTop: 15, alignItems: 'center', justifyContent: 'flex-end' },
+  casinoRoof: { width: '76%', height: 58, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3A2617', borderWidth: 3, borderColor: '#D5A73A', borderTopLeftRadius: 90, borderTopRightRadius: 90 },
+  casinoRoofMark: { color: '#FFE29A', fontSize: 29, textShadowColor: '#FFB52E', textShadowRadius: 10 },
+  casinoBuilding: { width: '94%', height: 275, alignItems: 'center', backgroundColor: '#201A1A', borderWidth: 3, borderColor: '#B88A31', borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+  casinoMarquee: { width: '86%', marginTop: 16, paddingVertical: 10, borderRadius: 12, alignItems: 'center', backgroundColor: '#731A25', borderWidth: 2, borderColor: '#F0C052' },
+  casinoMarqueeText: { color: '#FFF3BA', fontSize: 20, fontWeight: '900', letterSpacing: 2, textShadowColor: '#FF9E2E', textShadowRadius: 8 },
+  casinoMarqueeSub: { color: '#E9BE69', fontSize: 8, fontWeight: '900', letterSpacing: 2, marginTop: 3 },
+  casinoWindows: { width: '88%', flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
+  casinoWindow: { width: 38, height: 52, padding: 5, borderRadius: 20, borderWidth: 2, borderColor: '#9B7938', backgroundColor: '#100D0D' },
+  windowGlow: { flex: 1, borderRadius: 15, backgroundColor: '#E8BD66', opacity: 0.72, shadowColor: '#FFCB62', shadowOpacity: 1, shadowRadius: 8 },
+  casinoEntrance: { position: 'absolute', bottom: 0, width: 132, height: 112, flexDirection: 'row', borderWidth: 3, borderColor: '#D7A83D', borderTopLeftRadius: 65, borderTopRightRadius: 65, overflow: 'hidden', backgroundColor: '#08090C' },
+  entranceDoor: { flex: 1, alignItems: 'center', justifyContent: 'center', borderColor: '#9B762B', borderRightWidth: 1, backgroundColor: '#16151A' },
+  entranceDoorMark: { color: '#F5E7C0', fontSize: 25 },
+  redCarpet: { width: 195, height: 126, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 24, backgroundColor: '#7D1724', borderLeftWidth: 2, borderRightWidth: 2, borderColor: '#D8A642', transform: [{ perspective: 240 }, { rotateX: '48deg' }], marginTop: -15, marginBottom: -28 },
+  carpetLine: { width: 2, backgroundColor: '#E5B448', opacity: 0.8 },
+  ropeRow: { position: 'absolute', bottom: 23, width: 270, flexDirection: 'row', justifyContent: 'space-between' },
+  ropePost: { color: '#D8AF50', fontSize: 25, fontWeight: '900' },
+  splashEnterButton: { zIndex: 3, width: '88%', minHeight: 66, marginTop: 8, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#B88727', borderWidth: 2, borderColor: '#FFE39A', shadowColor: '#E1AD3F', shadowOpacity: 0.75, shadowRadius: 12, elevation: 8 },
+  splashEnterButtonTop: { color: '#4A2D08', fontSize: 11, fontWeight: '900', letterSpacing: 2 },
+  splashEnterButtonText: { color: '#170F05', fontSize: 18, fontWeight: '900', marginTop: 2 },
+  splashDisclaimer: { color: '#777C8B', fontSize: 10, marginTop: 12 },
   doors: { flexDirection: 'row', height: 330, width: '86%', marginVertical: 34, borderWidth: 2, borderColor: colors.gold, borderRadius: 140, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: 'hidden', backgroundColor: '#19140C' },
   door: { flex: 1, backgroundColor: '#241B0F', justifyContent: 'center', borderColor: '#8A6824' },
   leftDoor: { borderRightWidth: 1 },
