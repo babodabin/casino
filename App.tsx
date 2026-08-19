@@ -48,7 +48,7 @@ import {
 } from './src/baccarat';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
@@ -125,6 +125,7 @@ const STORAGE_KEYS = {
   coins: 'world-casino.coins',
   difficulty: 'world-casino.difficulty',
   records: 'world-casino.records',
+  testGrant: 'world-casino.test-grant-100k-v1',
 };
 
 const tabs: { name: Tab; icon: string }[] = [
@@ -166,11 +167,18 @@ export default function App() {
       AsyncStorage.getItem(STORAGE_KEYS.coins),
       AsyncStorage.getItem(STORAGE_KEYS.difficulty),
       AsyncStorage.getItem(STORAGE_KEYS.records),
-    ]).then(([savedCoins, savedDifficulty, savedRecords]) => {
-      if (savedCoins) {
+      AsyncStorage.getItem(STORAGE_KEYS.testGrant),
+    ]).then(([savedCoins, savedDifficulty, savedRecords, testGrant]) => {
+      if (!testGrant) {
+        const refilledCoins = Math.max(Number(savedCoins ?? 0), 100000);
+        setCoins(refilledCoins);
+        AsyncStorage.setItem(STORAGE_KEYS.coins, String(refilledCoins));
+        AsyncStorage.setItem(STORAGE_KEYS.testGrant, 'done');
+      } else if (savedCoins) {
         setCoins(Number(savedCoins));
       } else {
-        AsyncStorage.setItem(STORAGE_KEYS.coins, '10000');
+        setCoins(100000);
+        AsyncStorage.setItem(STORAGE_KEYS.coins, '100000');
       }
       if (savedDifficulty) setDifficulty(savedDifficulty);
       if (savedRecords) setRecords(JSON.parse(savedRecords));
@@ -183,6 +191,11 @@ export default function App() {
     const option = difficultyOptions.find((item) => item.name === value);
     if (option) setSelectedBet(option.bets[Math.min(1, option.bets.length - 1)]);
     await AsyncStorage.setItem(STORAGE_KEYS.difficulty, value);
+  };
+
+  const refillTestCoins = () => {
+    setCoins(100000);
+    AsyncStorage.setItem(STORAGE_KEYS.coins, '100000');
   };
 
   const startBlackjack = async () => {
@@ -351,7 +364,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratGame' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : 'gamePreview');
             }}
           />
         )}
@@ -405,7 +418,10 @@ export default function App() {
             onSettle={settleBaccarat}
           />
         )}
-        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, coins, records, (category) => {
+        {appScreen === 'baccaratSetup' && (
+          <BaccaratSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('baccaratGame')} />
+        )}
+        {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
         }, () => {
@@ -414,7 +430,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratGame' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -468,6 +484,7 @@ function renderTab(
   setSound: (value: boolean) => void,
   vibration: boolean,
   setVibration: (value: boolean) => void,
+  onRefillCoins: () => void,
   coins: number,
   records: GameRecord[],
   onOpenCategory: (category: GameCategory) => void,
@@ -478,7 +495,7 @@ function renderTab(
   if (tab === '지갑') return <WalletScreen coins={coins} records={records} />;
   if (tab === '기록') return <RecordsScreen records={records} />;
   if (tab === '설정') {
-    return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} />;
+    return <SettingsScreen difficulty={difficulty} saveDifficulty={saveDifficulty} sound={sound} setSound={setSound} vibration={vibration} setVibration={setVibration} onRefillCoins={onRefillCoins} />;
   }
   return <HomeScreen difficulty={difficulty} records={records} onContinue={(gameName) => {
     const casinoCategory = gameCategories[1];
@@ -1090,6 +1107,49 @@ function BlackjackGameScreen(props: {
   );
 }
 
+function BaccaratRules({ compact = false }: { compact?: boolean }) {
+  return (
+    <View style={[styles.baccaratRules, compact && styles.baccaratRulesCompact]}>
+      <Text style={styles.baccaratRulesTitle}>처음이어도 이것만 알면 돼요</Text>
+      <Text style={styles.baccaratRuleText}>1. 플레이어와 뱅커 중 카드 합계가 9에 가까운 쪽이 이깁니다.</Text>
+      <Text style={styles.baccaratRuleText}>2. A는 1점, 10·J·Q·K는 0점입니다.</Text>
+      <Text style={styles.baccaratRuleText}>3. 합계는 마지막 숫자만 사용합니다. 예: 7+8=15 → 5점</Text>
+      <Text style={styles.baccaratRuleText}>4. 세 번째 카드는 앱이 공식 규칙에 따라 자동으로 나눕니다.</Text>
+      <View style={styles.baccaratOddsGuide}><Text style={styles.baccaratOddsGuideText}>플레이어 1:1</Text><Text style={styles.baccaratOddsGuideText}>뱅커 0.95:1</Text><Text style={styles.baccaratOddsGuideText}>타이 8:1</Text></View>
+    </View>
+  );
+}
+
+function BaccaratSetupScreen(props: {
+  coins: number;
+  difficulty: string;
+  selectedBet: number;
+  onBack: () => void;
+  onDifficultyChange: (value: string) => void;
+  onBetChange: (value: number) => void;
+  onStart: () => void;
+}) {
+  const difficultyOption = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="바카라 준비" onBack={props.onBack} />
+      <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <View style={styles.baccaratSetupHero}><Text style={styles.baccaratSetupIcon}>◆</Text><View style={styles.baccaratSetupCopy}><Text style={styles.eyebrow}>BACCARAT GUIDE</Text><Text style={styles.detailLead}>누가 9에 가까울까요?</Text><Text style={styles.gameListDescription}>선택만 하면 카드 배분과 계산은 앱이 자동으로 합니다.</Text></View></View>
+        <BaccaratRules />
+
+        <Text style={styles.sectionTitle}>난이도</Text>
+        <View style={styles.setupOptions}>{difficultyOptions.map((option) => <Pressable key={option.name} style={[styles.setupOption, props.difficulty === option.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}><Text style={[styles.setupOptionTitle, props.difficulty === option.name && styles.setupOptionTitleActive]}>{option.name}</Text><Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text></Pressable>)}</View>
+
+        <Text style={styles.sectionTitle}>시작 베팅 금액</Text>
+        <View style={styles.setupOptions}>{difficultyOption.bets.map((amount) => <Pressable key={amount} style={[styles.rouletteChip, props.selectedBet === amount && styles.rouletteChipActive]} onPress={() => props.onBetChange(amount)}><Text style={[styles.setupOptionTitle, props.selectedBet === amount && styles.setupOptionTitleActive]}>{amount.toLocaleString()}</Text><Text style={styles.rouletteChipUnit}>WC</Text></Pressable>)}</View>
+
+        <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="현재 난이도" value={props.difficulty} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
+        <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>바카라 시작</Text></Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
 function BaccaratGameScreen({
   coins,
   difficulty,
@@ -1109,6 +1169,7 @@ function BaccaratGameScreen({
 }) {
   const [bet, setBet] = useState<BaccaratBet>('player');
   const [round, setRound] = useState<ReturnType<typeof dealBaccaratRound> | null>(null);
+  const [showRules, setShowRules] = useState(false);
   const difficultyOption = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const labels = { player: '플레이어', banker: '뱅커', tie: '타이' } as const;
   const odds = { player: '1:1', banker: '0.95:1', tie: '8:1' } as const;
@@ -1127,8 +1188,9 @@ function BaccaratGameScreen({
       <ScrollView contentContainerStyle={styles.baccaratPage} showsVerticalScrollIndicator={false}>
         <View style={styles.rouletteStatusRow}>
           <View><Text style={styles.eyebrow}>BACCARAT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
-          <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View>
+          <View style={styles.baccaratStatusActions}><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View><Pressable style={styles.rulesButton} onPress={() => setShowRules((value) => !value)}><Text style={styles.rulesButtonText}>? 규칙</Text></Pressable></View>
         </View>
+        {showRules && <BaccaratRules compact />}
 
         <View style={styles.baccaratTable}>
           <View style={styles.baccaratHandSection}>
@@ -1390,6 +1452,7 @@ function SettingsScreen(props: {
   setSound: (value: boolean) => void;
   vibration: boolean;
   setVibration: (value: boolean) => void;
+  onRefillCoins: () => void;
 }) {
   return (
     <Page>
@@ -1403,6 +1466,11 @@ function SettingsScreen(props: {
         ))}
       </View>
       <Text style={styles.helperText}>게임마다 난이도에 맞는 베팅 범위가 적용됩니다.</Text>
+      <Text style={styles.sectionTitle}>테스트 도구</Text>
+      <Pressable style={styles.refillButton} onPress={props.onRefillCoins}>
+        <Text style={styles.refillButtonTitle}>100,000 WC로 다시 채우기</Text>
+        <Text style={styles.refillButtonText}>게임 테스트용 가상 코인을 즉시 복구합니다</Text>
+      </Pressable>
       <Text style={styles.sectionTitle}>게임 환경</Text>
       <View style={styles.panel}>
         <ToggleRow title="효과음" value={props.sound} onValueChange={props.setSound} />
@@ -1618,6 +1686,18 @@ const styles = StyleSheet.create({
   exitButton: { minHeight: 48, width: '100%', alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   exitButtonText: { color: colors.goldLight, fontSize: 14, fontWeight: '800' },
   gameFooter: { color: '#7F9E92', fontSize: 11, textAlign: 'center', marginTop: 18 },
+  baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
+  baccaratSetupIcon: { width: 70, textAlign: 'center', color: colors.goldLight, fontSize: 44 },
+  baccaratSetupCopy: { flex: 1, marginLeft: 12 },
+  baccaratRules: { marginTop: 18, padding: 17, borderRadius: 18, backgroundColor: '#111E25', borderWidth: 1, borderColor: '#47616B' },
+  baccaratRulesCompact: { marginTop: 14 },
+  baccaratRulesTitle: { color: colors.goldLight, fontSize: 16, fontWeight: '900', marginBottom: 9 },
+  baccaratRuleText: { color: '#D8DDE0', fontSize: 12, lineHeight: 20, marginTop: 3 },
+  baccaratOddsGuide: { flexDirection: 'row', justifyContent: 'space-between', gap: 5, marginTop: 13 },
+  baccaratOddsGuideText: { flex: 1, paddingVertical: 8, textAlign: 'center', overflow: 'hidden', borderRadius: 9, color: colors.text, backgroundColor: '#24313A', fontSize: 9, fontWeight: '800' },
+  baccaratStatusActions: { alignItems: 'flex-end', gap: 7 },
+  rulesButton: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 11, backgroundColor: '#18303A', borderWidth: 1, borderColor: '#54717B' },
+  rulesButtonText: { color: colors.text, fontSize: 11, fontWeight: '800' },
   baccaratScreen: { flex: 1, backgroundColor: '#071D25' },
   baccaratPage: { padding: 18, paddingBottom: 44 },
   baccaratTable: { marginTop: 20, padding: 16, borderRadius: 70, backgroundColor: '#0A3A36', borderWidth: 3, borderColor: '#B88A30' },
@@ -1637,6 +1717,9 @@ const styles = StyleSheet.create({
   baccaratBetActive: { borderWidth: 3, borderColor: colors.goldLight },
   baccaratBetTitle: { color: colors.text, fontSize: 14, fontWeight: '900' },
   baccaratOdds: { color: '#D0D5DA', fontSize: 10, marginTop: 4 },
+  refillButton: { padding: 18, borderRadius: 17, backgroundColor: '#19382E', borderWidth: 1, borderColor: colors.gold },
+  refillButtonTitle: { color: colors.goldLight, fontSize: 16, fontWeight: '900' },
+  refillButtonText: { color: colors.muted, fontSize: 11, marginTop: 5 },
   roulettePage: { padding: 18, paddingBottom: 44 },
   rouletteStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rouletteBalance: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 3 },
