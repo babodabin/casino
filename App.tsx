@@ -74,6 +74,9 @@ const difficultyOptions = [
   { name: '전문가', min: 1000, max: 50000, bets: [1000, 5000, 10000, 50000] },
 ];
 
+const betTierNames: Record<string, string> = { '입문': '라이트', '쉬움': '스탠더드', '보통': '프리미엄', '어려움': '하이롤러', '전문가': 'VIP' };
+const betTierName = (value: string) => betTierNames[value] ?? value;
+
 const gameCategories: GameCategory[] = [
   { name: '한국 전통', icon: '花', detail: '고스톱 · 맞고 · 섰다', eyebrow: 'KOREAN CLASSICS', games: [
     { name: '고스톱', icon: '花', description: '화투패를 모아 점수를 겨루는 대표 게임', status: 'planned' },
@@ -573,7 +576,7 @@ function HomeScreen({ difficulty, records, onContinue }: { difficulty: string; r
           <React.Fragment key={record.id}>
             <Row
               title={`${record.game} · ${resultLabel(record.result)}`}
-              subtitle={`${record.detail ? `${record.detail} · ` : ''}${formatPlayedAt(record.playedAt)} · ${record.difficulty}`}
+              subtitle={`${record.detail ? `${record.detail} · ` : ''}${formatPlayedAt(record.playedAt)} · ${betTierName(record.difficulty)}`}
               value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
               positive={record.net > 0}
             />
@@ -657,7 +660,7 @@ function GamesScreen({
         <Text style={styles.sectionTitle}>바로 플레이</Text>
         <Pressable accessibilityRole="button" style={({ pressed }) => [styles.heroCard, pressed && styles.pressed]} onPress={onOpenBlackjack}>
           <View style={styles.blackjackMark}><Text style={styles.cardSuit}>A♠</Text><Text style={styles.cardSuit}>K♥</Text></View>
-          <View style={styles.heroCopy}><Text style={styles.muted}>지금 플레이 가능</Text><Text style={styles.cardTitle}>블랙잭</Text><Text style={styles.smallText}>난이도와 베팅 금액을 선택해 시작</Text></View>
+          <View style={styles.heroCopy}><Text style={styles.muted}>지금 플레이 가능</Text><Text style={styles.cardTitle}>블랙잭</Text><Text style={styles.smallText}>베팅 등급과 금액을 선택해 시작</Text></View>
           <View style={styles.smallButton}><Text style={styles.smallButtonText}>시작</Text></View>
         </Pressable>
         <Text style={styles.sectionTitle}>6개 카테고리</Text>
@@ -723,7 +726,7 @@ function BetOptionCoin({ amount, level, selected, disabled = false, onPress }: {
   return (
     <Pressable disabled={disabled} onPress={onPress} style={[styles.betOptionCoin, disabled && styles.disabledCard]} accessibilityLabel={`${amount.toLocaleString()} WC 베팅`}>
       {Array.from({ length: level }).map((_, index) => (
-        <View key={index} style={[styles.betOptionCoinLayer, selected && styles.betOptionCoinLayerActive, { bottom: 3 + index * 5, zIndex: index + 1 }]}>
+        <View key={index} style={[styles.betOptionCoinLayer, selected && styles.betOptionCoinLayerActive, { bottom: 3 + index * 9, zIndex: index + 1 }]}>
           {index === level - 1 && <View style={[styles.betOptionCoinCenter, selected && styles.betOptionCoinCenterActive]}><Text style={[styles.betButtonText, selected && styles.betButtonTextActive]}>{amount.toLocaleString()}</Text><Text style={[styles.betButtonUnit, selected && styles.betButtonTextActive]}>WC</Text></View>}
         </View>
       ))}
@@ -788,13 +791,13 @@ function BlackjackSetupScreen(props: {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>난이도</Text>
+        <Text style={styles.sectionTitle}>베팅 등급</Text>
         <View style={styles.setupOptions}>
           {difficultyOptions.map((option) => {
             const selected = props.difficulty === option.name;
             return (
               <Pressable key={option.name} style={[styles.setupOption, selected && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}>
-                <Text style={[styles.setupOptionTitle, selected && styles.setupOptionTitleActive]}>{option.name}</Text>
+                <Text style={[styles.setupOptionTitle, selected && styles.setupOptionTitleActive]}>{betTierName(option.name)}</Text>
                 <Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text>
               </Pressable>
             );
@@ -819,7 +822,7 @@ function BlackjackSetupScreen(props: {
         <View style={styles.setupSummary}>
           <Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} />
           <View style={styles.separator} />
-          <Row title="선택 난이도" value={props.difficulty} />
+          <Row title="베팅 등급" value={betTierName(props.difficulty)} />
           <View style={styles.separator} />
           <Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} />
         </View>
@@ -848,7 +851,7 @@ function GamePreviewScreen({ game, category, difficulty, onBack }: { game: Catal
         <View style={styles.panel}>
           <Row title="카테고리" value={category.name} />
           <View style={styles.separator} />
-          <Row title="기본 난이도" value={difficulty} />
+          <Row title="베팅 등급" value={betTierName(difficulty)} />
           <View style={styles.separator} />
           <Row title="사용 자산" value="통합 WC 코인" />
           <View style={styles.separator} />
@@ -876,7 +879,7 @@ function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet
     <View style={styles.slotSetupHero}><Text style={styles.slotLogo}>7</Text><View style={styles.slotSetupCopy}><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.detailLead}>그림을 맞추고 보너스에 도전</Text><Text style={styles.gameListDescription}>한 번 회전이 한 판이며, 무료 회전이 나오면 계속 이어집니다.</Text></View></View>
     <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><View style={[styles.slotModeCard, styles.slotModeActive]}><Text style={styles.slotModeTitleActive}>클래식 슬롯</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></View><View style={[styles.slotModeCard, styles.disabledCard]}><Text style={styles.slotModeTitle}>일본식 파치슬롯</Text><Text style={styles.slotModeText}>직접 릴 정지 · 다음 단계</Text></View></View>
     <SlotRules />
-    <Text style={styles.sectionTitle}>난이도</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{item.name}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
     <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="선택 모드" value="클래식 슬롯" /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
     <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>클래식 슬롯 시작</Text></Pressable>
@@ -902,7 +905,7 @@ function SlotGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, o
     }, 720);
   };
   return <View style={styles.slotScreen}><ScreenHeader title="클래식 슬롯" onBack={onBack} /><ScrollView contentContainerStyle={styles.slotPage} showsVerticalScrollIndicator={false}>
-    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
     <View style={styles.slotMachine}><Text style={styles.slotJackpot}>◆ JACKPOT · x50 ◆</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, Boolean(result?.multiplier) && styles.slotReelWin]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '회전 중…' : result?.label ?? 'SPIN을 눌러 시작하세요'}</Text>{result && <Text style={[styles.slotPayout, result.payout > 0 ? styles.positive : styles.muted]}>{result.payout > 0 ? `+${result.payout.toLocaleString()} WC 지급` : '당첨 없음'}</Text>}{freeSpins > 0 && <Text style={styles.freeSpinBadge}>무료 회전 {freeSpins}회 남음</Text>}</View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={spinning || freeSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
     <Pressable disabled={spinning || (freeSpins === 0 && selectedBet > coins)} style={[styles.slotSpinButton, (spinning || (freeSpins === 0 && selectedBet > coins)) && styles.disabledCard]} onPress={spin}><Text style={styles.slotSpinText}>{spinning ? '회전 중…' : freeSpins > 0 ? `무료 SPIN · ${freeSpins}회` : `SPIN · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
@@ -1174,7 +1177,7 @@ function BlackjackGameScreen(props: {
           </View>
         )}
 
-        <Text style={styles.gameFooter}>난이도 {props.difficulty} · 게임 전용 가상 코인</Text>
+        <Text style={styles.gameFooter}>베팅 등급 {betTierName(props.difficulty)} · 게임 전용 가상 코인</Text>
       </ScrollView>
     </View>
   );
@@ -1186,13 +1189,13 @@ function CrapsRules() {
 
 function CrapsSetupScreen(props: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onDifficultyChange: (value: string) => void; onBetChange: (value: number) => void; onStart: () => void }) {
   const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title="크랩스 준비" onBack={props.onBack} /><ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}><View style={styles.crapsSetupHero}><Text style={styles.crapsHeroDice}>⚄ ⚂</Text><Text style={styles.detailLead}>주사위 합으로 승부</Text><Text style={styles.gameListDescription}>두 주사위를 굴리고 포인트가 7보다 먼저 나올지 예측합니다.</Text></View><CrapsRules /><Text style={styles.sectionTitle}>난이도</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{item.name}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View><View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="현재 난이도" value={props.difficulty} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View><Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>크랩스 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title="크랩스 준비" onBack={props.onBack} /><ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}><View style={styles.crapsSetupHero}><Text style={styles.crapsHeroDice}>⚄ ⚂</Text><Text style={styles.detailLead}>주사위 합으로 승부</Text><Text style={styles.gameListDescription}>두 주사위를 굴리고 포인트가 7보다 먼저 나올지 예측합니다.</Text></View><CrapsRules /><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View><View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="베팅 등급" value={betTierName(props.difficulty)} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View><Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>크랩스 시작</Text></Pressable></ScrollView></View>;
 }
 
 function Die({ value }: { value: number }) { return <View style={styles.die}><Text style={styles.dieText}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text></View>; }
 
-function CrapsGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
-  const [bet, setBet] = useState<CrapsBet>('pass'); const [point, setPoint] = useState<number | null>(null); const [last, setLast] = useState<CrapsRollResult | null>(null); const [active, setActive] = useState(false); const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
+function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
+  const [bet, setBet] = useState<CrapsBet>('pass'); const [point, setPoint] = useState<number | null>(null); const [last, setLast] = useState<CrapsRollResult | null>(null); const [active, setActive] = useState(false); const option = difficultyOptions.find((item) => item.name === savedTier) ?? difficultyOptions[2]; const difficulty = betTierName(savedTier);
   const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
   const roll = () => { if (!active && !onPlaceBet(selectedBet)) return; const result = resolveCrapsRoll(bet, point, rollDice()); setLast(result); if (result.outcome === 'continue') { setPoint(result.point); setActive(true); } else { setPoint(null); setActive(false); onSettle(bet, selectedBet, result); } };
   return <View style={styles.crapsScreen}><ScreenHeader title="크랩스" onBack={onBack} /><ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View><View style={styles.crapsTable}><Text style={styles.crapsPointLabel}>{point ? `POINT ${point}` : 'COME OUT'}</Text><View style={styles.diceRow}>{last ? <><Die value={last.dice[0]} /><Die value={last.dice[1]} /></> : <><Die value={1} /><Die value={6} /></>}</View><Text style={styles.crapsTotal}>{last ? `합계 ${last.total}` : '주사위를 굴려보세요'}</Text>{last?.outcome === 'continue' && <Text style={styles.crapsContinue}>포인트 {last.point} · 다시 굴리세요</Text>}{last && last.outcome !== 'continue' && <Text style={[styles.crapsOutcome, last.outcome === 'win' ? styles.positive : last.outcome === 'loss' ? styles.negative : null]}>{last.outcome === 'win' ? '승리' : last.outcome === 'loss' ? '패배' : '무승부'} · {crapsNet(bet, selectedBet, last) > 0 ? '+' : ''}{crapsNet(bet, selectedBet, last).toLocaleString()} WC</Text>}</View><Text style={styles.sectionTitle}>베팅 위치</Text><View style={styles.crapsBetGrid}>{(['pass','dontPass','field'] as CrapsBet[]).map((item) => <Pressable key={item} disabled={active} style={[styles.crapsBetArea, bet === item && styles.baccaratBetActive]} onPress={() => { setBet(item); setLast(null); }} >{bet === item && !active && <CoinStack amount={selectedBet} compact />}<Text style={styles.baccaratBetTitle}>{names[item]}</Text><Text style={styles.baccaratOdds}>{item === 'field' ? '한 번 굴림' : '1:1'}</Text></Pressable>)}</View><Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={active} onPress={() => onBetChange(amount)} />)}</View><Pressable style={[styles.primaryButton, styles.rouletteSpinButton]} onPress={roll}><Text style={styles.primaryButtonText}>{active ? `포인트 ${point} · 다시 굴리기` : `${names[bet]}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable><Text style={styles.disclaimer}>게임 전용 가상 코인 · 필드 2·12는 2배 수익</Text></ScrollView></View>;
@@ -1228,13 +1231,13 @@ function BaccaratSetupScreen(props: {
         <View style={styles.baccaratSetupHero}><Text style={styles.baccaratSetupIcon}>◆</Text><View style={styles.baccaratSetupCopy}><Text style={styles.eyebrow}>BACCARAT GUIDE</Text><Text style={styles.detailLead}>누가 9에 가까울까요?</Text><Text style={styles.gameListDescription}>선택만 하면 카드 배분과 계산은 앱이 자동으로 합니다.</Text></View></View>
         <BaccaratRules />
 
-        <Text style={styles.sectionTitle}>난이도</Text>
-        <View style={styles.setupOptions}>{difficultyOptions.map((option) => <Pressable key={option.name} style={[styles.setupOption, props.difficulty === option.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}><Text style={[styles.setupOptionTitle, props.difficulty === option.name && styles.setupOptionTitleActive]}>{option.name}</Text><Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text></Pressable>)}</View>
+        <Text style={styles.sectionTitle}>베팅 등급</Text>
+        <View style={styles.setupOptions}>{difficultyOptions.map((option) => <Pressable key={option.name} style={[styles.setupOption, props.difficulty === option.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(option.name)}><Text style={[styles.setupOptionTitle, props.difficulty === option.name && styles.setupOptionTitleActive]}>{betTierName(option.name)}</Text><Text style={styles.setupOptionRange}>{option.min.toLocaleString()}~{option.max.toLocaleString()} WC</Text></Pressable>)}</View>
 
         <Text style={styles.sectionTitle}>시작 베팅 금액</Text>
         <View style={styles.betGrid}>{difficultyOption.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View>
 
-        <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="현재 난이도" value={props.difficulty} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
+        <View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="베팅 등급" value={betTierName(props.difficulty)} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View>
         <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>바카라 시작</Text></Pressable>
       </ScrollView>
     </View>
@@ -1279,7 +1282,7 @@ function BaccaratGameScreen({
       <ScrollView contentContainerStyle={styles.baccaratPage} showsVerticalScrollIndicator={false}>
         <View style={styles.rouletteStatusRow}>
           <View><Text style={styles.eyebrow}>BACCARAT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
-          <View style={styles.baccaratStatusActions}><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View><Pressable style={styles.rulesButton} onPress={() => setShowRules((value) => !value)}><Text style={styles.rulesButtonText}>? 규칙</Text></Pressable></View>
+          <View style={styles.baccaratStatusActions}><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View><Pressable style={styles.rulesButton} onPress={() => setShowRules((value) => !value)}><Text style={styles.rulesButtonText}>? 규칙</Text></Pressable></View>
         </View>
         {showRules && <BaccaratRules compact />}
 
@@ -1384,7 +1387,7 @@ function RouletteGameScreen({
       <ScrollView contentContainerStyle={styles.roulettePage} showsVerticalScrollIndicator={false}>
         <View style={styles.rouletteStatusRow}>
           <View><Text style={styles.eyebrow}>ROULETTE</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
-          <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View>
+          <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View>
         </View>
 
         <View style={styles.rouletteStage}>
@@ -1482,7 +1485,7 @@ function WalletScreen({ coins, records }: { coins: number; records: GameRecord[]
       <View style={styles.panel}>
         <Row title="게임별 손익" value="보기  ›" />
         <View style={styles.separator} />
-        <Row title="난이도별 수익률" value="보기  ›" />
+        <Row title="베팅 등급별 수익률" value="보기  ›" />
         <View style={styles.separator} />
         <Row title="전체 거래 내역" value="보기  ›" />
       </View>
@@ -1524,7 +1527,7 @@ function RecordsScreen({ records }: { records: GameRecord[] }) {
           <React.Fragment key={record.id}>
             <Row
               title={`${record.game} · ${resultLabel(record.result)}`}
-              subtitle={`${record.detail ? `${record.detail} · ` : ''}${record.difficulty} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
+              subtitle={`${record.detail ? `${record.detail} · ` : ''}${betTierName(record.difficulty)} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
               value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
               positive={record.net > 0}
             />
@@ -1548,15 +1551,15 @@ function SettingsScreen(props: {
   return (
     <Page>
       <Text style={styles.pageTitle}>설정</Text>
-      <Text style={styles.sectionTitle}>기본 난이도</Text>
+      <Text style={styles.sectionTitle}>기본 베팅 등급</Text>
       <View style={styles.difficultyRow}>
         {difficultyOptions.map((option) => (
           <Pressable key={option.name} style={[styles.difficultyButton, props.difficulty === option.name && styles.difficultyActive]} onPress={() => props.saveDifficulty(option.name)}>
-            <Text style={[styles.difficultyText, props.difficulty === option.name && styles.difficultyActiveText]}>{option.name}</Text>
+            <Text style={[styles.difficultyText, props.difficulty === option.name && styles.difficultyActiveText]}>{betTierName(option.name)}</Text>
           </Pressable>
         ))}
       </View>
-      <Text style={styles.helperText}>게임마다 난이도에 맞는 베팅 범위가 적용됩니다.</Text>
+      <Text style={styles.helperText}>베팅 등급은 걸 수 있는 WC 범위만 바꿉니다. 게임 실력 난이도와는 별개입니다.</Text>
       <Text style={styles.sectionTitle}>테스트 도구</Text>
       <Pressable style={styles.refillButton} onPress={props.onRefillCoins}>
         <Text style={styles.refillButtonTitle}>100,000 WC로 다시 채우기</Text>
@@ -1719,7 +1722,7 @@ const styles = StyleSheet.create({
   setupOptionTitleActive: { color: colors.goldLight },
   setupOptionRange: { color: colors.muted, fontSize: 9, marginTop: 5 },
   betGrid: { flexDirection: 'row', justifyContent: 'space-between', gap: 7 },
-  betOptionCoin: { width: '23%', height: 72, alignItems: 'center', justifyContent: 'flex-end' },
+  betOptionCoin: { width: '23%', height: 88, alignItems: 'center', justifyContent: 'flex-end' },
   betOptionCoinLayer: { position: 'absolute', width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#6E5518', borderWidth: 3, borderColor: '#D8AC3B', shadowColor: '#000000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.32, shadowRadius: 3, elevation: 4 },
   betOptionCoinLayerActive: { backgroundColor: '#E1B63F', borderColor: '#FFE99A', shadowColor: colors.goldLight, shadowOpacity: 0.65 },
   betOptionCoinCenter: { width: 31, height: 31, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: '#F0CE70' },
@@ -1909,7 +1912,7 @@ const styles = StyleSheet.create({
   difficultyRow: { flexDirection: 'row', gap: 7 },
   difficultyButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.panel },
   difficultyActive: { backgroundColor: colors.gold, borderColor: colors.gold },
-  difficultyText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  difficultyText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   difficultyActiveText: { color: '#171107' },
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
   disclaimerBlock: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 22, padding: 14, borderRadius: 12, backgroundColor: '#0D1119' },
