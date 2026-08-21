@@ -9,6 +9,7 @@ export type MahjongDecomposition = { pair:{suit:MahjongSuit;value:number}; group
 export type MahjongWaitShape = 'ryanmen'|'kanchan'|'penchan'|'tanki'|'shanpon';
 export type RiichiFuResult = { fu:number; wait:MahjongWaitShape; details:string[]; pinfu:boolean };
 export type RiichiScoreResult={basePoints:number;total:number;payments:number[];limitName:string};
+export type MahjongAiLevel='beginner'|'easy'|'normal'|'hard'|'expert';
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; deadWall:MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -211,13 +212,26 @@ export function applyMahjongCall(hand: MahjongTile[], discarded: MahjongTile, op
   };
 }
 
-export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random) {
+function computerHandPotential(hand:MahjongTile[],includeHonors=true){
+  const waits=getMahjongWaits(hand,0,includeHonors);if(waits.length)return 10000+waits.length*100;
+  return hand.reduce((score,tile)=>{const same=hand.filter((other)=>sameTile(tile,other)).length-1;if(tile.suit==='z')return score+same*7;const adjacent=hand.filter((other)=>other.suit===tile.suit&&Math.abs(other.value-tile.value)===1).length;const gap=hand.filter((other)=>other.suit===tile.suit&&Math.abs(other.value-tile.value)===2).length;const middle=tile.value>=3&&tile.value<=7?1:0;return score+same*7+adjacent*4+gap*2+middle;},0);
+}
+
+export function chooseComputerDiscard(hand:MahjongTile[],options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;random?:()=>number}={}){
+  const level=options.level??'normal',random=options.random??Math.random;if(!hand.length)throw new Error('버릴 패가 없습니다');
+  if(level==='beginner')return hand[Math.floor(random()*hand.length)];
+  const scored=hand.map((tile,index)=>{const remaining=hand.filter((_,candidate)=>candidate!==index);let score=computerHandPotential(remaining,options.includeHonors??true);if(level==='easy')score=Math.floor(score/20);
+    if((level==='hard'||level==='expert')&&options.opponentRiichi){const safe=options.opponentRiver?.some((discarded)=>sameTile(discarded,tile))??false;if(safe)score+=level==='expert'?5000:1200;else if(tile.suit==='z')score+=300;}
+    return {tile,score,tie:random()};});
+  scored.sort((a,b)=>b.score-a.score||b.tie-a.tie);return scored[0].tile;
+}
+
+export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean}={}) {
   const draw = drawTile(hand, wall);
   if (!draw.drawn) return { hand, wall, discarded: null, win: false };
   if (isWinningMahjongHand(draw.hand)) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true };
-  const discardIndex = Math.floor(random() * draw.hand.length);
-  const discarded = draw.hand[discardIndex];
-  return { hand: sortMahjongHand(draw.hand.filter((_, index) => index !== discardIndex)), wall: draw.wall, discarded, win: false };
+  const discarded=chooseComputerDiscard(draw.hand,{...options,random});
+  return { hand: sortMahjongHand(draw.hand.filter((tile) => tile.id !== discarded.id)), wall: draw.wall, discarded, win: false };
 }
 
 export function drawTile(hand: MahjongTile[], wall: MahjongTile[]) {

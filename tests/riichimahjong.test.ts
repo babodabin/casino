@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -61,6 +61,18 @@ test('유국 때 텐파이 인원이 노텐에게서 총 3000점을 받는다', 
   assert.deepEqual(calculateNotenPayments([true,true,false,false]), [1500,1500,-1500,-1500]);
   assert.deepEqual(calculateNotenPayments([true,true,true,false]), [1000,1000,1000,-3000]);
   assert.deepEqual(calculateNotenPayments([true,true,true,true]), [0,0,0,0]);
+});
+
+test('보통 컴퓨터는 텐파이를 유지하는 버림패를 고른다', () => {
+  const tiles=hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1','z2']);
+  const discarded=chooseComputerDiscard(tiles,{level:'normal',random:()=>0});
+  assert.equal(`${discarded.suit}${discarded.value}`,'z2');
+});
+
+test('전문가 컴퓨터는 상대 리치 때 상대가 이미 버린 현물패를 우선한다', () => {
+  const tiles=hand(['m1','m2','m3','p2','p3','p4','s4','s5','s6','z1','z1','z2','z3','z4']);
+  const discarded=chooseComputerDiscard(tiles,{level:'expert',opponentRiichi:true,opponentRiver:hand(['z3']),random:()=>0});
+  assert.equal(`${discarded.suit}${discarded.value}`,'z3');
 });
 
 test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
