@@ -61,7 +61,7 @@ import { dealHoldem, dealOmaha, madeHandCards, resolveHoldem, resolveOmaha } fro
 import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
 import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCardDraw } from './src/fivecarddraw';
 import { dealHighLow, resolveHighLow } from './src/highlow';
-import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
+import { advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
@@ -200,77 +200,82 @@ export default function App() {
       if (!testGrant) {
         const refilledCoins = Math.max(Number(savedCoins ?? 0), 100000);
         setCoins(refilledCoins);
-        AsyncStorage.setItem(STORAGE_KEYS.coins, String(refilledCoins));
-        AsyncStorage.setItem(STORAGE_KEYS.testGrant, 'done');
-      } else if (savedCoins) {
+        AsyncStorage.setItem(STORAGE_KEYS.testGrant, 'done').catch(() => {});
+      } else if (savedCoins && Number.isFinite(Number(savedCoins))) {
         setCoins(Number(savedCoins));
       } else {
         setCoins(100000);
-        AsyncStorage.setItem(STORAGE_KEYS.coins, '100000');
       }
       if (savedDifficulty) setDifficulty(savedDifficulty);
-      if (savedRecords) setRecords(JSON.parse(savedRecords));
-      setLoaded(true);
-    });
+      // 저장된 기록이 깨져 있어도 앱이 시작되지 못하는 일은 없어야 합니다.
+      if (savedRecords) {
+        try {
+          const parsed = JSON.parse(savedRecords);
+          if (Array.isArray(parsed)) setRecords(parsed);
+        } catch {
+          AsyncStorage.removeItem(STORAGE_KEYS.records).catch(() => {});
+        }
+      }
+    })
+      .catch(() => {})
+      // 저장소를 읽지 못해도 로딩 화면에서 멈추지 않고 기본값으로 시작합니다.
+      .finally(() => setLoaded(true));
   }, []);
 
-  const saveDifficulty = async (value: string) => {
+  // 저장은 상태 업데이터 안이 아니라 여기 한 곳에서만 일어납니다.
+  // (업데이터는 순수해야 하며, React가 두 번 호출하거나 결과를 버릴 수 있습니다.)
+  useEffect(() => {
+    if (!loaded) return;
+    AsyncStorage.setItem(STORAGE_KEYS.coins, String(coins)).catch(() => {});
+  }, [coins, loaded]);
+
+  useEffect(() => {
+    if (!loaded) return;
+    AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(records)).catch(() => {});
+  }, [records, loaded]);
+
+  const saveDifficulty = (value: string) => {
     setDifficulty(value);
     const option = difficultyOptions.find((item) => item.name === value);
     if (option) setSelectedBet(option.bets[Math.min(1, option.bets.length - 1)]);
-    await AsyncStorage.setItem(STORAGE_KEYS.difficulty, value);
+    AsyncStorage.setItem(STORAGE_KEYS.difficulty, value).catch(() => {});
   };
 
   const refillTestCoins = () => {
     setCoins(100000);
-    AsyncStorage.setItem(STORAGE_KEYS.coins, '100000');
   };
 
-  const startBlackjack = async () => {
-    if (selectedBet > coins) return;
-    const nextCoins = coins - selectedBet;
-    setCoins(nextCoins);
-    await AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
+  // 같은 렌더 안에서 차감이 연속으로 일어나도 정확하도록 잔액을 ref로 함께 추적합니다.
+  const coinsRef = useRef(coins);
+  coinsRef.current = coins;
+
+  const placeBet = (stake: number) => {
+    if (stake > coinsRef.current) return false;
+    coinsRef.current -= stake;
+    setCoins((current) => current - stake);
+    return true;
+  };
+
+  const startBlackjack = () => {
+    if (!placeBet(selectedBet)) return;
     setGameRoundId((value) => value + 1);
     setAppScreen('blackjackGame');
   };
 
-  const doubleBlackjack = () => {
-    if (selectedBet > coins) return false;
-    const nextCoins = coins - selectedBet;
-    setCoins(nextCoins);
-    AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-    return true;
-  };
+  const doubleBlackjack = () => placeBet(selectedBet);
 
-  const placeInsurance = (stake: number) => {
-    if (stake > coins) return false;
-    setCoins((currentCoins) => {
-      const nextCoins = currentCoins - stake;
-      AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-      return nextCoins;
-    });
-    return true;
-  };
+  const placeInsurance = (stake: number) => placeBet(stake);
 
   const settleInsurance = (won: boolean, stake: number) => {
     const payout = insurancePayout(stake, won);
     if (payout > 0) {
-      setCoins((currentCoins) => {
-        const nextCoins = currentCoins + payout;
-        AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-        return nextCoins;
-      });
+      setCoins((currentCoins) => currentCoins + payout);
     }
   };
 
   const settleBlackjack = (result: RoundResult, roundBet = selectedBet) => {
     const payout = payoutForResult(roundBet, result);
-    setCoins((currentCoins) => {
-      const nextCoins = currentCoins + payout;
-      AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-      return nextCoins;
-    });
+    setCoins((currentCoins) => currentCoins + payout);
 
     setRecords((currentRecords) => {
       const record: GameRecord = {
@@ -283,28 +288,15 @@ export default function App() {
         playedAt: new Date().toISOString(),
       };
       const nextRecords = [record, ...currentRecords].slice(0, 100);
-      AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(nextRecords));
       return nextRecords;
     });
-  };
-
-  const placeRouletteBet = (stake: number) => {
-    if (stake > coins) return false;
-    const nextCoins = coins - stake;
-    setCoins(nextCoins);
-    AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-    return true;
   };
 
   const settleRoulette = (bet: RouletteBet, stake: number, number: number, label: string) => {
     const payout = roulettePayout(bet, stake, number);
     const won = rouletteBetWins(bet, number);
     if (payout > 0) {
-      setCoins((currentCoins) => {
-        const nextCoins = currentCoins + payout;
-        AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-        return nextCoins;
-      });
+      setCoins((currentCoins) => currentCoins + payout);
     }
     setRecords((currentRecords) => {
       const record: GameRecord = {
@@ -318,7 +310,6 @@ export default function App() {
         detail: `${label} · 결과 ${number}`,
       };
       const nextRecords = [record, ...currentRecords].slice(0, 100);
-      AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(nextRecords));
       return nextRecords;
     });
   };
@@ -327,11 +318,7 @@ export default function App() {
     const payout = baccaratPayout(bet, stake, winner);
     const net = baccaratNet(bet, stake, winner);
     if (payout > 0) {
-      setCoins((currentCoins) => {
-        const nextCoins = currentCoins + payout;
-        AsyncStorage.setItem(STORAGE_KEYS.coins, String(nextCoins));
-        return nextCoins;
-      });
+      setCoins((currentCoins) => currentCoins + payout);
     }
     const labels = { player: '플레이어', banker: '뱅커', tie: '타이' } as const;
     setRecords((currentRecords) => {
@@ -346,7 +333,6 @@ export default function App() {
         detail: `${labels[bet]} 베팅 · ${labels[winner]} 승리`,
       };
       const nextRecords = [record, ...currentRecords].slice(0, 100);
-      AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(nextRecords));
       return nextRecords;
     });
   };
@@ -354,56 +340,56 @@ export default function App() {
   const settleCraps = (bet: CrapsBet, stake: number, result: CrapsRollResult) => {
     const payout = crapsPayout(bet, stake, result);
     const net = crapsNet(bet, stake, result);
-    if (payout > 0) setCoins((current) => { const next = current + payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    if (payout > 0) setCoins((current) => current + payout);
     const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
     setRecords((current) => {
       const record: GameRecord = { id: `${Date.now()}-craps-${current.length}`, game: '크랩스', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${names[bet]} · 주사위 합 ${result.total}` };
-      const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next;
+      const next = [record, ...current].slice(0, 100); return next;
     });
   };
 
   const settleSlot = (stake: number, result: SlotResult, usedFreeSpin: boolean) => {
-    if (result.payout > 0) setCoins((current) => { const next = current + result.payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    if (result.payout > 0) setCoins((current) => current + result.payout);
     const net = result.payout - (usedFreeSpin ? 0 : stake);
     setRecords((current) => {
       const record: GameRecord = { id: `${Date.now()}-slot-${current.length}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeSpin ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `${result.reels.join(' ')} · ${result.label}` };
-      const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next;
+      const next = [record, ...current].slice(0, 100); return next;
     });
   };
 
   const settlePachislot = (stake: number, result: PachislotResult, usedFreeGame: boolean) => {
-    if (result.payout > 0) setCoins((current) => { const next = current + result.payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
+    if (result.payout > 0) setCoins((current) => current + result.payout);
     const net = result.payout - (usedFreeGame ? 0 : stake);
-    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-pachislot-${current.length}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeGame ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `파치슬롯 · ${result.reels.join(' ')} · ${result.label}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
+    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-pachislot-${current.length}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeGame ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `파치슬롯 · ${result.reels.join(' ')} · ${result.label}` }; const next = [record, ...current].slice(0, 100); return next; });
   };
 
   const settleSicBo = (bet: SicBoBet, stake: number, dice: SicBoDice) => {
     const payout = sicBoPayout(bet, stake, dice); const net = sicBoNet(bet, stake, dice);
-    if (payout > 0) setCoins((current) => { const next = current + payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
-    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-sicbo-${current.length}`, game: '식보', result: net > 0 ? 'win' : 'loss', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${sicBoBetLabel(bet)} · ${dice.join('·')} · 합계 ${dice[0] + dice[1] + dice[2]}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
+    if (payout > 0) setCoins((current) => current + payout);
+    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-sicbo-${current.length}`, game: '식보', result: net > 0 ? 'win' : 'loss', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${sicBoBetLabel(bet)} · ${dice.join('·')} · 합계 ${dice[0] + dice[1] + dice[2]}` }; const next = [record, ...current].slice(0, 100); return next; });
   };
 
   const settleVideoPoker = (stake: number, hand: Card[]) => {
     const result = evaluateVideoPoker(hand); const payout = videoPokerPayout(stake, hand); const net = videoPokerNet(stake, hand);
-    if (payout > 0) setCoins((current) => { const next = current + payout; AsyncStorage.setItem(STORAGE_KEYS.coins, String(next)); return next; });
-    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-video-poker-${current.length}`, game: '비디오 포커', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${result.label} · ${hand.map((card) => `${card.rank}${card.suit}`).join(' ')}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
+    if (payout > 0) setCoins((current) => current + payout);
+    setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-video-poker-${current.length}`, game: '비디오 포커', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${result.label} · ${hand.map((card) => `${card.rank}${card.suit}`).join(' ')}` }; const next = [record, ...current].slice(0, 100); return next; });
   };
 
   const settlePoker = (game: '텍사스 홀덤'|'오마하'|'세븐 포커'|'파이브 카드 드로우', stake: number, result: 'win' | 'loss' | 'push', detail: string) => {
     const payout = result === 'win' ? stake * 2 : result === 'push' ? stake : 0;
-    if (payout) setCoins((current) => { const next=current+payout; AsyncStorage.setItem(STORAGE_KEYS.coins,String(next)); return next; });
-    setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-poker-${current.length}`, game, result, difficulty, bet:stake, net:result==='win'?stake:result==='push'?0:-stake, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next)); return next; });
+    if (payout) setCoins((current) => current + payout);
+    setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-poker-${current.length}`, game, result, difficulty, bet:stake, net:result==='win'?stake:result==='push'?0:-stake, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); return next; });
   };
 
   const settleHighLow = (stake: number, share: number, detail: string) => {
     const payout = Math.round(stake * 2 * share); const net = payout - stake;
-    if (payout) setCoins((current) => { const next=current+payout; AsyncStorage.setItem(STORAGE_KEYS.coins,String(next)); return next; });
-    setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-high-low-${current.length}`, game:'하이로우', result:net>0?'win':net<0?'loss':'push', difficulty, bet:stake, net, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next)); return next; });
+    if (payout) setCoins((current) => current + payout);
+    setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-high-low-${current.length}`, game:'하이로우', result:net>0?'win':net<0?'loss':'push', difficulty, bet:stake, net, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); return next; });
   };
 
   const settleMahjong = (game:'리치 마작'|'중국식 마작'|'홍콩 마작'|'사천 마작',stake: number, result: 'win'|'loss'|'push', detail: string) => {
-    const payout=result==='win'?stake*4:result==='push'?stake:0; if(payout)setCoins((current)=>{const next=current+payout;AsyncStorage.setItem(STORAGE_KEYS.coins,String(next));return next;});
-    setRecords((current)=>{const record:GameRecord={id:`${Date.now()}-mahjong-${current.length}`,game,result,difficulty,bet:stake,net:result==='win'?stake*3:result==='push'?0:-stake,playedAt:new Date().toISOString(),detail};const next=[record,...current].slice(0,100);AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next));return next;});
+    const payout=result==='win'?stake*4:result==='push'?stake:0; if(payout)setCoins((current) => current + payout);
+    setRecords((current)=>{const record:GameRecord={id:`${Date.now()}-mahjong-${current.length}`,game,result,difficulty,bet:stake,net:result==='win'?stake*3:result==='push'?0:-stake,playedAt:new Date().toISOString(),detail};const next=[record,...current].slice(0,100);return next;});
   };
 
   if (!entered) {
@@ -476,7 +462,7 @@ export default function App() {
             selectedBet={selectedBet}
             onBack={() => setAppScreen('categoryCatalog')}
             onBetChange={setSelectedBet}
-            onPlaceBet={placeRouletteBet}
+            onPlaceBet={placeBet}
             onSettle={settleRoulette}
           />
         )}
@@ -487,7 +473,7 @@ export default function App() {
             selectedBet={selectedBet}
             onBack={() => setAppScreen('baccaratSetup')}
             onBetChange={setSelectedBet}
-            onPlaceBet={placeRouletteBet}
+            onPlaceBet={placeBet}
             onSettle={settleBaccarat}
           />
         )}
@@ -495,31 +481,31 @@ export default function App() {
           <BaccaratSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('baccaratGame')} />
         )}
         {appScreen === 'crapsSetup' && <CrapsSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('crapsGame')} />}
-        {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('crapsSetup')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleCraps} />}
+        {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('crapsSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleCraps} />}
         {appScreen === 'slotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} mode={slotMode} onModeChange={setSlotMode} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen(slotMode === 'classic' ? 'slotGame' : 'pachislotGame')} />}
-        {appScreen === 'slotGame' && <SlotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('slotSetup')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSlot} />}
-        {appScreen === 'pachislotGame' && <PachislotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('slotSetup')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settlePachislot} />}
+        {appScreen === 'slotGame' && <SlotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('slotSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleSlot} />}
+        {appScreen === 'pachislotGame' && <PachislotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('slotSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settlePachislot} />}
         {appScreen === 'sicboSetup' && <SicBoSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sicboGame')} />}
-        {appScreen === 'sicboGame' && <SicBoGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('sicboSetup')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleSicBo} />}
-        {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeRouletteBet} onSettle={settleVideoPoker} />}
+        {appScreen === 'sicboGame' && <SicBoGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('sicboSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleSicBo} />}
+        {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleVideoPoker} />}
         {appScreen === 'holdemSetup' && <PokerSetupScreen mode="holdem" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('holdemGame')} />}
-        {appScreen === 'holdemGame' && <PokerGameScreen mode="holdem" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('텍사스 홀덤',stake,result,detail)} />}
+        {appScreen === 'holdemGame' && <PokerGameScreen mode="holdem" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settlePoker('텍사스 홀덤',stake,result,detail)} />}
         {appScreen === 'omahaSetup' && <PokerSetupScreen mode="omaha" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('omahaGame')} />}
-        {appScreen === 'omahaGame' && <PokerGameScreen mode="omaha" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('omahaSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('오마하',stake,result,detail)} />}
+        {appScreen === 'omahaGame' && <PokerGameScreen mode="omaha" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('omahaSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settlePoker('오마하',stake,result,detail)} />}
         {appScreen === 'sevenPokerSetup' && <SevenPokerSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sevenPokerGame')} />}
-        {appScreen === 'sevenPokerGame' && <SevenPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sevenPokerSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('세븐 포커',stake,result,detail)} />}
+        {appScreen === 'sevenPokerGame' && <SevenPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sevenPokerSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settlePoker('세븐 포커',stake,result,detail)} />}
         {appScreen === 'fiveDrawSetup' && <FiveDrawSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('fiveDrawGame')} />}
-        {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('fiveDrawSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('파이브 카드 드로우',stake,result,detail)} />}
+        {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('fiveDrawSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settlePoker('파이브 카드 드로우',stake,result,detail)} />}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
-        {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeRouletteBet} onSettle={settleHighLow} />}
+        {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
-        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
+        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
         {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
-        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
+        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
         {appScreen === 'hongKongMahjongSetup' && <WorldMahjongSetupScreen mode="hongkong" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('hongKongMahjongGame')} />}
-        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
+        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
         {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
-        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
+        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -1112,8 +1098,8 @@ function SevenPokerSetupScreen(props: { coins:number; difficulty:string; selecte
 function SevenPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealSevenPoker>|null>(null); const [stage,setStage]=useState(0); const [totalBet,setTotalBet]=useState(0); const [outcome,setOutcome]=useState(''); const [showdown,setShowdown]=useState<ReturnType<typeof resolveSevenPoker>|null>(null); const [foldedVisible,setFoldedVisible]=useState(0);
   const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealSevenPoker());setStage(1);setTotalBet(selectedBet);setOutcome('');setShowdown(null);setFoldedVisible(0);};
-  const finish=(fold=false)=>{if(!round)return;if(fold){setFoldedVisible(stage+2);setOutcome('폴드 · 패배 · 상대 비공개 카드는 공개하지 않습니다');setShowdown(null);onSettle(totalBet,'loss','상대 패 비공개 · 중간 폴드');setStage(5);return;}const resolved=resolveSevenPoker(round.player,round.opponent);setShowdown(resolved);setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'무승부입니다');onSettle(totalBet,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`);setStage(5);};
-  const next=()=>stage<4?setStage(stage+1):finish(); const raise=()=>{if(onPlaceBet(selectedBet)){setTotalBet((value)=>value+selectedBet);next();}}; const visible=stage===0?0:stage===5&&!showdown&&foldedVisible?foldedVisible:stage+2;
+  const finish=(fold=false,stake=totalBet)=>{if(!round)return;if(fold){setFoldedVisible(stage+2);setOutcome('폴드 · 패배 · 상대 비공개 카드는 공개하지 않습니다');setShowdown(null);onSettle(stake,'loss','상대 패 비공개 · 중간 폴드');setStage(5);return;}const resolved=resolveSevenPoker(round.player,round.opponent);setShowdown(resolved);setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'무승부입니다');onSettle(stake,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`);setStage(5);};
+  const next=()=>stage<4?setStage(stage+1):finish(); const raise=()=>{if(!onPlaceBet(selectedBet))return;const staked=totalBet+selectedBet;setTotalBet(staked);if(stage<4)setStage(stage+1);else finish(false,staked);}; const visible=stage===0?0:stage===5&&!showdown&&foldedVisible?foldedVisible:stage+2;
   const emphasis=(card:Card,side:'player'|'opponent'):'winner'|'selected'|'dim'|undefined=>{if(!showdown)return undefined;const own=madeHandCards(side==='player'?showdown.playerHand:showdown.opponentHand);if(!own.some((used)=>used.id===card.id))return'dim';if(showdown.result==='push')return'selected';return(side==='player')===(showdown.result==='win')?'winner':'selected';};
   const cards=(side:'player'|'opponent')=>(round?.[side].slice(0,visible)??[]).map((card,index)=>{const privateCard=index<2||index===6;const label=privateCard?(side==='player'?'나만 보기':'비공개'):'모두 공개';return <View key={card.id} style={styles.sevenPokerCardSlot}><PlayingCard card={card} compact hidden={side==='opponent'&&!showdown&&privateCard} emphasis={emphasis(card,side)}/><Text style={[styles.sevenPokerVisibility,privateCard?styles.sevenPokerPrivate:styles.sevenPokerPublic]}>{label}</Text></View>;});
   return <View style={styles.detailScreen}><ScreenHeader title="세븐 포커(Seven-card Poker)" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={[styles.holdemTable,styles.sevenPokerTable]}><Text style={styles.holdemSeat}>컴퓨터</Text><Text style={styles.sevenPokerHint}>{showdown?'모든 카드 공개':stage===5?'폴드 · 비공개 유지':'앞의 2장은 비공개'}</Text><View style={styles.sevenPokerCards}>{cards('opponent')}</View><Text style={styles.holdemPot}>POT {(totalBet*2).toLocaleString()} WC</Text><Text style={styles.holdemSeat}>나</Text><View style={styles.sevenPokerCards}>{cards('player')}</View>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}{showdown?<Text style={styles.pokerInlineResult}>내 패: {showdown.playerHand.label} · 상대 패: {showdown.opponentHand.label}</Text>:null}</View>{stage===0||stage===5?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':'처음 3장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={()=>finish(true)}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable style={styles.holdemAction} onPress={next}><Text style={styles.primaryButtonText}>체크/콜</Text></Pressable><Pressable disabled={selectedBet>coins} style={styles.holdemAction} onPress={raise}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet}</Text></Pressable></View>}<Text style={styles.disclaimer}>현재 단계: {['대기','첫 3장','네 번째 카드','다섯 번째 카드','여섯 번째 카드','마지막 승부'][stage]}</Text></ScrollView></View>;
@@ -1127,8 +1113,8 @@ function HighLowSetupScreen(props: { coins:number; difficulty:string; selectedBe
 function HighLowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,share:number,detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealHighLow>|null>(null); const [stage,setStage]=useState(0); const [totalBet,setTotalBet]=useState(0); const [showdown,setShowdown]=useState<ReturnType<typeof resolveHighLow>|null>(null); const [outcome,setOutcome]=useState(''); const [foldedVisible,setFoldedVisible]=useState(0);
   const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealHighLow());setStage(1);setTotalBet(selectedBet);setShowdown(null);setOutcome('하이와 로우를 함께 노리세요');setFoldedVisible(0);};
-  const finish=(fold=false)=>{if(!round)return;if(fold){setFoldedVisible(stage+2);setStage(5);setOutcome('폴드 · 상대 비공개 카드는 공개하지 않습니다');onSettle(totalBet,0,'중간 폴드 · 상대 패 비공개');return;}const resolved=resolveHighLow(round.player,round.opponent);setShowdown(resolved);setStage(5);const label=resolved.share===1?'하이와 로우를 모두 이겼습니다':resolved.share===0.5?'팟을 절반 가져왔습니다':resolved.share===0?'하이와 로우 모두 졌습니다':`팟의 ${Math.round(resolved.share*100)}%를 가져왔습니다`;setOutcome(label);onSettle(totalBet,resolved.share,`하이 ${resolved.playerHigh.label} · 로우 ${resolved.playerLow?.label??'없음'}`);};
-  const next=()=>stage<4?setStage(stage+1):finish(); const raise=()=>{if(onPlaceBet(selectedBet)){setTotalBet((value)=>value+selectedBet);next();}}; const visible=stage===0?0:stage===5&&!showdown&&foldedVisible?foldedVisible:stage+2;
+  const finish=(fold=false,stake=totalBet)=>{if(!round)return;if(fold){setFoldedVisible(stage+2);setStage(5);setOutcome('폴드 · 상대 비공개 카드는 공개하지 않습니다');onSettle(stake,0,'중간 폴드 · 상대 패 비공개');return;}const resolved=resolveHighLow(round.player,round.opponent);setShowdown(resolved);setStage(5);const label=resolved.share===1?'하이와 로우를 모두 이겼습니다':resolved.share===0.5?'팟을 절반 가져왔습니다':resolved.share===0?'하이와 로우 모두 졌습니다':`팟의 ${Math.round(resolved.share*100)}%를 가져왔습니다`;setOutcome(label);onSettle(stake,resolved.share,`하이 ${resolved.playerHigh.label} · 로우 ${resolved.playerLow?.label??'없음'}`);};
+  const next=()=>stage<4?setStage(stage+1):finish(); const raise=()=>{if(!onPlaceBet(selectedBet))return;const staked=totalBet+selectedBet;setTotalBet(staked);if(stage<4)setStage(stage+1);else finish(false,staked);}; const visible=stage===0?0:stage===5&&!showdown&&foldedVisible?foldedVisible:stage+2;
   const cards=(side:'player'|'opponent')=>(round?.[side].slice(0,visible)??[]).map((card,index)=>{const privateCard=index<2||index===6;return <View key={card.id} style={styles.sevenPokerCardSlot}><PlayingCard card={card} compact hidden={side==='opponent'&&!showdown&&privateCard}/><Text style={[styles.sevenPokerVisibility,privateCard?styles.sevenPokerPrivate:styles.sevenPokerPublic]}>{privateCard?(side==='player'?'나만 보기':'비공개'):'모두 공개'}</Text></View>;});
   const winner=(side:'player'|'opponent',kind:'high'|'low')=>{if(!showdown)return'';const value=kind==='high'?showdown.highWinner:showdown.lowWinner;return value==='tie'?'무승부':value==='none'?'성립 없음':value===side?'승리':'패배';};
   return <View style={styles.detailScreen}><ScreenHeader title="하이로우(High–Low)" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={[styles.holdemTable,styles.sevenPokerTable]}><Text style={styles.holdemSeat}>컴퓨터</Text><View style={styles.sevenPokerCards}>{cards('opponent')}</View><Text style={styles.holdemPot}>POT {(totalBet*2).toLocaleString()} WC</Text><Text style={styles.holdemSeat}>나</Text><View style={styles.sevenPokerCards}>{cards('player')}</View><Text style={styles.holdemOutcome}>{outcome||'처음 3장을 받아 시작하세요'}</Text>{showdown?<View style={styles.highLowResultRow}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>HIGH · {winner('player','high')}</Text><Text style={styles.slotRuleText}>나 {showdown.playerHigh.label}</Text><Text style={styles.slotRuleText}>상대 {showdown.opponentHigh.label}</Text></View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>LOW · {winner('player','low')}</Text><Text style={styles.slotRuleText}>나 {showdown.playerLow?.label??'로우 없음'}</Text><Text style={styles.slotRuleText}>상대 {showdown.opponentLow?.label??'로우 없음'}</Text></View></View>:null}</View>{stage===0||stage===5?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':'처음 3장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={()=>finish(true)}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable style={styles.holdemAction} onPress={next}><Text style={styles.primaryButtonText}>체크/콜</Text></Pressable><Pressable disabled={selectedBet>coins} style={styles.holdemAction} onPress={raise}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet}</Text></Pressable></View>}<Text style={styles.disclaimer}>8 이하 로우 · 하이와 로우가 팟 절반씩 · 중간 폴드 시 상대 비공개 유지</Text></ScrollView></View>;
@@ -1142,8 +1128,8 @@ function PokerSetupScreen(props: { mode:'holdem'|'omaha'; coins:number; difficul
 function PokerGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:'holdem'|'omaha';coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealHoldem>|null>(null); const [stage,setStage]=useState(0); const [totalBet,setTotalBet]=useState(0); const [outcome,setOutcome]=useState(''); const [showdown,setShowdown]=useState<ReturnType<typeof resolveHoldem>|null>(null); const [foldedShown,setFoldedShown]=useState(0); const omaha=mode==='omaha';
   const start=()=>{ if(!onPlaceBet(selectedBet))return; setRound(omaha?dealOmaha():dealHoldem()); setStage(1); setTotalBet(selectedBet); setOutcome(''); setShowdown(null); setFoldedShown(0); };
-  const finish=(fold=false)=>{ if(!round)return; if(fold){ setFoldedShown(stage===1?0:stage===2?3:stage===3?4:5); setOutcome('폴드 · 패배 · 상대 카드는 비공개입니다'); setShowdown(null); onSettle(totalBet,'loss','중간 폴드 · 상대 패 비공개'); setStage(5); return; } const resolved=omaha?resolveOmaha(round.player,round.opponent,round.community):resolveHoldem(round.player,round.opponent,round.community); setShowdown(resolved); setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'무승부입니다'); onSettle(totalBet,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`); setStage(5); };
-  const next=()=>{ if(stage<4)setStage(stage+1); else finish(); }; const raise=()=>{ if(onPlaceBet(selectedBet)){setTotalBet((v)=>v+selectedBet); next();} };
+  const finish=(fold=false,stake=totalBet)=>{ if(!round)return; if(fold){ setFoldedShown(stage===1?0:stage===2?3:stage===3?4:5); setOutcome('폴드 · 패배 · 상대 카드는 비공개입니다'); setShowdown(null); onSettle(stake,'loss','중간 폴드 · 상대 패 비공개'); setStage(5); return; } const resolved=omaha?resolveOmaha(round.player,round.opponent,round.community):resolveHoldem(round.player,round.opponent,round.community); setShowdown(resolved); setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'무승부입니다'); onSettle(stake,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`); setStage(5); };
+  const next=()=>{ if(stage<4)setStage(stage+1); else finish(); }; const raise=()=>{ if(!onPlaceBet(selectedBet))return; const staked=totalBet+selectedBet; setTotalBet(staked); if(stage<4)setStage(stage+1); else finish(false,staked); };
   const shown=stage===5&&!showdown?foldedShown:stage===1?0:stage===2?3:stage===3?4:5;
   const inHand=(card:Card,hand?:Card[])=>Boolean(hand?.some((used)=>used.id===card.id));
   const pokerEmphasis=(card:Card,side:'player'|'opponent'|'community'):'winner'|'selected'|'dim'|undefined=>{ if(!showdown)return undefined; const playerCards=madeHandCards(showdown.playerHand); const opponentCards=madeHandCards(showdown.opponentHand); const own=side==='opponent'?opponentCards:playerCards; const winner=showdown.result==='win'?playerCards:showdown.result==='loss'?opponentCards:null; if(side==='community')return winner&&inHand(card,winner)?'winner':inHand(card,playerCards)||inHand(card,opponentCards)?'selected':'dim'; if(inHand(card,own))return showdown.result==='push'?'selected':(side==='player')===(showdown.result==='win')?'winner':'selected'; return 'dim'; };
@@ -1187,7 +1173,7 @@ function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins
 function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const profile=mahjongProfiles[mode];
   type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean};
-  type MahjongRoundResult={winner:number|null;method:'론'|'쯔모'|'유국';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
+  type MahjongRoundResult={winner:number|null;method:'론'|'쯔모'|'유국'|'유국만관';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
   const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready'); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [deadWall,setDeadWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
   const [openMelds,setOpenMelds]=useState<MahjongTile[][]>([]); const [pendingCall,setPendingCall]=useState<PendingCall|null>(null);
   const [riichiDeclared,setRiichiDeclared]=useState(false); const [choosingRiichi,setChoosingRiichi]=useState(false); const [riichiPoints,setRiichiPoints]=useState(25000); const [riichiMarker,setRiichiMarker]=useState('');
@@ -1197,9 +1183,46 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
   const [opponentMelds,setOpponentMelds]=useState<MahjongTile[][][]>([[],[],[]]);
   const [roundResult,setRoundResult]=useState<MahjongRoundResult|null>(null);
   const [matchState,setMatchState]=useState<RiichiMatchState>({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});
-  const start=()=>{if((phase==='ready'||matchState.finished)&&!onPlaceBet(selectedBet))return;if(phase==='ready'||matchState.finished)setMatchState({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});const round=dealRiichi(Math.random,profile.honors);const draw=drawMahjongTile(round.player,round.wall);setPlayer(draw.hand);setOpponents(round.opponents);setWall(draw.wall);setDeadWall(round.deadWall);setRivers(round.rivers);setOpenMelds([]);setPendingCall(null);setRoundResult(null);setRiichiDeclared(false);setChoosingRiichi(false);if(phase==='ready'||matchState.finished)setRiichiPoints(25000);setRiichiMarker('');setTemporaryFuriten(false);setIppatsuEligible(false);setOpponentRiichi([false,false,false]);setOpponentOpenMelds([0,0,0]);setOpponentMelds([[],[],[]]);setDrawnId(draw.drawn?.id??'');const indicator=round.deadWall[0],dora=indicator?doraFromIndicator(indicator):null;setMessage(`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`);setPhase('playing');};
+  const [concealedKans,setConcealedKans]=useState<MahjongTile[][]>([]);
+  const [afterKanDraw,setAfterKanDraw]=useState(false);
+  // 도라 표시패는 누가 깡했든 한 장씩 늘어나므로 국 전체의 깡 수를 따로 셉니다.
+  const [revealedKans,setRevealedKans]=useState(0);
+  // 도중유국·유국만관 판정에 필요한 국 단위 기록
+  const [kanOwners,setKanOwners]=useState<number[]>([]);
+  const [anyCallMade,setAnyCallMade]=useState(false);
+  const [myDiscardClaimed,setMyDiscardClaimed]=useState(false);
+  const [turnsTaken,setTurnsTaken]=useState(0);
+  // 깡은 손패 길이와 완성 판정에 모두 영향을 줍니다. 암깡도 몸통 하나로 셉니다.
+  const meldCount=openMelds.length+concealedKans.length;
+  const kanCount=openMelds.filter((meld)=>meld.length===4).length+concealedKans.length;
+  const start=()=>{if((phase==='ready'||matchState.finished)&&!onPlaceBet(selectedBet))return;if(phase==='ready'||matchState.finished)setMatchState({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});const round=dealRiichi(Math.random,profile.honors);const draw=drawMahjongTile(round.player,round.wall);setPlayer(draw.hand);setOpponents(round.opponents);setWall(draw.wall);setDeadWall(round.deadWall);setRivers(round.rivers);setOpenMelds([]);setPendingCall(null);setRoundResult(null);setRiichiDeclared(false);setChoosingRiichi(false);if(phase==='ready'||matchState.finished)setRiichiPoints(25000);setRiichiMarker('');setTemporaryFuriten(false);setIppatsuEligible(false);setOpponentRiichi([false,false,false]);setOpponentOpenMelds([0,0,0]);setOpponentMelds([[],[],[]]);setConcealedKans([]);setAfterKanDraw(false);setRevealedKans(0);setKanOwners([]);setAnyCallMade(false);setMyDiscardClaimed(false);setTurnsTaken(0);setDrawnId(draw.drawn?.id??'');const indicator=deadWallDoraIndicators(round.deadWall,0)[0],dora=indicator?doraFromIndicator(indicator):null;setMessage(`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`);setPhase('playing');};
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
-  const settleExhaustiveDraw=(nextPlayer:MahjongTile[],nextOpponents:MahjongTile[][])=>{const tenpai=[getMahjongWaits(nextPlayer,openMelds.length,profile.honors).length>0,...nextOpponents.map((hand)=>getMahjongWaits(hand,0,profile.honors).length>0)];const payments=calculateNotenPayments(tenpai);const mine=payments[0];setMatchState((current)=>advanceRiichiMatch(current,{exhaustive:true,tenpai}));setPlayer(nextPlayer);setOpponents(nextOpponents);setWall([]);setRiichiPoints((value)=>value+mine);setRoundResult({winner:null,method:'유국',concealed:[],melds:[],yaku:[],grade:tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · '),scoreText:mine===0?'내 점수 이동 없음':`내 점수 ${mine>0?'+':''}${mine.toLocaleString()}점`});finish('push',`유국 · 나는 ${tenpai[0]?'텐파이':'노텐'}${mine===0?' · 점수 이동 없음':` · ${mine>0?'+':''}${mine.toLocaleString()}점`}\n${tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · ')}`);};
+  // 도중유국: 친이 그대로 유지되고 본장만 하나 올라갑니다.
+  const settleAbortiveDraw=(label:string,detail:string)=>{
+    setMatchState((current)=>advanceRiichiMatch(current,{abortive:true}));
+    setWall([]);
+    setRoundResult({winner:null,method:'유국',concealed:[],melds:[],yaku:[],grade:label,scoreText:detail});
+    finish('push',`${label} · ${detail}`);
+  };
+  const settleExhaustiveDraw=(nextPlayer:MahjongTile[],nextOpponents:MahjongTile[][])=>{const tenpai=[getMahjongWaits(nextPlayer,meldCount,profile.honors).length>0,...nextOpponents.map((hand)=>getMahjongWaits(hand,0,profile.honors).length>0)];
+    // 유국만관: 버린 패가 전부 1·9·자패이고 한 번도 울리지 않았으면 만관 취급
+    if(mode==='riichi'&&isNagashiMangan(rivers[0],myDiscardClaimed)){
+      const payouts=nagashiManganPayments(0,matchState.roundIndex%4);
+      setMatchState((current)=>{const next={...current,scores:current.scores.map((score,seat)=>score+payouts[seat]) as RiichiMatchState['scores']};setRiichiPoints(next.scores[0]);return advanceRiichiMatch(next,{exhaustive:true,tenpai});});
+      setPlayer(nextPlayer);setOpponents(nextOpponents);setWall([]);
+      setRoundResult({winner:0,method:'유국만관',concealed:sortMahjongHand(nextPlayer),melds:[],yaku:['유국만관 (流し満貫)'],grade:'유국만관',scoreText:`${payouts[0].toLocaleString()}점 획득 · 버림패가 모두 1·9·자패`});
+      finish('win',`유국만관! 버린 패가 모두 1·9·자패였습니다 · ${payouts[0].toLocaleString()}점`);
+      return;
+    }
+    const payments=calculateNotenPayments(tenpai);const mine=payments[0];setMatchState((current)=>advanceRiichiMatch(current,{exhaustive:true,tenpai}));setPlayer(nextPlayer);setOpponents(nextOpponents);setWall([]);setRiichiPoints((value)=>value+mine);setRoundResult({winner:null,method:'유국',concealed:[],melds:[],yaku:[],grade:tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · '),scoreText:mine===0?'내 점수 이동 없음':`내 점수 ${mine>0?'+':''}${mine.toLocaleString()}점`});finish('push',`유국 · 나는 ${tenpai[0]?'텐파이':'노텐'}${mine===0?' · 점수 이동 없음':` · ${mine>0?'+':''}${mine.toLocaleString()}점`}\n${tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · ')}`);};
+  // 도중유국 감시: 사개깡 · 사가리치 · 사풍연타
+  useEffect(()=>{
+    if(phase!=='playing'||mode!=='riichi'||pendingCall)return;
+    if(isFourKanAbort(kanOwners)){settleAbortiveDraw('사개깡','두 명 이상이 나눠서 깡을 네 번 해 유국');return;}
+    if(isFourRiichiAbort([riichiDeclared,...opponentRiichi])){settleAbortiveDraw('사가리치','네 명이 모두 리치를 선언해 유국');return;}
+    if(isFourWindDiscardAbort(rivers,anyCallMade)){settleAbortiveDraw('사풍연타','첫 순번에 네 명이 같은 바람패를 버려 유국');return;}
+  },[phase,mode,pendingCall,kanOwners,riichiDeclared,opponentRiichi,rivers,anyCallMade]);
+
   const drawForPlayer=(nextHand:MahjongTile[],nextWall:MahjongTile[],nextOpponents=opponents)=>{const draw=drawMahjongTile(nextHand,nextWall);if(!draw.drawn){settleExhaustiveDraw(nextHand,nextOpponents);return;}if(!riichiDeclared)setTemporaryFuriten(false);setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);const permanent=isMahjongFuriten(nextHand,rivers[0],openMelds.length,profile.honors);setMessage(permanent?'새 패를 뽑았습니다 · 내 버림패에 대기패가 있어 후리텐(론 불가, 쯔모 가능)':'새 패를 뽑았습니다 · 한 장을 버리세요');};
   const runComputers=(from:number,nextOpponents:MahjongTile[][],nextWall:MahjongTile[],nextRivers:MahjongTile[][],nextPlayer:MahjongTile[],lockedRiichi=riichiDeclared,blockedFuriten=temporaryFuriten,openCounts=opponentOpenMelds,computerMelds=opponentMelds)=>{
     const hands=nextOpponents.map((hand)=>[...hand]);
@@ -1223,13 +1246,12 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     const finishComputerWin=(winner:number,concealed:MahjongTile[],winningTile:MahjongTile,winType:'ron'|'tsumo',loser?:number)=>{
       persist();
       const melds=meldSets[winner];
-      const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds:melds,riichi:riichiStates[winner],winType,winningTile}):[];
-      const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds:melds,winningTile,winType}):null;
+      const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds:melds,riichi:riichiStates[winner],winType,winningTile,seatWind:seatWindFor(winner+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):[];
+      const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds:melds,winningTile,winType,seatWind:seatWindFor(winner+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):null;
       const tiles=[...concealed,...melds.flat()];
-      const kanCount=melds.filter((meld)=>meld.length===4).length;
-      const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));
-      const ura=riichiStates[winner]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;
-      const yakuman=yaku.filter((item)=>item.yakuman).length;
+      const visible=countMahjongDora(tiles,deadWallDoraIndicators(deadWall,revealedKans));
+      const ura=riichiStates[winner]?countMahjongDora(tiles,deadWallUraIndicators(deadWall,revealedKans)):0;
+      const yakuman=countYakumanMultiplier(yaku);
       const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;
       const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===winner+1,winType,yakumanCount:yakuman}):null;
       const grade=yakuman?(yakuman>1?`${yakuman}배 역만`:'역만'):`${han}판 ${fu?.fu??0}부${score?.limitName?` · ${score.limitName}`:''}`;
@@ -1242,7 +1264,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
 
     const processTurn=(index:number):void=>{
       if(index>=3){persist();setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);return;}
-      const turn=playOneComputerTurn(hands[index],remaining,Math.random,{level:levels[index],opponentRiver:streams[0],opponentRiichi:lockedRiichi,includeHonors:profile.honors,riichiDeclared:riichiStates[index],openMeldCount:counts[index],openMelds:meldSets[index],requireYaku:mode==='riichi'});
+      const turn=playOneComputerTurn(hands[index],remaining,Math.random,{level:levels[index],riichiRivers:[...(lockedRiichi?[streams[0]]:[]),...riichiStates.flatMap((declared,seat)=>declared&&seat!==index?[streams[seat+1]]:[])],visibleTiles:[...hands[index],...streams.flat(),...meldSets.flat(2)],opponentRiichi:lockedRiichi||riichiStates.some((declared,seat)=>declared&&seat!==index),includeHonors:profile.honors,riichiDeclared:riichiStates[index],openMeldCount:counts[index],openMelds:meldSets[index],requireYaku:mode==='riichi'});
       hands[index]=turn.hand;
       remaining=turn.wall;
       if(turn.riichi){
@@ -1257,9 +1279,9 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     const resolveDiscard=(discarder:number,discarded:MahjongTile,nextComputer:number,declaredNow=false):void=>{
       streams[discarder+1].push(discarded);
       const playerOptions=lockedRiichi?[]:getMahjongCallOptions(nextPlayer,discarded,discarder===2);
-      const structurallyRon=canRonMahjong(nextPlayer,discarded,openMelds.length);
-      const permanentFuriten=isMahjongFuriten(nextPlayer,streams[0],openMelds.length,profile.honors);
-      const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:discarded}).length>0;
+      const structurallyRon=canRonMahjong(nextPlayer,discarded,meldCount);
+      const permanentFuriten=isMahjongFuriten(nextPlayer,streams[0],meldCount,profile.honors);
+      const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:discarded,seatWind:seatWindFor(0,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0;
       const playerRon=structurallyRon&&hasRonYaku&&!blockedFuriten&&!permanentFuriten;
       const reactionOrder=Array.from({length:3},(_,offset)=>(discarder+2+offset)%4).filter((seat)=>seat>0).map((seat)=>seat-1);
       const ronWinner=reactionOrder.find((candidate)=>{
@@ -1267,7 +1289,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const structural=canRonMahjong(hands[candidate],discarded,counts[candidate]);
         if(!structural)return false;
         const furiten=isMahjongFuriten(hands[candidate],streams[candidate+1],counts[candidate],profile.honors);
-        const hasYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hands[candidate],discarded],openMelds:meldSets[candidate],riichi:riichiStates[candidate],winType:'ron',winningTile:discarded}).length>0;
+        const hasYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hands[candidate],discarded],openMelds:meldSets[candidate],riichi:riichiStates[candidate],winType:'ron',winningTile:discarded,seatWind:seatWindFor(candidate+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0;
         return hasYaku&&!furiten;
       });
       if(playerRon||playerOptions.length){
@@ -1302,7 +1324,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
             callHand=supplement.hand;
             remaining=supplement.wall;
           }
-          const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});
+          const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(lockedRiichi?[streams[0]]:[]),...riichiStates.flatMap((declared,seat)=>declared&&seat!==caller?[streams[seat+1]]:[])],visibleTiles:[...callHand,...streams.flat(),...meldSets.flat(2)]});
           hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));
           setIppatsuEligible(false);
           setMessage(`컴퓨터 ${caller+1}이 컴퓨터 ${discarder+1}의 패로 ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);
@@ -1315,14 +1337,61 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     processTurn(from);
   };
   const riichiChoices=mode==='riichi'&&!riichiDeclared&&!openMelds.length&&wall.length>=4?getRiichiDiscardOptions(player,profile.honors):[];
-  const discard=(tile:MahjongTile)=>{if(phase!=='playing'||pendingCall)return;if(riichiDeclared&&tile.id!==drawnId)return;const declaration=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);if(choosingRiichi&&!declaration)return;const mine=discardTile(player,tile.id);const nextRivers=rivers.map((river)=>[...river]);nextRivers[0].push(mine.discarded);if(declaration){setRiichiDeclared(true);setChoosingRiichi(false);setRiichiPoints((value)=>value-1000);setRiichiMarker(mine.discarded.id);setIppatsuEligible(true);setMessage(`리치! ${mine.discarded.glyph}을 옆으로 놓고 1,000점을 공탁했습니다`);}else if(riichiDeclared)setIppatsuEligible(false);const computerRon=opponents.findIndex((hand,index)=>canRonMahjong(hand,mine.discarded,opponentOpenMelds[index])&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hand,mine.discarded],openMelds:opponentMelds[index],riichi:opponentRiichi[index],winType:'ron',winningTile:mine.discarded}).length>0));setPlayer(mine.hand);setDrawnId('');if(computerRon>=0){setRivers(nextRivers);if(declaration){setRiichiDeclared(false);setRiichiPoints((value)=>value+1000);}const melds=opponentMelds[computerRon];const winningHand=[...opponents[computerRon],mine.discarded];const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:winningHand,openMelds:melds,riichi:opponentRiichi[computerRon],winType:'ron',winningTile:mine.discarded}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed:winningHand,openMelds:melds,winningTile:mine.discarded,winType:'ron'}):null;const tiles=[...winningHand,...melds.flat()];const kanCount=melds.filter((meld)=>meld.length===4).length;const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));const ura=opponentRiichi[computerRon]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;const yakuman=yaku.filter((item)=>item.yakuman).length;const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===computerRon+1,winType:'ron',yakumanCount:yakuman}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:computerRon+1,loser:0,score,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});else setMatchState((current)=>advanceRiichiMatch(current,{winner:computerRon+1}));finish('loss',`컴퓨터 ${computerRon+1} 론 · 내가 버린 ${mine.discarded.glyph}으로 완성${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors}));const caller=calls.findIndex(Boolean);if(caller>=0){const call=calls[caller]!;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=drawMahjongTile(callHand,remaining);callHand=supplement.hand;remaining=supplement.wall;}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
+  // 깡은 패를 뽑은 직후에만, 국당 네 번까지. 리치 중에는 대기가 바뀌지 않는 암깡만 허용합니다.
+  const drawnTileNow=player.find((tile)=>tile.id===drawnId)??null;
+  const kanOptions:MahjongKanOption[]=phase!=='playing'||pendingCall||!drawnId||revealedKans>=MAX_KAN_PER_ROUND||!wall.length?[]
+    :[...getAnkanOptions(player),...getKakanOptions(player,openMelds)].filter((option)=>{
+      if(!riichiDeclared)return true;
+      if(option.kind!=='ankan'||!drawnTileNow)return false;
+      if(option.tiles[0].suit!==drawnTileNow.suit||option.tiles[0].value!==drawnTileNow.value)return false;
+      return ankanKeepsWait(player.filter((tile)=>tile.id!==drawnTileNow.id),drawnTileNow,meldCount,profile.honors);
+    });
+
+  // 구종구패: 첫 순번에 1·9·자패가 아홉 종류 이상이면 유국을 선언할 수 있습니다.
+  const canAbortNineTerminals=mode==='riichi'&&phase==='playing'&&!pendingCall&&!!drawnId&&canDeclareNineTerminals(player,turnsTaken===0,anyCallMade);
+  const declareNineTerminals=()=>{
+    if(!canAbortNineTerminals)return;
+    settleAbortiveDraw('구종구패',`1·9·자패 ${countNineTerminals(player)}종류로 유국을 선언했습니다`);
+  };
+
+  const declareKan=(option:MahjongKanOption)=>{
+    if(phase!=='playing'||pendingCall)return;
+    if(option.kind==='kakan'){
+      const added=option.tiles[option.tiles.length-1];
+      // 창깡: 가깡하려는 패로 상대가 완성할 수 있으면 그 자리에서 론이 성립합니다.
+      const robber=opponents.findIndex((hand,index)=>canRobKan(hand,added,opponentOpenMelds[index])&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hand,added],openMelds:opponentMelds[index],riichi:opponentRiichi[index],winType:'ron',winningTile:added,robbingKan:true,seatWind:seatWindFor(index+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0));
+      if(robber>=0){
+        const melds=opponentMelds[robber];const winningHand=[...opponents[robber],added];
+        const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:winningHand,openMelds:melds,riichi:opponentRiichi[robber],winType:'ron',winningTile:added,robbingKan:true,seatWind:seatWindFor(robber+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):[];
+        const fu=mode==='riichi'?calculateRiichiFu({concealed:winningHand,openMelds:melds,winningTile:added,winType:'ron',seatWind:seatWindFor(robber+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):null;
+        const tiles=[...winningHand,...melds.flat()];
+        const visible=countMahjongDora(tiles,deadWallDoraIndicators(deadWall,revealedKans));
+        const ura=opponentRiichi[robber]?countMahjongDora(tiles,deadWallUraIndicators(deadWall,revealedKans)):0;
+        const yakuman=countYakumanMultiplier(yaku);const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;
+        const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===robber+1,winType:'ron',yakumanCount:yakuman}):null;
+        if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:robber+1,loser:0,score,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});
+        else setMatchState((current)=>advanceRiichiMatch(current,{winner:robber+1}));
+        finish('loss',`창깡! 컴퓨터 ${robber+1}이 내 가깡 패 ${added.glyph}을 가로챘습니다${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')}`:''}`);
+        return;
+      }
+    }
+    const applied=option.kind==='ankan'?applyAnkan(player,option):applyKakan(player,openMelds,option);
+    if(option.kind==='ankan')setConcealedKans((current)=>[...current,option.tiles]);
+    else setOpenMelds((applied as ReturnType<typeof applyKakan>).openMelds);
+    const supplement=drawReplacementTile(applied.hand,wall,deadWall,revealedKans);
+    setPlayer(supplement.hand);setWall(supplement.wall);setDeadWall(supplement.deadWall);
+    setDrawnId(supplement.drawn?.id??'');setAfterKanDraw(true);setIppatsuEligible(false);setRevealedKans((value)=>value+1);setKanOwners((current)=>[...current,0]);setAnyCallMade(true);
+    const indicator=deadWallDoraIndicators(supplement.deadWall,revealedKans+1).slice(-1)[0];
+    setMessage(`${option.kind==='ankan'?'암깡':'가깡'} ${option.tiles[0].glyph} · 영상패 ${supplement.drawn?.glyph??'없음'}${indicator?` · 깡도라 표시 ${indicator.glyph}`:''}`);
+  };
+  const discard=(tile:MahjongTile)=>{if(phase!=='playing'||pendingCall)return;if(riichiDeclared&&tile.id!==drawnId)return;const declaration=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);if(choosingRiichi&&!declaration)return;setAfterKanDraw(false);setTurnsTaken((value)=>value+1);const mine=discardTile(player,tile.id);const nextRivers=rivers.map((river)=>[...river]);nextRivers[0].push(mine.discarded);if(declaration){setRiichiDeclared(true);setChoosingRiichi(false);setRiichiPoints((value)=>value-1000);setRiichiMarker(mine.discarded.id);setIppatsuEligible(true);setMessage(`리치! ${mine.discarded.glyph}을 옆으로 놓고 1,000점을 공탁했습니다`);}else if(riichiDeclared)setIppatsuEligible(false);const computerRon=opponents.findIndex((hand,index)=>canRonMahjong(hand,mine.discarded,opponentOpenMelds[index])&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hand,mine.discarded],openMelds:opponentMelds[index],riichi:opponentRiichi[index],winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(index+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0));setPlayer(mine.hand);setDrawnId('');if(computerRon>=0){setRivers(nextRivers);if(declaration){setRiichiDeclared(false);setRiichiPoints((value)=>value+1000);}const melds=opponentMelds[computerRon];const winningHand=[...opponents[computerRon],mine.discarded];const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:winningHand,openMelds:melds,riichi:opponentRiichi[computerRon],winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(computerRon+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed:winningHand,openMelds:melds,winningTile:mine.discarded,winType:'ron',seatWind:seatWindFor(computerRon+1,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):null;const tiles=[...winningHand,...melds.flat()];const visible=countMahjongDora(tiles,deadWallDoraIndicators(deadWall,revealedKans));const ura=opponentRiichi[computerRon]?countMahjongDora(tiles,deadWallUraIndicators(deadWall,revealedKans)):0;const yakuman=countYakumanMultiplier(yaku);const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===computerRon+1,winType:'ron',yakumanCount:yakuman}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:computerRon+1,loser:0,score,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});else setMatchState((current)=>advanceRiichiMatch(current,{winner:computerRon+1}));finish('loss',`컴퓨터 ${computerRon+1} 론 · 내가 버린 ${mine.discarded.glyph}으로 완성${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors}));const caller=calls.findIndex(Boolean);if(caller>=0){const call=calls[caller]!;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);setAnyCallMade(true);setMyDiscardClaimed(true);if(call.kind==='kan')setKanOwners((current)=>[...current,caller+1]);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=drawReplacementTile(callHand,remaining,deadWall,revealedKans);callHand=supplement.hand;remaining=supplement.wall;setDeadWall(supplement.deadWall);setRevealedKans((value)=>value+1);}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(riichiDeclared||declaration?[nextRivers[0]]:[]),...opponentRiichi.flatMap((declared,seat)=>declared&&seat!==caller?[nextRivers[seat+1]]:[])],visibleTiles:[...callHand,...nextRivers.flat(),...computerMeldSets.flat(2)]});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
   const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
-  const claim=(option:MahjongCallOption)=>{if(!pendingCall)return;setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){const draw=drawMahjongTile(called.hand,wall);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};
+  const claim=(option:MahjongCallOption)=>{setAnyCallMade(true);if(option.kind==='kan')setKanOwners((current)=>[...current,0]);if(!pendingCall)return;setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){const draw=drawMahjongTile(called.hand,wall);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};
   const opponentMeldView=(index:number)=>opponentMelds[index]?.length?<View style={styles.mahjongOpponentMeldRow}>{opponentMelds[index].map((meld,meldIndex)=><View key={meldIndex} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>:null;
-  const kanCount=openMelds.filter((meld)=>meld.length===4).length;const doraIndicators=mode==='riichi'?deadWall.slice(0,1+kanCount):[];const uraIndicators=mode==='riichi'&&riichiDeclared?deadWall.slice(7,8+kanCount):[];
-  const structuralWin=isWinningMahjongHand(player,openMelds.length);const drawnTile=player.find((tile)=>tile.id===drawnId)??player[player.length-1];const win=structuralWin&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:player,openMelds,riichi:riichiDeclared,ippatsu:ippatsuEligible,winType:'tsumo',winningTile:drawnTile}).length>0); const quit=()=>{if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
-  const winWithRiichi=(text:string)=>{const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];const concealed=pendingCall?[...player,pendingCall.tile]:player;const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds,riichi:riichiDeclared,ippatsu:ippatsuEligible,winType,winningTile}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds,winningTile,winType}):null;const allTiles=[...concealed,...openMelds.flat()];const visibleDora=countMahjongDora(allTiles,doraIndicators),uraDora=countMahjongDora(allTiles,uraIndicators);const yakuHan=yaku.reduce((sum,item)=>sum+item.han,0),yakumanCount=yaku.filter((item)=>item.yakuman).length,totalHan=yakumanCount?0:yakuHan+visibleDora+uraDora;const score=mode==='riichi'&&(fu||yakumanCount)?calculateRiichiScore({han:totalHan,fu:fu?.fu??0,dealer:matchState.roundIndex%4===0,winType,yakumanCount}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:0,score,winType,loser:pendingCall?.discarder});setRiichiPoints(next.scores[0]);return next;});const grade=yakumanCount?(yakumanCount>1?`${yakumanCount}배 역만`:'역만'):`총 ${totalHan}판${fu?` ${fu.fu}부`:''}${score?` · ${score.limitName||`${score.total.toLocaleString()}점`}`:''}`;const doraText=!yakumanCount&&(visibleDora||uraDora)?`\n도라 ${visibleDora}판${riichiDeclared?` · 뒷도라 ${uraDora}판`:''}`:'';const payText=score?`\n점수: ${score.total.toLocaleString()}점${winType==='tsumo'?` (${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점씩 지불)`:''}`:'';const fuText=fu?`\n부 계산: ${fu.details.join(' · ')}`:'';setRoundResult({winner:0,method:winType==='ron'?'론':'쯔모',concealed:sortMahjongHand(concealed),melds:openMelds.map((meld)=>[...meld]),yaku:yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}`),grade,scoreText:score?(winType==='ron'?`${(score.total+matchState.honba*300).toLocaleString()}점 획득${matchState.riichiSticks?` · 공탁 ${matchState.riichiSticks*1000}점 포함`:''}`:`지불 ${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점`):'간이 규칙 점수 적용'});const summary=yaku.length?` · ${grade}\n${yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}: ${item.detail}`).join('\n')}${doraText}${fuText}${payText}`:' · 기본 완성(세부 역 판정 준비 중)';if(!score)setMatchState((current)=>advanceRiichiMatch(current,{winner:0}));finish('win',text+summary);};
-  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):profile.round}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text><Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}<View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} onPress={canDiscard?()=>discard(tile):undefined}/>;})}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'반장전 결과':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}<Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{win?'쯔모':'아직 미완성'}</Text></Pressable></View>}<Text style={styles.disclaimer}>{riichiDeclared?'리치 후에는 새로 뽑은 패만 그대로 버릴 수 있습니다':'밝게 올라온 패가 방금 뽑은 패입니다'} · {profile.note}</Text></ScrollView></View>;
+  const doraIndicators=mode==='riichi'?deadWallDoraIndicators(deadWall,revealedKans):[];const uraIndicators=mode==='riichi'&&riichiDeclared?deadWallUraIndicators(deadWall,revealedKans):[];
+  const structuralWin=isWinningMahjongHand(player,meldCount);const drawnTile=player.find((tile)=>tile.id===drawnId)??player[player.length-1];const win=structuralWin&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:player,openMelds,concealedKans,afterKan:afterKanDraw,riichi:riichiDeclared,ippatsu:ippatsuEligible,winType:'tsumo',winningTile:drawnTile,seatWind:seatWindFor(0,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0); const quit=()=>{if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
+  const winWithRiichi=(text:string)=>{const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];const concealed=pendingCall?[...player,pendingCall.tile]:player;const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds,concealedKans,afterKan:afterKanDraw&&winType==='tsumo',riichi:riichiDeclared,ippatsu:ippatsuEligible,winType,winningTile,seatWind:seatWindFor(0,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds,concealedKans,winningTile,winType,seatWind:seatWindFor(0,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}):null;const allTiles=[...concealed,...openMelds.flat(),...concealedKans.flat()];const visibleDora=countMahjongDora(allTiles,doraIndicators),uraDora=countMahjongDora(allTiles,uraIndicators);const yakuHan=yaku.reduce((sum,item)=>sum+item.han,0),yakumanCount=countYakumanMultiplier(yaku),totalHan=yakumanCount?0:yakuHan+visibleDora+uraDora;const score=mode==='riichi'&&(fu||yakumanCount)?calculateRiichiScore({han:totalHan,fu:fu?.fu??0,dealer:matchState.roundIndex%4===0,winType,yakumanCount}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:0,score,winType,loser:pendingCall?.discarder});setRiichiPoints(next.scores[0]);return next;});const grade=yakumanCount?(yakumanCount>1?`${yakumanCount}배 역만`:'역만'):`총 ${totalHan}판${fu?` ${fu.fu}부`:''}${score?` · ${score.limitName||`${score.total.toLocaleString()}점`}`:''}`;const doraText=!yakumanCount&&(visibleDora||uraDora)?`\n도라 ${visibleDora}판${riichiDeclared?` · 뒷도라 ${uraDora}판`:''}`:'';const payText=score?`\n점수: ${score.total.toLocaleString()}점${winType==='tsumo'?` (${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점씩 지불)`:''}`:'';const fuText=fu?`\n부 계산: ${fu.details.join(' · ')}`:'';setRoundResult({winner:0,method:winType==='ron'?'론':'쯔모',concealed:sortMahjongHand(concealed),melds:[...openMelds,...concealedKans].map((meld)=>[...meld]),yaku:yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}`),grade,scoreText:score?(winType==='ron'?`${(score.total+matchState.honba*300).toLocaleString()}점 획득${matchState.riichiSticks?` · 공탁 ${matchState.riichiSticks*1000}점 포함`:''}`:`지불 ${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점`):'간이 규칙 점수 적용'});const summary=yaku.length?` · ${grade}\n${yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}: ${item.detail}`).join('\n')}${doraText}${fuText}${payText}`:' · 기본 완성(세부 역 판정 준비 중)';if(!score)setMatchState((current)=>advanceRiichiMatch(current,{winner:0}));finish('win',text+summary);};
+  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):profile.round}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text><Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}<View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} onPress={canDiscard?()=>discard(tile):undefined}/>;})}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'반장전 결과':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}{canAbortNineTerminals&&<Pressable onPress={declareNineTerminals} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>구종구패</Text></Pressable>}{kanOptions.map((option,index)=><Pressable key={`kan-${index}`} onPress={()=>declareKan(option)} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>{option.kind==='ankan'?'암깡':'가깡'} {option.tiles[0].glyph}</Text></Pressable>)}<Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{win?'쯔모':'아직 미완성'}</Text></Pressable></View>}<Text style={styles.disclaimer}>{riichiDeclared?'리치 후에는 새로 뽑은 패만 그대로 버릴 수 있습니다':'밝게 올라온 패가 방금 뽑은 패입니다'} · {profile.note}</Text></ScrollView></View>;
 }
 
 function PlayingCard({ card, hidden = false, compact = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
@@ -1441,7 +1510,8 @@ function BlackjackGameScreen(props: {
 
   const finishSplit = (firstHand: Card[], secondHand: Card[], nextDeck: Card[]) => {
     const dealerResult = playDealer(nextDeck, dealer);
-    const results = [resolveRound(firstHand, dealerResult.hand), resolveRound(secondHand, dealerResult.hand)];
+    // 스플릿한 손의 21은 블랙잭이 아니므로 2.5배가 아닌 2배로 정산합니다.
+    const results = [resolveRound(firstHand, dealerResult.hand, false), resolveRound(secondHand, dealerResult.hand, false)];
     setPlayer(firstHand);
     setSplitHand(secondHand);
     setDealer(dealerResult.hand);
@@ -1769,30 +1839,77 @@ function RouletteGameScreen({
   const betLabel = bet.type === 'straight' ? `숫자 ${bet.number}` : outsideBets.find((item) => item.bet.type === bet.type)?.label ?? '';
   const won = resultNumber !== null && rouletteBetWins(bet, resultNumber);
 
-  useEffect(() => () => wheelProgress.stopAnimation(), [wheelProgress]);
+  // 스핀을 누르는 순간 코인이 빠지므로, 회전 애니메이션이 끝나든 중간에 화면을 벗어나든
+  // 정산은 반드시 한 번 실행되어야 합니다. 결과 숫자는 이미 정해져 있습니다.
+  const pendingSettle = useRef<(() => void) | null>(null);
+  const settleOnce = () => {
+    const run = pendingSettle.current;
+    pendingSettle.current = null;
+    run?.();
+  };
+
+  // 회전 중 마커가 가리키는 숫자를 실시간으로 따라갑니다. 마지막 저속 구간에서
+  // 숫자가 한 칸씩 넘어가는 것이 보여야 긴장감이 생깁니다.
+  const [tickingNumber, setTickingNumber] = useState<number | null>(null);
+  const tickingRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const id = wheelProgress.addListener(({ value }) => {
+      const step = 360 / europeanWheelOrder.length;
+      const normalized = ((-value % 360) + 360) % 360;
+      const index = Math.round(normalized / step) % europeanWheelOrder.length;
+      const pocket = europeanWheelOrder[index];
+      if (tickingRef.current !== pocket) {
+        tickingRef.current = pocket;
+        setTickingNumber(pocket);
+      }
+    });
+    return () => {
+      wheelProgress.removeListener(id);
+      wheelProgress.stopAnimation();
+      settleOnce();
+    };
+  }, [wheelProgress]);
 
   const spin = () => {
     if (phase === 'spinning' || !onPlaceBet(selectedBet)) return;
     const number = spinRoulette();
     const pocketIndex = europeanWheelOrder.indexOf(number);
-    const target = 1800 + (360 - pocketIndex * (360 / europeanWheelOrder.length));
+    const step = 360 / europeanWheelOrder.length;
+    const landing = 360 - pocketIndex * step;
+    // 1단계에서 빠르게 여섯 바퀴를 돌고, 2단계에서 마지막 한 바퀴 반을 기어가듯 붙입니다.
+    const handoff = 360 * 6 + landing - 540;
+    const target = 360 * 6 + landing;
+
     wheelProgress.setValue(0);
     setPhase('spinning');
     setResultNumber(null);
-    Animated.timing(wheelProgress, {
-      toValue: target,
-      duration: 1800,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(({ finished }) => {
+    pendingSettle.current = () => onSettle(bet, selectedBet, number, betLabel);
+
+    Animated.sequence([
+      Animated.timing(wheelProgress, {
+        toValue: handoff,
+        duration: 2400,
+        easing: Easing.bezier(0.22, 0.68, 0.42, 0.92),
+        useNativeDriver: true,
+      }),
+      Animated.timing(wheelProgress, {
+        toValue: target,
+        duration: 3400,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
       if (!finished) return;
       setResultNumber(number);
       setPhase('result');
-      onSettle(bet, selectedBet, number, betLabel);
+      settleOnce();
     });
   };
 
-  const wheelRotation = wheelProgress.interpolate({ inputRange: [0, 2160], outputRange: ['0deg', '2160deg'] });
+  const wheelRotation = wheelProgress.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
+  const shownNumber = phase === 'spinning' ? tickingNumber : resultNumber;
+  const shownColor = shownNumber === null ? null : rouletteColor(shownNumber);
 
   return (
     <View style={styles.detailScreen}>
@@ -1805,14 +1922,16 @@ function RouletteGameScreen({
 
         <View style={styles.rouletteStage}>
           <View style={styles.rouletteMarker} />
+          <View style={styles.rouletteBall} />
           <View style={[styles.rouletteWheel, phase === 'spinning' && styles.rouletteWheelSpinning]}>
             <Animated.View style={[styles.rouletteWheelRing, { transform: [{ rotate: wheelRotation }] }]}>
               {europeanWheelOrder.map((number, index) => {
                 const angle = index * (360 / europeanWheelOrder.length);
                 const radians = angle * Math.PI / 180;
-                const radius = 103;
-                const left = 125 + Math.sin(radians) * radius - 12;
-                const top = 125 - Math.cos(radians) * radius - 12;
+                const center = 150;
+                const radius = 124;
+                const left = center + Math.sin(radians) * radius - 17;
+                const top = center - Math.cos(radians) * radius - 14;
                 const color = rouletteColor(number);
                 return (
                   <View key={number} style={[styles.roulettePocket, { left, top, transform: [{ rotate: `${angle}deg` }] }, color === 'red' ? styles.roulettePocketRed : color === 'black' ? styles.roulettePocketBlack : styles.roulettePocketGreen]}>
@@ -1820,11 +1939,23 @@ function RouletteGameScreen({
                   </View>
                 );
               })}
+              <View style={styles.rouletteSpokes} />
             </Animated.View>
             <View style={styles.rouletteBowl}>
               <View style={styles.rouletteHub} />
-              <Text style={[styles.rouletteResultNumber, resultNumber !== null && rouletteColor(resultNumber) === 'red' && styles.rouletteRedText]}>{phase === 'spinning' ? '•' : resultNumber ?? '◎'}</Text>
-              <Text style={styles.rouletteWheelLabel}>{phase === 'spinning' ? '회전 중' : resultNumber === null ? '베팅 선택' : rouletteColor(resultNumber).toUpperCase()}</Text>
+              <Text
+                style={[
+                  styles.rouletteResultNumber,
+                  shownColor === 'red' && styles.rouletteRedText,
+                  shownColor === 'green' && styles.rouletteGreenText,
+                  phase === 'spinning' && styles.rouletteNumberTicking,
+                ]}
+              >
+                {shownNumber ?? '◎'}
+              </Text>
+              <Text style={styles.rouletteWheelLabel}>
+                {phase === 'spinning' ? '멈추는 중…' : resultNumber === null ? '베팅 선택' : rouletteColor(resultNumber).toUpperCase()}
+              </Text>
             </View>
           </View>
         </View>
@@ -2218,11 +2349,11 @@ const styles = StyleSheet.create({
   mahjongBack: { width: 18, height: 28, borderRadius: 3, backgroundColor: '#183D71', borderWidth: 1, borderColor: '#D8B95E' },
   mahjongMiddle: { minHeight: 210, flexDirection: 'row', alignItems: 'center', gap: 7 },
   mahjongSide: { flex: 1, minHeight: 130, padding: 7, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.16)' },
-  mahjongCenter: { width: 92, height: 92, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#E5D7A8', borderWidth: 3, borderColor: '#8E7137' },
+  mahjongCenter: { minWidth: 104, maxWidth: 132, paddingVertical: 10, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#E5D7A8', borderWidth: 3, borderColor: '#8E7137' },
   mahjongRound: { color: '#8B1F25', fontSize: 22, fontWeight: '900' },
-  mahjongWall: { color: '#3D3726', fontSize: 9, fontWeight: '800', marginTop: 3 },
+  mahjongWall: { color: '#3D3726', fontSize: 9, fontWeight: '800', marginTop: 3, textAlign: 'center' },
   mahjongPot: { color: '#6D5117', fontSize: 9, fontWeight: '900', marginTop: 3 },
-  mahjongPoints: { color: '#8B1F25', fontSize: 9, fontWeight: '900', marginTop: 2 },
+  mahjongPoints: { color: '#8B1F25', fontSize: 9, fontWeight: '900', marginTop: 2, textAlign: 'center' },
   mahjongRiver: { color: '#FFF8DC', fontSize: 20, lineHeight: 27, textAlign: 'center' },
   mahjongPlayerRiver: { minHeight: 70, padding: 6, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.14)' },
   mahjongRiichiMarker: { color: '#FFD966', fontSize: 9, fontWeight: '900', textAlign: 'center', marginTop: 2 },
@@ -2257,6 +2388,7 @@ const styles = StyleSheet.create({
   mahjongCallButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#28614D' },
   mahjongRonButton: { minHeight: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#B3232C', borderWidth: 1, borderColor: '#F0C75B' },
   mahjongPassButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#39444A' },
+  mahjongKanButton: { minHeight: 44, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#8C6A2A', backgroundColor: '#2A2113' },
   mahjongSortButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#244B63' },
   mahjongTsumoButton: { flex: 1.2, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#B3232C', borderWidth: 2, borderColor: '#F0C75B' },
   sevenPokerCards: { minHeight: 185, maxWidth: 310, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'center', gap: 8 },
@@ -2453,19 +2585,23 @@ const styles = StyleSheet.create({
   rouletteBalance: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 3 },
   difficultyBadge: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: '#2E2512', borderWidth: 1, borderColor: colors.gold },
   difficultyBadgeText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
-  rouletteStage: { height: 300, alignItems: 'center', justifyContent: 'center' },
-  rouletteMarker: { position: 'absolute', zIndex: 5, top: 4, width: 0, height: 0, borderLeftWidth: 11, borderRightWidth: 11, borderTopWidth: 22, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: colors.goldLight },
-  rouletteWheel: { width: 270, height: 270, alignItems: 'center', justifyContent: 'center', borderRadius: 135, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 16, shadowOffset: { width: 0, height: 9 } },
+  rouletteStage: { height: 330, alignItems: 'center', justifyContent: 'center' },
+  rouletteMarker: { position: 'absolute', zIndex: 6, top: 2, width: 0, height: 0, borderLeftWidth: 12, borderRightWidth: 12, borderTopWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFE39A' },
+  rouletteBall: { position: 'absolute', zIndex: 6, top: 30, width: 13, height: 13, borderRadius: 7, backgroundColor: '#FFFDF5', borderWidth: 1, borderColor: '#B99B4E', shadowColor: '#000000', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  rouletteWheel: { width: 316, height: 316, alignItems: 'center', justifyContent: 'center', borderRadius: 158, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
   rouletteWheelSpinning: { borderColor: '#FFE39A' },
-  rouletteWheelRing: { position: 'absolute', width: 250, height: 250, borderRadius: 125, backgroundColor: '#17201D', borderWidth: 2, borderColor: '#E0C276' },
-  roulettePocket: { position: 'absolute', width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderRadius: 4, borderWidth: 0.5, borderColor: '#E8D9AA' },
-  roulettePocketRed: { backgroundColor: '#A72F39' },
-  roulettePocketBlack: { backgroundColor: '#1A1D21' },
+  rouletteWheelRing: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: '#141C1A', borderWidth: 2, borderColor: '#E0C276' },
+  rouletteSpokes: { position: 'absolute', top: 60, left: 60, width: 180, height: 180, borderRadius: 90, borderWidth: 1, borderColor: 'rgba(224,194,118,0.22)' },
+  roulettePocket: { position: 'absolute', width: 34, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 1, borderColor: 'rgba(232,217,170,0.85)' },
+  roulettePocketRed: { backgroundColor: '#B4323D' },
+  roulettePocketBlack: { backgroundColor: '#121519' },
   roulettePocketGreen: { backgroundColor: '#14754F' },
-  roulettePocketText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' },
-  rouletteBowl: { width: 142, height: 142, alignItems: 'center', justifyContent: 'center', borderRadius: 71, backgroundColor: '#0A392B', borderWidth: 8, borderColor: '#B68D33' },
+  roulettePocketText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 15 },
+  rouletteBowl: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', borderRadius: 75, backgroundColor: '#0A392B', borderWidth: 8, borderColor: '#B68D33' },
   rouletteHub: { position: 'absolute', top: 18, width: 22, height: 22, borderRadius: 11, backgroundColor: '#E9CD7A', borderWidth: 4, borderColor: '#725619' },
-  rouletteResultNumber: { color: colors.text, fontSize: 38, fontWeight: '900', marginTop: 12 },
+  rouletteResultNumber: { color: colors.text, fontSize: 44, fontWeight: '900', marginTop: 12, fontVariant: ['tabular-nums'] },
+  rouletteNumberTicking: { opacity: 0.92 },
+  rouletteGreenText: { color: '#5FD6A4' },
   rouletteRedText: { color: '#FF6973' },
   rouletteWheelLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', marginTop: 2 },
   rouletteResultCard: { padding: 15, borderRadius: 16, borderWidth: 1, marginBottom: 2 },

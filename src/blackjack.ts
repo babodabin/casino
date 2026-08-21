@@ -91,10 +91,14 @@ export function playDealer(deck: Card[], dealerHand: Card[]) {
   return { deck: remaining, hand };
 }
 
-export function resolveRound(player: Card[], dealer: Card[]): RoundResult {
+/**
+ * 스플릿한 손은 2장으로 21을 만들어도 블랙잭이 아니라 일반 21입니다.
+ * 그런 경우 playerCanBlackjack에 false를 넘기세요.
+ */
+export function resolveRound(player: Card[], dealer: Card[], playerCanBlackjack = true): RoundResult {
   const playerScore = handValue(player);
   const dealerScore = handValue(dealer);
-  const playerBlackjack = isBlackjack(player);
+  const playerBlackjack = playerCanBlackjack && isBlackjack(player);
   const dealerBlackjack = isBlackjack(dealer);
 
   if (playerBlackjack && !dealerBlackjack) return 'blackjack';
