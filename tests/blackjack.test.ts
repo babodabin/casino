@@ -75,3 +75,24 @@ test('보험은 원래 베팅의 절반이며 딜러 블랙잭이면 2대1 이�
   assert.equal(insurancePayout(250, true), 750);
   assert.equal(insurancePayout(250, false), 0);
 });
+
+test('스플릿한 손의 21은 블랙잭이 아니라 일반 승리로 정산한다', () => {
+  const twentyOne = [card('A'), card('10', '♥')];
+  const dealerStands = [card('9', '♦'), card('8', '♣')];
+
+  // 첫 손이면 블랙잭 → 2.5배
+  assert.equal(resolveRound(twentyOne, dealerStands), 'blackjack');
+  assert.equal(payoutForResult(1000, resolveRound(twentyOne, dealerStands)), 2500);
+
+  // 스플릿한 손이면 일반 21 → 2배
+  assert.equal(resolveRound(twentyOne, dealerStands, false), 'win');
+  assert.equal(payoutForResult(1000, resolveRound(twentyOne, dealerStands, false)), 2000);
+});
+
+test('스플릿한 손의 21도 딜러 블랙잭에는 진다', () => {
+  const twentyOne = [card('A'), card('10', '♥')];
+  const dealerBlackjack = [card('A', '♦'), card('K', '♣')];
+
+  assert.equal(resolveRound(twentyOne, dealerBlackjack), 'push');
+  assert.equal(resolveRound(twentyOne, dealerBlackjack, false), 'loss');
+});
