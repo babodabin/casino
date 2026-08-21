@@ -61,17 +61,18 @@ import { dealHoldem, dealOmaha, madeHandCards, resolveHoldem, resolveOmaha } fro
 import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
 import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCardDraw } from './src/fivecarddraw';
 import { dealHighLow, resolveHighLow } from './src/highlow';
-import { dealRiichi, discardTile, drawTile as drawMahjongTile, isWinningMahjongHand, playComputerTurns, sortMahjongHand, type MahjongTile } from './src/riichimahjong';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame';
+type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -125,9 +126,9 @@ const gameCategories: GameCategory[] = [
   ]},
   { name: '마작', icon: '發', detail: '리치 · 중국식 마작', eyebrow: 'MAHJONG', games: [
     { name: '리치 마작', icon: '立', description: '패를 뽑고 버려 네 몸통과 한 머리를 완성', status: 'playable' },
-    { name: '중국식 마작', icon: '中', description: '중국 표준 규칙 기반 마작', status: 'planned' },
-    { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 규칙', status: 'planned' },
-    { name: '사천 마작', icon: '川', description: '지역 특색을 살린 사천식 마작', status: 'planned' },
+    { name: '중국식 마작', icon: '中', description: '136장으로 즐기는 중국 표준형 마작', status: 'playable' },
+    { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 마작', status: 'playable' },
+    { name: '사천 마작', icon: '川', description: '자패 없이 세 종류 숫자패로 승부', status: 'playable' },
   ]},
   { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 경정', eyebrow: 'RACING', games: [
     { name: '경마', icon: '馬', description: '말과 기수의 순위를 예측', status: 'planned' },
@@ -400,9 +401,9 @@ export default function App() {
     setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-high-low-${current.length}`, game:'하이로우', result:net>0?'win':net<0?'loss':'push', difficulty, bet:stake, net, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next)); return next; });
   };
 
-  const settleRiichi = (stake: number, result: 'win'|'loss'|'push', detail: string) => {
+  const settleMahjong = (game:'리치 마작'|'중국식 마작'|'홍콩 마작'|'사천 마작',stake: number, result: 'win'|'loss'|'push', detail: string) => {
     const payout=result==='win'?stake*4:result==='push'?stake:0; if(payout)setCoins((current)=>{const next=current+payout;AsyncStorage.setItem(STORAGE_KEYS.coins,String(next));return next;});
-    setRecords((current)=>{const record:GameRecord={id:`${Date.now()}-riichi-${current.length}`,game:'리치 마작',result,difficulty,bet:stake,net:result==='win'?stake*3:result==='push'?0:-stake,playedAt:new Date().toISOString(),detail};const next=[record,...current].slice(0,100);AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next));return next;});
+    setRecords((current)=>{const record:GameRecord={id:`${Date.now()}-mahjong-${current.length}`,game,result,difficulty,bet:stake,net:result==='win'?stake*3:result==='push'?0:-stake,playedAt:new Date().toISOString(),detail};const next=[record,...current].slice(0,100);AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next));return next;});
   };
 
   if (!entered) {
@@ -436,7 +437,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : game.name === '하이로우' ? 'highLowSetup' : game.name === '리치 마작' ? 'riichiSetup' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : game.name === '하이로우' ? 'highLowSetup' : game.name === '리치 마작' ? 'riichiSetup' : game.name === '중국식 마작' ? 'chineseMahjongSetup' : game.name === '홍콩 마작' ? 'hongKongMahjongSetup' : game.name === '사천 마작' ? 'sichuanMahjongSetup' : 'gamePreview');
             }}
           />
         )}
@@ -512,7 +513,13 @@ export default function App() {
         {appScreen === 'highLowSetup' && <HighLowSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeRouletteBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
-        {appScreen === 'riichiGame' && <RiichiGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeRouletteBet} onSettle={settleRiichi} />}
+        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
+        {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
+        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
+        {appScreen === 'hongKongMahjongSetup' && <WorldMahjongSetupScreen mode="hongkong" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('hongKongMahjongGame')} />}
+        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
+        {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
+        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -522,7 +529,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : game.name === '하이로우' ? 'highLowSetup' : game.name === '리치 마작' ? 'riichiSetup' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : game.name === '하이로우' ? 'highLowSetup' : game.name === '리치 마작' ? 'riichiSetup' : game.name === '중국식 마작' ? 'chineseMahjongSetup' : game.name === '홍콩 마작' ? 'hongKongMahjongSetup' : game.name === '사천 마작' ? 'sichuanMahjongSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -1145,20 +1152,177 @@ function PokerGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mo
 
 function RiichiSetupScreen(props:{coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}) {
   const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text><Text style={styles.slotRuleText}>지금 단계에서는 쯔모 완성, 컴퓨터 3명 턴, 버림패와 코인 정산을 먼저 지원합니다.</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>동1국 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text></View><RiichiBeginnerGuide/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>설명을 읽었어요 · 동1국 시작</Text></Pressable></ScrollView></View>;
+}
+
+function RiichiBeginnerGuide(){
+  const [open,setOpen]=useState(true);
+  return <View style={styles.mahjongBeginner}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>FIRST MAHJONG</Text><Text style={styles.mahjongGuideTitle}>처음 하는 사람을 위한 설명</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGuideBody}>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>1</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>무엇을 만들면 되나요?</Text><Text style={styles.mahjongLessonText}>내 패 14장을 <Text style={styles.mahjongStrong}>몸통 4개 + 머리 1개</Text>로 나누면 기본 완성입니다. 머리는 똑같은 패 2장입니다. 예외로 서로 다른 일곱 쌍인 칠대자와 1·9·자패 13종을 모으는 국사무쌍도 있습니다.</Text><Text style={styles.mahjongExample}>🀇🀈🀉　🀙🀚🀛　🀐🀐🀐　🀀🀀🀀　🀄🀄</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>2</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>몸통은 두 종류예요</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>연속 3장</Text>: 같은 무늬의 3·4·5처럼 이어지는 숫자입니다. <Text style={styles.mahjongStrong}>같은 3장</Text>: 똑같은 패 세 장입니다. 동·남·서·북과 백·발·중은 숫자가 아니므로 연속으로 만들 수 없습니다.</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>3</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>패의 종류</Text><Text style={styles.mahjongLessonText}>🀇~🀏 만수, 🀙~🀡 통수, 🀐~🀘 삭수는 각각 1부터 9입니다. 🀀🀁🀂🀃은 동·남·서·북, 🀆🀅🀄은 백·발·중입니다. 모든 패는 네 장씩 있습니다.</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>4</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>내 차례에 하는 일</Text><Text style={styles.mahjongLessonText}>패 한 장을 자동으로 뽑아 14장이 됩니다. 필요 없는 패 하나를 누르면 버리고 다시 13장이 됩니다. 이 과정을 반복하면서 완성에 가까워지면 됩니다. 밝게 올라온 패가 방금 뽑은 패입니다.</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>5</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>쯔모와 론</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>쯔모</Text>는 내가 뽑은 패로 완성하는 승리, <Text style={styles.mahjongStrong}>론</Text>은 다른 사람이 버린 패로 완성하는 승리입니다. 상대의 버림패로 완성되면 론 버튼이 나타납니다.</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>6</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>치·퐁·깡·리치는 무엇인가요?</Text><Text style={styles.mahjongLessonText}>치·퐁은 상대의 버림패를 가져와 몸통을 만드는 것, 깡은 같은 패 4장을 공개하는 것입니다. 치는 바로 왼쪽 상대의 패만 가져올 수 있지만 퐁·깡은 누구의 패든 가능합니다. 리치는 패를 공개하지 않은 텐파이 상태에서 1,000점을 맡기고 선언합니다. 선언 후에는 새로 뽑은 패만 그대로 버립니다.</Text></View></View>
+    <View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>현재 이 앱에서 먼저 연습하는 것</Text><Text style={styles.mahjongLessonText}>패 뽑기 → 필요 없는 패 버리기 → 몸통 4개와 머리 1개 만들기 → 쯔모 판정. 처음에는 점수보다 패 모양을 익히면 됩니다.</Text></View>
+  </View>:null}</View>;
 }
 
 function MahjongTileView({tile,selected=false,onPress}:{tile:MahjongTile;selected?:boolean;onPress?:()=>void}) {
   return <Pressable disabled={!onPress} onPress={onPress} style={[styles.mahjongTile,selected&&styles.mahjongTileDrawn]}><Text style={styles.mahjongGlyph}>{tile.glyph}</Text></Pressable>;
 }
 
-function RiichiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
-  const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready'); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
-  const start=()=>{if(!onPlaceBet(selectedBet))return;const round=dealRiichi();const draw=drawMahjongTile(round.player,round.wall);setPlayer(draw.hand);setOpponents(round.opponents);setWall(draw.wall);setRivers(round.rivers);setDrawnId(draw.drawn?.id??'');setMessage('뽑은 패를 확인하고 한 장을 버리세요');setPhase('playing');};
+const mahjongProfiles:Record<MahjongMode,{title:string;round:string;lead:string;rules:string[];honors:boolean;note:string}>={
+  riichi:{title:'리치 마작(Riichi Mahjong)',round:'東 1局',lead:'일본식 리치 규칙의 기본판',rules:['136장의 숫자패와 자패를 모두 사용합니다.','몸통 4개와 머리 1개뿐 아니라 칠대자와 국사무쌍도 완성으로 판정합니다.'],honors:true,note:'도라·뒷도라·깡도라와 판·부 실제 점수 계산 지원'},
+  chinese:{title:'중국식 마작(Chinese Mahjong)',round:'东 1局',lead:'중국 표준형 마작의 기본판',rules:['136장의 숫자패와 동·남·서·북·백·발·중을 사용합니다.','한 장을 뽑고 한 장을 버려 몸통 4개와 머리 1개를 만듭니다.','중국 표준 8점 역 계산은 다음 단계에서 연결합니다.'],honors:true,note:'현재는 기본 완성·쯔모·컴퓨터 턴을 먼저 지원'},
+  hongkong:{title:'홍콩 마작(Hong Kong Mahjong)',round:'東 1局',lead:'빠르고 직관적인 홍콩식 기본판',rules:['136장 전체를 사용하며 기본 완성 모양은 같습니다.','홍콩식은 비교적 간결한 번(番) 체계를 사용합니다.','꽃패와 실제 번·최소 번 규칙은 다음 단계에서 추가합니다.'],honors:true,note:'현재는 기본 완성·쯔모·컴퓨터 턴을 먼저 지원'},
+  sichuan:{title:'사천 마작(Sichuan Mahjong)',round:'川 1局',lead:'자패 없이 숫자패로만 즐기는 기본판',rules:['동·남·서·북·백·발·중을 빼고 만수·통수·삭수 108장만 사용합니다.','몸통 4개와 머리 1개를 만드는 기본 목표는 같습니다.','환삼장·정결·혈전 규칙은 다음 단계에서 추가합니다.'],honors:false,note:'현재는 108장 기본 완성·쯔모·컴퓨터 턴 지원'},
+};
+
+function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}){
+  const profile=mahjongProfiles[props.mode];const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
+  return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
+}
+
+function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+  const profile=mahjongProfiles[mode];
+  type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean};
+  type MahjongRoundResult={winner:number|null;method:'론'|'쯔모'|'유국';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
+  const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready'); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [deadWall,setDeadWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
+  const [openMelds,setOpenMelds]=useState<MahjongTile[][]>([]); const [pendingCall,setPendingCall]=useState<PendingCall|null>(null);
+  const [riichiDeclared,setRiichiDeclared]=useState(false); const [choosingRiichi,setChoosingRiichi]=useState(false); const [riichiPoints,setRiichiPoints]=useState(25000); const [riichiMarker,setRiichiMarker]=useState('');
+  const [temporaryFuriten,setTemporaryFuriten]=useState(false); const [ippatsuEligible,setIppatsuEligible]=useState(false);
+  const [opponentRiichi,setOpponentRiichi]=useState([false,false,false]);
+  const [opponentOpenMelds,setOpponentOpenMelds]=useState([0,0,0]);
+  const [opponentMelds,setOpponentMelds]=useState<MahjongTile[][][]>([[],[],[]]);
+  const [roundResult,setRoundResult]=useState<MahjongRoundResult|null>(null);
+  const [matchState,setMatchState]=useState<RiichiMatchState>({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});
+  const start=()=>{if((phase==='ready'||matchState.finished)&&!onPlaceBet(selectedBet))return;if(phase==='ready'||matchState.finished)setMatchState({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});const round=dealRiichi(Math.random,profile.honors);const draw=drawMahjongTile(round.player,round.wall);setPlayer(draw.hand);setOpponents(round.opponents);setWall(draw.wall);setDeadWall(round.deadWall);setRivers(round.rivers);setOpenMelds([]);setPendingCall(null);setRoundResult(null);setRiichiDeclared(false);setChoosingRiichi(false);if(phase==='ready'||matchState.finished)setRiichiPoints(25000);setRiichiMarker('');setTemporaryFuriten(false);setIppatsuEligible(false);setOpponentRiichi([false,false,false]);setOpponentOpenMelds([0,0,0]);setOpponentMelds([[],[],[]]);setDrawnId(draw.drawn?.id??'');const indicator=round.deadWall[0],dora=indicator?doraFromIndicator(indicator):null;setMessage(`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`);setPhase('playing');};
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
-  const discard=(tile:MahjongTile)=>{if(phase!=='playing')return;const mine=discardTile(player,tile.id);const nextRivers=rivers.map((river)=>[...river]);nextRivers[0].push(mine.discarded);const computers=playComputerTurns(opponents,wall,nextRivers);setOpponents(computers.opponents);setRivers(computers.rivers);if(computers.winner!==null){setWall(computers.wall);finish('loss',`컴퓨터 ${computers.winner+1} 쯔모`);return;}const draw=drawMahjongTile(mine.hand,computers.wall);if(!draw.drawn){setPlayer(mine.hand);setWall([]);finish('push','유국 · 벽패가 모두 소진됐습니다');return;}setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);setMessage('새 패를 뽑았습니다 · 한 장을 버리세요');};
-  const win=isWinningMahjongHand(player); const quit=()=>{if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
-  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong)" onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View></View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text></View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>東 1局</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text><Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text></View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text></View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text></View><Text style={styles.mahjongMessage}>{message}</Text><View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=><MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId} onPress={phase==='playing'?()=>discard(tile):undefined}/>)}</View></View>{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 시작':'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:<View style={styles.mahjongActions}><Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>finish('win','쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{win?'쯔모':'아직 미완성'}</Text></Pressable></View>}<Text style={styles.disclaimer}>밝게 올라온 패가 방금 뽑은 패입니다 · 버릴 패를 직접 누르세요</Text></ScrollView></View>;
+  const settleExhaustiveDraw=(nextPlayer:MahjongTile[],nextOpponents:MahjongTile[][])=>{const tenpai=[getMahjongWaits(nextPlayer,openMelds.length,profile.honors).length>0,...nextOpponents.map((hand)=>getMahjongWaits(hand,0,profile.honors).length>0)];const payments=calculateNotenPayments(tenpai);const mine=payments[0];setMatchState((current)=>advanceRiichiMatch(current,{exhaustive:true,tenpai}));setPlayer(nextPlayer);setOpponents(nextOpponents);setWall([]);setRiichiPoints((value)=>value+mine);setRoundResult({winner:null,method:'유국',concealed:[],melds:[],yaku:[],grade:tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · '),scoreText:mine===0?'내 점수 이동 없음':`내 점수 ${mine>0?'+':''}${mine.toLocaleString()}점`});finish('push',`유국 · 나는 ${tenpai[0]?'텐파이':'노텐'}${mine===0?' · 점수 이동 없음':` · ${mine>0?'+':''}${mine.toLocaleString()}점`}\n${tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · ')}`);};
+  const drawForPlayer=(nextHand:MahjongTile[],nextWall:MahjongTile[],nextOpponents=opponents)=>{const draw=drawMahjongTile(nextHand,nextWall);if(!draw.drawn){settleExhaustiveDraw(nextHand,nextOpponents);return;}if(!riichiDeclared)setTemporaryFuriten(false);setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);const permanent=isMahjongFuriten(nextHand,rivers[0],openMelds.length,profile.honors);setMessage(permanent?'새 패를 뽑았습니다 · 내 버림패에 대기패가 있어 후리텐(론 불가, 쯔모 가능)':'새 패를 뽑았습니다 · 한 장을 버리세요');};
+  const runComputers=(from:number,nextOpponents:MahjongTile[][],nextWall:MahjongTile[],nextRivers:MahjongTile[][],nextPlayer:MahjongTile[],lockedRiichi=riichiDeclared,blockedFuriten=temporaryFuriten,openCounts=opponentOpenMelds,computerMelds=opponentMelds)=>{
+    const hands=nextOpponents.map((hand)=>[...hand]);
+    const streams=nextRivers.map((river)=>[...river]);
+    const riichiStates=[...opponentRiichi];
+    const counts=[...openCounts];
+    const meldSets=computerMelds.map((melds)=>melds.map((meld)=>[...meld]));
+    const levels=(['easy','normal','expert'] as const);
+    let remaining=[...nextWall];
+
+    const persist=()=>{
+      setOpponents(hands.map((hand)=>[...hand]));
+      setOpponentRiichi([...riichiStates]);
+      setOpponentOpenMelds([...counts]);
+      setOpponentMelds(meldSets.map((melds)=>melds.map((meld)=>[...meld])));
+      setWall([...remaining]);
+      setRivers(streams.map((river)=>[...river]));
+      setPlayer(nextPlayer);
+    };
+
+    const finishComputerWin=(winner:number,concealed:MahjongTile[],winningTile:MahjongTile,winType:'ron'|'tsumo',loser?:number)=>{
+      persist();
+      const melds=meldSets[winner];
+      const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds:melds,riichi:riichiStates[winner],winType,winningTile}):[];
+      const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds:melds,winningTile,winType}):null;
+      const tiles=[...concealed,...melds.flat()];
+      const kanCount=melds.filter((meld)=>meld.length===4).length;
+      const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));
+      const ura=riichiStates[winner]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;
+      const yakuman=yaku.filter((item)=>item.yakuman).length;
+      const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;
+      const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===winner+1,winType,yakumanCount:yakuman}):null;
+      const grade=yakuman?(yakuman>1?`${yakuman}배 역만`:'역만'):`${han}판 ${fu?.fu??0}부${score?.limitName?` · ${score.limitName}`:''}`;
+      const scoreText=score?(winType==='ron'?`${(score.total+matchState.honba*300).toLocaleString()}점 이동${matchState.riichiSticks?` · 공탁 ${matchState.riichiSticks*1000}점 획득`:''}`:`지불 ${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점${matchState.honba?` · 본장 각 ${matchState.honba*100}점 추가`:''}`):'간이 규칙 점수 적용';
+      setRoundResult({winner:winner+1,method:winType==='ron'?'론':'쯔모',concealed:sortMahjongHand(concealed),melds:melds.map((meld)=>[...meld]),yaku:yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}`),grade,scoreText});
+      if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:winner+1,loser:loser===undefined?undefined:loser+1,score,winType});setRiichiPoints(next.scores[0]);return next;});
+      else setMatchState((current)=>advanceRiichiMatch(current,{winner:winner+1}));
+      finish('loss',`컴퓨터 ${winner+1} ${winType==='ron'?'론':'쯔모'}${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);
+    };
+
+    const processTurn=(index:number):void=>{
+      if(index>=3){persist();setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);return;}
+      const turn=playOneComputerTurn(hands[index],remaining,Math.random,{level:levels[index],opponentRiver:streams[0],opponentRiichi:lockedRiichi,includeHonors:profile.honors,riichiDeclared:riichiStates[index],openMeldCount:counts[index],openMelds:meldSets[index],requireYaku:mode==='riichi'});
+      hands[index]=turn.hand;
+      remaining=turn.wall;
+      if(turn.riichi){
+        riichiStates[index]=true;
+        setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:current.scores.map((score,seat)=>seat===index+1?score-1000:score) as RiichiMatchState['scores']}));
+      }
+      if(turn.win){finishComputerWin(index,turn.hand,turn.winningTile!,'tsumo');return;}
+      if(turn.discarded)resolveDiscard(index,turn.discarded,index+1,Boolean(turn.riichi));
+      else processTurn(index+1);
+    };
+
+    const resolveDiscard=(discarder:number,discarded:MahjongTile,nextComputer:number,declaredNow=false):void=>{
+      streams[discarder+1].push(discarded);
+      const playerOptions=lockedRiichi?[]:getMahjongCallOptions(nextPlayer,discarded,discarder===2);
+      const structurallyRon=canRonMahjong(nextPlayer,discarded,openMelds.length);
+      const permanentFuriten=isMahjongFuriten(nextPlayer,streams[0],openMelds.length,profile.honors);
+      const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:discarded}).length>0;
+      const playerRon=structurallyRon&&hasRonYaku&&!blockedFuriten&&!permanentFuriten;
+      const reactionOrder=Array.from({length:3},(_,offset)=>(discarder+2+offset)%4).filter((seat)=>seat>0).map((seat)=>seat-1);
+      const ronWinner=reactionOrder.find((candidate)=>{
+        if(candidate===discarder)return false;
+        const structural=canRonMahjong(hands[candidate],discarded,counts[candidate]);
+        if(!structural)return false;
+        const furiten=isMahjongFuriten(hands[candidate],streams[candidate+1],counts[candidate],profile.honors);
+        const hasYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hands[candidate],discarded],openMelds:meldSets[candidate],riichi:riichiStates[candidate],winType:'ron',winningTile:discarded}).length>0;
+        return hasYaku&&!furiten;
+      });
+      if(playerRon||playerOptions.length){
+        if(!playerRon&&ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+        persist();
+        setPendingCall({tile:discarded,discarder:discarder+1,nextComputer,options:playerOptions,canRon:playerRon});
+        setMessage(`컴퓨터 ${discarder+1}(${['쉬움','보통','전문가'][discarder]})이 ${discarded.glyph} 버림 · ${playerRon?'론할 수 있어요':'가져올까요?'}${declaredNow?' · 컴퓨터 리치 선언':''}`);
+        return;
+      }
+      if(structurallyRon&&(blockedFuriten||permanentFuriten))setMessage(`${discarded.glyph}은 완성패지만 후리텐이라 론할 수 없습니다 · 쯔모는 가능`);
+
+      if(ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+
+      const callReactions=reactionOrder.flatMap((candidate)=>{
+        if(candidate===discarder||riichiStates[candidate])return [];
+        const nextSeat=(discarder+2)%4;
+        const canChi=candidate+1===nextSeat;
+        const call=chooseComputerCall(hands[candidate],discarded,canChi,{level:levels[candidate],openMeldCount:counts[candidate],includeHonors:profile.honors});
+        return call?[{candidate,call}]:[];
+      });
+      const callReaction=callReactions.find(({call})=>call.kind!=='chi')??callReactions[0];
+      if(callReaction){
+        const {candidate:caller,call}=callReaction;
+          const called=applyMahjongCall(hands[caller],discarded,call);
+          streams[discarder+1].pop();
+          counts[caller]++;
+          meldSets[caller].push(called.meld);
+          let callHand=called.hand;
+          if(call.kind==='kan'){
+            const supplement=drawMahjongTile(callHand,remaining);
+            if(!supplement.drawn){persist();settleExhaustiveDraw(nextPlayer,hands);return;}
+            callHand=supplement.hand;
+            remaining=supplement.wall;
+          }
+          const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});
+          hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));
+          setIppatsuEligible(false);
+          setMessage(`컴퓨터 ${caller+1}이 컴퓨터 ${discarder+1}의 패로 ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);
+          resolveDiscard(caller,thrown,caller+1);
+          return;
+      }
+      processTurn(nextComputer);
+    };
+
+    processTurn(from);
+  };
+  const riichiChoices=mode==='riichi'&&!riichiDeclared&&!openMelds.length&&wall.length>=4?getRiichiDiscardOptions(player,profile.honors):[];
+  const discard=(tile:MahjongTile)=>{if(phase!=='playing'||pendingCall)return;if(riichiDeclared&&tile.id!==drawnId)return;const declaration=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);if(choosingRiichi&&!declaration)return;const mine=discardTile(player,tile.id);const nextRivers=rivers.map((river)=>[...river]);nextRivers[0].push(mine.discarded);if(declaration){setRiichiDeclared(true);setChoosingRiichi(false);setRiichiPoints((value)=>value-1000);setRiichiMarker(mine.discarded.id);setIppatsuEligible(true);setMessage(`리치! ${mine.discarded.glyph}을 옆으로 놓고 1,000점을 공탁했습니다`);}else if(riichiDeclared)setIppatsuEligible(false);const computerRon=opponents.findIndex((hand,index)=>canRonMahjong(hand,mine.discarded,opponentOpenMelds[index])&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hand,mine.discarded],openMelds:opponentMelds[index],riichi:opponentRiichi[index],winType:'ron',winningTile:mine.discarded}).length>0));setPlayer(mine.hand);setDrawnId('');if(computerRon>=0){setRivers(nextRivers);if(declaration){setRiichiDeclared(false);setRiichiPoints((value)=>value+1000);}const melds=opponentMelds[computerRon];const winningHand=[...opponents[computerRon],mine.discarded];const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:winningHand,openMelds:melds,riichi:opponentRiichi[computerRon],winType:'ron',winningTile:mine.discarded}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed:winningHand,openMelds:melds,winningTile:mine.discarded,winType:'ron'}):null;const tiles=[...winningHand,...melds.flat()];const kanCount=melds.filter((meld)=>meld.length===4).length;const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));const ura=opponentRiichi[computerRon]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;const yakuman=yaku.filter((item)=>item.yakuman).length;const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===computerRon+1,winType:'ron',yakumanCount:yakuman}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:computerRon+1,loser:0,score,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});else setMatchState((current)=>advanceRiichiMatch(current,{winner:computerRon+1}));finish('loss',`컴퓨터 ${computerRon+1} 론 · 내가 버린 ${mine.discarded.glyph}으로 완성${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors}));const caller=calls.findIndex(Boolean);if(caller>=0){const call=calls[caller]!;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=drawMahjongTile(callHand,remaining);callHand=supplement.hand;remaining=supplement.wall;}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
+  const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
+  const claim=(option:MahjongCallOption)=>{if(!pendingCall)return;setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){const draw=drawMahjongTile(called.hand,wall);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};
+  const opponentMeldView=(index:number)=>opponentMelds[index]?.length?<View style={styles.mahjongOpponentMeldRow}>{opponentMelds[index].map((meld,meldIndex)=><View key={meldIndex} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>:null;
+  const kanCount=openMelds.filter((meld)=>meld.length===4).length;const doraIndicators=mode==='riichi'?deadWall.slice(0,1+kanCount):[];const uraIndicators=mode==='riichi'&&riichiDeclared?deadWall.slice(7,8+kanCount):[];
+  const structuralWin=isWinningMahjongHand(player,openMelds.length);const drawnTile=player.find((tile)=>tile.id===drawnId)??player[player.length-1];const win=structuralWin&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:player,openMelds,riichi:riichiDeclared,ippatsu:ippatsuEligible,winType:'tsumo',winningTile:drawnTile}).length>0); const quit=()=>{if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
+  const winWithRiichi=(text:string)=>{const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];const concealed=pendingCall?[...player,pendingCall.tile]:player;const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds,riichi:riichiDeclared,ippatsu:ippatsuEligible,winType,winningTile}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds,winningTile,winType}):null;const allTiles=[...concealed,...openMelds.flat()];const visibleDora=countMahjongDora(allTiles,doraIndicators),uraDora=countMahjongDora(allTiles,uraIndicators);const yakuHan=yaku.reduce((sum,item)=>sum+item.han,0),yakumanCount=yaku.filter((item)=>item.yakuman).length,totalHan=yakumanCount?0:yakuHan+visibleDora+uraDora;const score=mode==='riichi'&&(fu||yakumanCount)?calculateRiichiScore({han:totalHan,fu:fu?.fu??0,dealer:matchState.roundIndex%4===0,winType,yakumanCount}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:0,score,winType,loser:pendingCall?.discarder});setRiichiPoints(next.scores[0]);return next;});const grade=yakumanCount?(yakumanCount>1?`${yakumanCount}배 역만`:'역만'):`총 ${totalHan}판${fu?` ${fu.fu}부`:''}${score?` · ${score.limitName||`${score.total.toLocaleString()}점`}`:''}`;const doraText=!yakumanCount&&(visibleDora||uraDora)?`\n도라 ${visibleDora}판${riichiDeclared?` · 뒷도라 ${uraDora}판`:''}`:'';const payText=score?`\n점수: ${score.total.toLocaleString()}점${winType==='tsumo'?` (${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점씩 지불)`:''}`:'';const fuText=fu?`\n부 계산: ${fu.details.join(' · ')}`:'';setRoundResult({winner:0,method:winType==='ron'?'론':'쯔모',concealed:sortMahjongHand(concealed),melds:openMelds.map((meld)=>[...meld]),yaku:yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}`),grade,scoreText:score?(winType==='ron'?`${(score.total+matchState.honba*300).toLocaleString()}점 획득${matchState.riichiSticks?` · 공탁 ${matchState.riichiSticks*1000}점 포함`:''}`:`지불 ${score.payments.map((value)=>value.toLocaleString()).join(' / ')}점`):'간이 규칙 점수 적용'});const summary=yaku.length?` · ${grade}\n${yaku.map((item)=>`${item.name} ${item.yakuman?'역만':`${item.han}판`}: ${item.detail}`).join('\n')}${doraText}${fuText}${payText}`:' · 기본 완성(세부 역 판정 준비 중)';if(!score)setMatchState((current)=>advanceRiichiMatch(current,{winner:0}));finish('win',text+summary);};
+  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):profile.round}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text><Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}<View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} onPress={canDiscard?()=>discard(tile):undefined}/>;})}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'반장전 결과':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}<Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{win?'쯔모':'아직 미완성'}</Text></Pressable></View>}<Text style={styles.disclaimer}>{riichiDeclared?'리치 후에는 새로 뽑은 패만 그대로 버릴 수 있습니다':'밝게 올라온 패가 방금 뽑은 패입니다'} · {profile.note}</Text></ScrollView></View>;
 }
 
 function PlayingCard({ card, hidden = false, compact = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
@@ -2031,6 +2195,21 @@ const styles = StyleSheet.create({
   highLowResultTitle: { color: '#FFE080', fontSize: 12, fontWeight: '900', marginBottom: 4 },
   mahjongGuide: { padding: 18, borderRadius: 20, backgroundColor: '#16352C', borderWidth: 1, borderColor: '#6C8D70' },
   mahjongHeroTiles: { color: '#FFF4D4', fontSize: 35, textAlign: 'center', marginBottom: 12 },
+  mahjongBeginner: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#101E1A', borderWidth: 1, borderColor: '#678573' },
+  mahjongGuideHeader: { minHeight: 70, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1B3A30' },
+  mahjongGuideEyebrow: { color: '#C5A957', fontSize: 8, fontWeight: '900', letterSpacing: 2 },
+  mahjongGuideTitle: { color: '#FFF4CF', fontSize: 15, fontWeight: '900', marginTop: 3 },
+  mahjongGuideToggle: { color: '#FFE080', fontSize: 11, fontWeight: '900' },
+  mahjongGuideBody: { padding: 13, gap: 11 },
+  mahjongLesson: { flexDirection: 'row', gap: 10, paddingBottom: 11, borderBottomWidth: 1, borderBottomColor: '#29453B' },
+  mahjongLessonNumber: { width: 27, height: 27, color: '#221A06', fontSize: 13, lineHeight: 27, fontWeight: '900', textAlign: 'center', overflow: 'hidden', borderRadius: 14, backgroundColor: '#E1BC52' },
+  mahjongLessonCopy: { flex: 1 },
+  mahjongLessonTitle: { color: '#FFF0B5', fontSize: 13, fontWeight: '900', marginBottom: 4 },
+  mahjongLessonText: { color: '#D6E0DA', fontSize: 11, lineHeight: 18 },
+  mahjongStrong: { color: '#FFE080', fontWeight: '900' },
+  mahjongExample: { color: '#FFFFFF', fontSize: 23, lineHeight: 31, textAlign: 'center', marginTop: 8 },
+  mahjongCurrentRule: { padding: 12, borderRadius: 12, backgroundColor: '#25341A', borderWidth: 1, borderColor: '#829047' },
+  mahjongCurrentTitle: { color: '#E7D76E', fontSize: 12, fontWeight: '900', marginBottom: 5 },
   mahjongPage: { padding: 12, paddingBottom: 44 },
   mahjongTable: { minHeight: 590, padding: 12, borderRadius: 34, backgroundColor: '#0A5940', borderWidth: 7, borderColor: '#5C321B', justifyContent: 'space-between' },
   mahjongOpponent: { alignItems: 'center', minHeight: 72 },
@@ -2043,14 +2222,41 @@ const styles = StyleSheet.create({
   mahjongRound: { color: '#8B1F25', fontSize: 22, fontWeight: '900' },
   mahjongWall: { color: '#3D3726', fontSize: 9, fontWeight: '800', marginTop: 3 },
   mahjongPot: { color: '#6D5117', fontSize: 9, fontWeight: '900', marginTop: 3 },
+  mahjongPoints: { color: '#8B1F25', fontSize: 9, fontWeight: '900', marginTop: 2 },
   mahjongRiver: { color: '#FFF8DC', fontSize: 20, lineHeight: 27, textAlign: 'center' },
   mahjongPlayerRiver: { minHeight: 70, padding: 6, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.14)' },
+  mahjongRiichiMarker: { color: '#FFD966', fontSize: 9, fontWeight: '900', textAlign: 'center', marginTop: 2 },
+  mahjongMeldArea: { alignItems: 'center', paddingVertical: 5 },
+  mahjongMeldLabel: { color: '#D9E9D4', fontSize: 9, fontWeight: '800', marginBottom: 3 },
+  mahjongMeldRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 5 },
+  mahjongOpenMeld: { flexDirection: 'row', paddingHorizontal: 4, paddingVertical: 3, borderRadius: 6, backgroundColor: '#EADDAF', borderWidth: 1, borderColor: '#D0AD54' },
+  mahjongMeldGlyph: { color: '#17130D', fontSize: 20, lineHeight: 24 },
+  mahjongOpponentMeldRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 3, marginTop: 4, maxWidth: 150 },
+  mahjongOpponentOpenMeld: { flexDirection: 'row', paddingHorizontal: 2, paddingVertical: 1, borderRadius: 4, backgroundColor: '#EADDAF', borderWidth: 1, borderColor: '#D0AD54' },
+  mahjongOpponentMeldGlyph: { color: '#17130D', fontSize: 13, lineHeight: 16 },
+  mahjongResultPanel: { width: '100%', padding: 12, borderRadius: 12, backgroundColor: '#132D24', borderWidth: 1, borderColor: '#D0AD54', marginBottom: 10, alignItems: 'center' },
+  mahjongResultTitle: { color: '#FFE28A', fontSize: 18, fontWeight: '900', marginBottom: 8 },
+  mahjongResultTiles: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 2, marginBottom: 7 },
+  mahjongResultTile: { color: '#17130D', backgroundColor: '#F5EEDC', borderColor: '#D8C9A4', borderWidth: 1, borderRadius: 4, fontSize: 17, lineHeight: 23, paddingHorizontal: 3, paddingVertical: 2 },
+  mahjongResultGrade: { color: '#FFF0B6', fontSize: 14, fontWeight: '900', textAlign: 'center', marginTop: 7 },
+  mahjongResultYaku: { color: '#DDEBDD', fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  mahjongResultScore: { color: '#7EE2A8', fontSize: 13, fontWeight: '900', textAlign: 'center', marginTop: 5 },
   mahjongMessage: { color: '#FFF4C7', fontSize: 13, fontWeight: '900', textAlign: 'center', marginVertical: 8 },
+  mahjongWaitPanel: { padding: 7, borderRadius: 9, backgroundColor: 'rgba(20,20,20,0.4)', marginBottom: 7 },
+  mahjongWaitTitle: { color: '#FFE080', fontSize: 10, fontWeight: '900', textAlign: 'center', marginBottom: 3 },
+  mahjongWaitText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   mahjongHand: { minHeight: 112, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: 2 },
   mahjongTile: { width: 26, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 4, backgroundColor: '#FFF7DC', borderWidth: 1, borderColor: '#C9B98A', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 2 },
   mahjongTileDrawn: { transform: [{ translateY: -7 }], borderWidth: 2, borderColor: '#FFD45B', backgroundColor: '#FFF0AE' },
   mahjongGlyph: { color: '#17130D', fontSize: 25, lineHeight: 30 },
   mahjongActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  mahjongRiichiButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#9E2029', borderWidth: 2, borderColor: '#F0C75B' },
+  mahjongCallPanel: { marginTop: 10, padding: 10, borderRadius: 14, backgroundColor: '#173E31', borderWidth: 1, borderColor: '#D6B95D' },
+  mahjongCallTitle: { color: '#FFF0B5', fontSize: 12, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  mahjongCallButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
+  mahjongCallButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#28614D' },
+  mahjongRonButton: { minHeight: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#B3232C', borderWidth: 1, borderColor: '#F0C75B' },
+  mahjongPassButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#39444A' },
   mahjongSortButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#244B63' },
   mahjongTsumoButton: { flex: 1.2, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#B3232C', borderWidth: 2, borderColor: '#F0C75B' },
   sevenPokerCards: { minHeight: 185, maxWidth: 310, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignContent: 'center', gap: 8 },
