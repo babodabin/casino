@@ -10,9 +10,9 @@ const glyphs: Record<MahjongSuit, string[]> = {
 };
 const suitOrder: Record<MahjongSuit, number> = { m: 0, p: 1, s: 2, z: 3 };
 
-export function createMahjongTiles(): MahjongTile[] {
+export function createMahjongTiles(includeHonors = true): MahjongTile[] {
   const tiles: MahjongTile[] = [];
-  (['m','p','s','z'] as MahjongSuit[]).forEach((suit) => glyphs[suit].forEach((glyph, index) => {
+  ((includeHonors ? ['m','p','s','z'] : ['m','p','s']) as MahjongSuit[]).forEach((suit) => glyphs[suit].forEach((glyph, index) => {
     for (let copy = 0; copy < 4; copy++) tiles.push({ id: `${suit}${index + 1}-${copy}`, suit, value: index + 1, glyph });
   }));
   return tiles;
@@ -28,8 +28,8 @@ export function sortMahjongHand(hand: MahjongTile[]) {
   return [...hand].sort((a, b) => suitOrder[a.suit] - suitOrder[b.suit] || a.value - b.value || a.id.localeCompare(b.id));
 }
 
-export function dealRiichi(random: () => number = Math.random): RiichiRound {
-  const deck = shuffleMahjong(createMahjongTiles(), random); let cursor = 0;
+export function dealRiichi(random: () => number = Math.random, includeHonors = true): RiichiRound {
+  const deck = shuffleMahjong(createMahjongTiles(includeHonors), random); let cursor = 0;
   const hands = [[],[],[],[]] as MahjongTile[][];
   for (let count = 0; count < 13; count++) for (let player = 0; player < 4; player++) hands[player].push(deck[cursor++]);
   return { player: sortMahjongHand(hands[0]), opponents: hands.slice(1).map(sortMahjongHand), wall: deck.slice(cursor), rivers: [[],[],[],[]] };
