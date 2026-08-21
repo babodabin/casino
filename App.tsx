@@ -1199,7 +1199,116 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
   const settleExhaustiveDraw=(nextPlayer:MahjongTile[],nextOpponents:MahjongTile[][])=>{const tenpai=[getMahjongWaits(nextPlayer,openMelds.length,profile.honors).length>0,...nextOpponents.map((hand)=>getMahjongWaits(hand,0,profile.honors).length>0)];const payments=calculateNotenPayments(tenpai);const mine=payments[0];setMatchState((current)=>advanceRiichiMatch(current,{exhaustive:true,tenpai}));setPlayer(nextPlayer);setOpponents(nextOpponents);setWall([]);setRiichiPoints((value)=>value+mine);finish('push',`유국 · 나는 ${tenpai[0]?'텐파이':'노텐'}${mine===0?' · 점수 이동 없음':` · ${mine>0?'+':''}${mine.toLocaleString()}점`}\n${tenpai.map((ready,index)=>`${index===0?'나':`컴퓨터 ${index}`}: ${ready?'텐파이':'노텐'}`).join(' · ')}`);};
   const drawForPlayer=(nextHand:MahjongTile[],nextWall:MahjongTile[],nextOpponents=opponents)=>{const draw=drawMahjongTile(nextHand,nextWall);if(!draw.drawn){settleExhaustiveDraw(nextHand,nextOpponents);return;}if(!riichiDeclared)setTemporaryFuriten(false);setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);const permanent=isMahjongFuriten(nextHand,rivers[0],openMelds.length,profile.honors);setMessage(permanent?'새 패를 뽑았습니다 · 내 버림패에 대기패가 있어 후리텐(론 불가, 쯔모 가능)':'새 패를 뽑았습니다 · 한 장을 버리세요');};
-  const runComputers=(from:number,nextOpponents:MahjongTile[][],nextWall:MahjongTile[],nextRivers:MahjongTile[][],nextPlayer:MahjongTile[],lockedRiichi=riichiDeclared,blockedFuriten=temporaryFuriten,openCounts=opponentOpenMelds,computerMelds=opponentMelds)=>{const hands=nextOpponents.map((hand)=>[...hand]);const streams=nextRivers.map((river)=>[...river]);const riichiStates=[...opponentRiichi];let remaining=[...nextWall];for(let index=from;index<3;index++){const turn=playOneComputerTurn(hands[index],remaining,Math.random,{level:(['easy','normal','expert'] as const)[index],opponentRiver:streams[0],opponentRiichi:lockedRiichi,includeHonors:profile.honors,riichiDeclared:riichiStates[index],openMeldCount:openCounts[index],openMelds:computerMelds[index],requireYaku:mode==='riichi'});hands[index]=turn.hand;remaining=turn.wall;if(turn.riichi){riichiStates[index]=true;setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:current.scores.map((score,seat)=>seat===index+1?score-1000:score) as RiichiMatchState['scores']}));}if(turn.win){setOpponents(hands);setOpponentRiichi(riichiStates);setOpponentOpenMelds(openCounts);setWall(remaining);setRivers(streams);const winningTile=turn.winningTile!;const melds=computerMelds[index];const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:turn.hand,openMelds:melds,riichi:riichiStates[index],winType:'tsumo',winningTile}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed:turn.hand,openMelds:melds,winningTile,winType:'tsumo'}):null;const tiles=[...turn.hand,...melds.flat()];const visible=countMahjongDora(tiles,deadWall.slice(0,1+melds.filter((meld)=>meld.length===4).length));const ura=riichiStates[index]?countMahjongDora(tiles,deadWall.slice(7,8+melds.filter((meld)=>meld.length===4).length)):0;const yakuman=yaku.filter((item)=>item.yakuman).length;const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===index+1,winType:'tsumo',yakumanCount:yakuman}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:index+1,score,winType:'tsumo'});setRiichiPoints(next.scores[0]);return next;});else setMatchState((current)=>advanceRiichiMatch(current,{winner:index+1}));finish('loss',`컴퓨터 ${index+1} 쯔모${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);return;}if(turn.discarded){streams[index+1].push(turn.discarded);const options=lockedRiichi?[]:getMahjongCallOptions(nextPlayer,turn.discarded,index===2);const structurallyRon=canRonMahjong(nextPlayer,turn.discarded,openMelds.length);const permanentFuriten=isMahjongFuriten(nextPlayer,streams[0],openMelds.length,profile.honors);const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,turn.discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:turn.discarded}).length>0;const ron=structurallyRon&&hasRonYaku&&!blockedFuriten&&!permanentFuriten;if(ron||options.length){setOpponents(hands);setOpponentRiichi(riichiStates);setOpponentOpenMelds(openCounts);setWall(remaining);setRivers(streams);setPlayer(nextPlayer);setPendingCall({tile:turn.discarded,discarder:index+1,nextComputer:index+1,options,canRon:ron});setMessage(`컴퓨터 ${index+1}(${['쉬움','보통','전문가'][index]})이 ${turn.discarded.glyph} 버림 · ${ron?'론할 수 있어요':'가져올까요?'}${turn.riichi?' · 컴퓨터 리치 선언':''}`);return;}if(structurallyRon&&(blockedFuriten||permanentFuriten))setMessage(`${turn.discarded.glyph}은 완성패지만 후리텐이라 론할 수 없습니다 · 쯔모는 가능`);}}setOpponents(hands);setOpponentRiichi(riichiStates);setOpponentOpenMelds(openCounts);setRivers(streams);setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);};
+  const runComputers=(from:number,nextOpponents:MahjongTile[][],nextWall:MahjongTile[],nextRivers:MahjongTile[][],nextPlayer:MahjongTile[],lockedRiichi=riichiDeclared,blockedFuriten=temporaryFuriten,openCounts=opponentOpenMelds,computerMelds=opponentMelds)=>{
+    const hands=nextOpponents.map((hand)=>[...hand]);
+    const streams=nextRivers.map((river)=>[...river]);
+    const riichiStates=[...opponentRiichi];
+    const counts=[...openCounts];
+    const meldSets=computerMelds.map((melds)=>melds.map((meld)=>[...meld]));
+    const levels=(['easy','normal','expert'] as const);
+    let remaining=[...nextWall];
+
+    const persist=()=>{
+      setOpponents(hands.map((hand)=>[...hand]));
+      setOpponentRiichi([...riichiStates]);
+      setOpponentOpenMelds([...counts]);
+      setOpponentMelds(meldSets.map((melds)=>melds.map((meld)=>[...meld])));
+      setWall([...remaining]);
+      setRivers(streams.map((river)=>[...river]));
+      setPlayer(nextPlayer);
+    };
+
+    const finishComputerWin=(winner:number,concealed:MahjongTile[],winningTile:MahjongTile,winType:'ron'|'tsumo',loser?:number)=>{
+      persist();
+      const melds=meldSets[winner];
+      const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed,openMelds:melds,riichi:riichiStates[winner],winType,winningTile}):[];
+      const fu=mode==='riichi'?calculateRiichiFu({concealed,openMelds:melds,winningTile,winType}):null;
+      const tiles=[...concealed,...melds.flat()];
+      const kanCount=melds.filter((meld)=>meld.length===4).length;
+      const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));
+      const ura=riichiStates[winner]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;
+      const yakuman=yaku.filter((item)=>item.yakuman).length;
+      const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;
+      const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===winner+1,winType,yakumanCount:yakuman}):null;
+      if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:winner+1,loser:loser===undefined?undefined:loser+1,score,winType});setRiichiPoints(next.scores[0]);return next;});
+      else setMatchState((current)=>advanceRiichiMatch(current,{winner:winner+1}));
+      finish('loss',`컴퓨터 ${winner+1} ${winType==='ron'?'론':'쯔모'}${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);
+    };
+
+    const processTurn=(index:number):void=>{
+      if(index>=3){persist();setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);return;}
+      const turn=playOneComputerTurn(hands[index],remaining,Math.random,{level:levels[index],opponentRiver:streams[0],opponentRiichi:lockedRiichi,includeHonors:profile.honors,riichiDeclared:riichiStates[index],openMeldCount:counts[index],openMelds:meldSets[index],requireYaku:mode==='riichi'});
+      hands[index]=turn.hand;
+      remaining=turn.wall;
+      if(turn.riichi){
+        riichiStates[index]=true;
+        setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:current.scores.map((score,seat)=>seat===index+1?score-1000:score) as RiichiMatchState['scores']}));
+      }
+      if(turn.win){finishComputerWin(index,turn.hand,turn.winningTile!,'tsumo');return;}
+      if(turn.discarded)resolveDiscard(index,turn.discarded,index+1,Boolean(turn.riichi));
+      else processTurn(index+1);
+    };
+
+    const resolveDiscard=(discarder:number,discarded:MahjongTile,nextComputer:number,declaredNow=false):void=>{
+      streams[discarder+1].push(discarded);
+      const playerOptions=lockedRiichi?[]:getMahjongCallOptions(nextPlayer,discarded,discarder===2);
+      const structurallyRon=canRonMahjong(nextPlayer,discarded,openMelds.length);
+      const permanentFuriten=isMahjongFuriten(nextPlayer,streams[0],openMelds.length,profile.honors);
+      const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:discarded}).length>0;
+      const playerRon=structurallyRon&&hasRonYaku&&!blockedFuriten&&!permanentFuriten;
+      const reactionOrder=Array.from({length:3},(_,offset)=>(discarder+2+offset)%4).filter((seat)=>seat>0).map((seat)=>seat-1);
+      const ronWinner=reactionOrder.find((candidate)=>{
+        if(candidate===discarder)return false;
+        const structural=canRonMahjong(hands[candidate],discarded,counts[candidate]);
+        if(!structural)return false;
+        const furiten=isMahjongFuriten(hands[candidate],streams[candidate+1],counts[candidate],profile.honors);
+        const hasYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hands[candidate],discarded],openMelds:meldSets[candidate],riichi:riichiStates[candidate],winType:'ron',winningTile:discarded}).length>0;
+        return hasYaku&&!furiten;
+      });
+      if(playerRon||playerOptions.length){
+        if(!playerRon&&ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+        persist();
+        setPendingCall({tile:discarded,discarder:discarder+1,nextComputer,options:playerOptions,canRon:playerRon});
+        setMessage(`컴퓨터 ${discarder+1}(${['쉬움','보통','전문가'][discarder]})이 ${discarded.glyph} 버림 · ${playerRon?'론할 수 있어요':'가져올까요?'}${declaredNow?' · 컴퓨터 리치 선언':''}`);
+        return;
+      }
+      if(structurallyRon&&(blockedFuriten||permanentFuriten))setMessage(`${discarded.glyph}은 완성패지만 후리텐이라 론할 수 없습니다 · 쯔모는 가능`);
+
+      if(ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+
+      const callReactions=reactionOrder.flatMap((candidate)=>{
+        if(candidate===discarder||riichiStates[candidate])return [];
+        const nextSeat=(discarder+2)%4;
+        const canChi=candidate+1===nextSeat;
+        const call=chooseComputerCall(hands[candidate],discarded,canChi,{level:levels[candidate],openMeldCount:counts[candidate],includeHonors:profile.honors});
+        return call?[{candidate,call}]:[];
+      });
+      const callReaction=callReactions.find(({call})=>call.kind!=='chi')??callReactions[0];
+      if(callReaction){
+        const {candidate:caller,call}=callReaction;
+          const called=applyMahjongCall(hands[caller],discarded,call);
+          streams[discarder+1].pop();
+          counts[caller]++;
+          meldSets[caller].push(called.meld);
+          let callHand=called.hand;
+          if(call.kind==='kan'){
+            const supplement=drawMahjongTile(callHand,remaining);
+            if(!supplement.drawn){persist();settleExhaustiveDraw(nextPlayer,hands);return;}
+            callHand=supplement.hand;
+            remaining=supplement.wall;
+          }
+          const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});
+          hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));
+          setIppatsuEligible(false);
+          setMessage(`컴퓨터 ${caller+1}이 컴퓨터 ${discarder+1}의 패로 ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);
+          resolveDiscard(caller,thrown,caller+1);
+          return;
+      }
+      processTurn(nextComputer);
+    };
+
+    processTurn(from);
+  };
   const riichiChoices=mode==='riichi'&&!riichiDeclared&&!openMelds.length&&wall.length>=4?getRiichiDiscardOptions(player,profile.honors):[];
   const discard=(tile:MahjongTile)=>{if(phase!=='playing'||pendingCall)return;if(riichiDeclared&&tile.id!==drawnId)return;const declaration=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);if(choosingRiichi&&!declaration)return;const mine=discardTile(player,tile.id);const nextRivers=rivers.map((river)=>[...river]);nextRivers[0].push(mine.discarded);if(declaration){setRiichiDeclared(true);setChoosingRiichi(false);setRiichiPoints((value)=>value-1000);setRiichiMarker(mine.discarded.id);setIppatsuEligible(true);setMessage(`리치! ${mine.discarded.glyph}을 옆으로 놓고 1,000점을 공탁했습니다`);}else if(riichiDeclared)setIppatsuEligible(false);const computerRon=opponents.findIndex((hand,index)=>canRonMahjong(hand,mine.discarded,opponentOpenMelds[index])&&(mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...hand,mine.discarded],openMelds:opponentMelds[index],riichi:opponentRiichi[index],winType:'ron',winningTile:mine.discarded}).length>0));setPlayer(mine.hand);setDrawnId('');if(computerRon>=0){setRivers(nextRivers);if(declaration){setRiichiDeclared(false);setRiichiPoints((value)=>value+1000);}const melds=opponentMelds[computerRon];const winningHand=[...opponents[computerRon],mine.discarded];const yaku=mode==='riichi'?evaluateBasicRiichiYaku({concealed:winningHand,openMelds:melds,riichi:opponentRiichi[computerRon],winType:'ron',winningTile:mine.discarded}):[];const fu=mode==='riichi'?calculateRiichiFu({concealed:winningHand,openMelds:melds,winningTile:mine.discarded,winType:'ron'}):null;const tiles=[...winningHand,...melds.flat()];const kanCount=melds.filter((meld)=>meld.length===4).length;const visible=countMahjongDora(tiles,deadWall.slice(0,1+kanCount));const ura=opponentRiichi[computerRon]?countMahjongDora(tiles,deadWall.slice(7,8+kanCount)):0;const yakuman=yaku.filter((item)=>item.yakuman).length;const han=yakuman?0:yaku.reduce((sum,item)=>sum+item.han,0)+visible+ura;const score=mode==='riichi'&&(fu||yakuman)?calculateRiichiScore({han,fu:fu?.fu??0,dealer:matchState.roundIndex%4===computerRon+1,winType:'ron',yakumanCount:yakuman}):null;if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:computerRon+1,loser:0,score,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});else setMatchState((current)=>advanceRiichiMatch(current,{winner:computerRon+1}));finish('loss',`컴퓨터 ${computerRon+1} 론 · 내가 버린 ${mine.discarded.glyph}으로 완성${yaku.length?` · ${yaku.map((item)=>item.name).join(' · ')} · ${yakuman?'역만':`${han}판 ${fu?.fu??0}부`}`:''}`);return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors}));const caller=calls.findIndex(Boolean);if(caller>=0){const call=calls[caller]!;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=drawMahjongTile(callHand,remaining);callHand=supplement.hand;remaining=supplement.wall;}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
   const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
