@@ -93,6 +93,20 @@ export function getMahjongWaits(hand: MahjongTile[], openMeldCount = 0, includeH
   return candidates.filter((tile) => canRonMahjong(hand, tile, openMeldCount));
 }
 
+export function isMahjongFuriten(hand: MahjongTile[], river: MahjongTile[], openMeldCount = 0, includeHonors = true) {
+  const waits = getMahjongWaits(hand, openMeldCount, includeHonors);
+  return waits.some((wait) => river.some((discarded) => sameTile(wait, discarded)));
+}
+
+export function calculateNotenPayments(tenpai: boolean[]) {
+  if (tenpai.length !== 4) throw new Error('리치마작 노텐 정산은 4명이 필요합니다');
+  const ready = tenpai.filter(Boolean).length;
+  if (ready === 0 || ready === 4) return [0, 0, 0, 0];
+  const receive = 3000 / ready;
+  const pay = 3000 / (4 - ready);
+  return tenpai.map((isReady) => isReady ? receive : -pay);
+}
+
 export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true): RiichiDiscardOption[] {
   if (hand.length !== 14) return [];
   return hand.flatMap((tile) => {
@@ -135,11 +149,12 @@ function concealedCanBeAllTriplets(hand: MahjongTile[]) {
   return false;
 }
 
-export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMelds?: MahjongTile[][]; riichi?: boolean; winType: 'tsumo'|'ron'; winningTile?:MahjongTile; seatWind?: number; roundWind?: number }) {
+export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMelds?: MahjongTile[][]; riichi?: boolean; ippatsu?:boolean; winType: 'tsumo'|'ron'; winningTile?:MahjongTile; seatWind?: number; roundWind?: number }) {
   const openMelds = args.openMelds ?? []; const allTiles = [...args.concealed, ...openMelds.flat()]; const yaku: RiichiYaku[] = [];
   const closed = openMelds.length === 0;
   if (closed && isThirteenOrphansHand(args.concealed)) return [{ name:'국사무쌍', japanese:'国士無双', han:13, yakuman:true, detail:'서로 다른 1·9·자패 13종을 모두 모으고 그중 하나를 한 장 더 모은 역만' }];
   if (args.riichi && closed) yaku.push({ name:'리치', japanese:'立直', han:1, detail:'패를 공개하지 않은 텐파이에서 선언' });
+  if (args.riichi && args.ippatsu && closed) yaku.push({ name:'일발', japanese:'一発', han:1, detail:'리치 뒤 다음 내 차례가 끝나기 전, 아무도 치·퐁·깡하지 않은 동안 완성' });
   if (args.winType === 'tsumo' && closed) yaku.push({ name:'멘젠쯔모', japanese:'門前清自摸和', han:1, detail:'패를 공개하지 않고 직접 뽑아 완성' });
   if(args.winningTile&&calculateRiichiFu({concealed:args.concealed,openMelds,winningTile:args.winningTile,winType:args.winType,seatWind:args.seatWind,roundWind:args.roundWind})?.pinfu)yaku.push({name:'핑후',japanese:'平和',han:1,detail:'비공개 손패의 몸통이 모두 연속패이고 가치 없는 머리·양면 대기로 완성'});
   const sevenPairs = closed && isSevenPairsHand(args.concealed);

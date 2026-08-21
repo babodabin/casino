@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, calculateRiichiFu, calculateRiichiScore, canRonMahjong, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -50,6 +50,19 @@ test('텐파이 손패에서 기다리는 패를 알려준다', () => {
   assert.deepEqual(getMahjongWaits(waiting).map((tile) => `${tile.suit}${tile.value}`), ['m1','m4','z1']);
 });
 
+test('대기패 중 하나를 이미 버렸으면 후리텐이다', () => {
+  const waiting = hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1']);
+  assert.equal(isMahjongFuriten(waiting, hand(['m4'])), true);
+  assert.equal(isMahjongFuriten(waiting, hand(['p9'])), false);
+});
+
+test('유국 때 텐파이 인원이 노텐에게서 총 3000점을 받는다', () => {
+  assert.deepEqual(calculateNotenPayments([true,false,false,false]), [3000,-1000,-1000,-1000]);
+  assert.deepEqual(calculateNotenPayments([true,true,false,false]), [1500,1500,-1500,-1500]);
+  assert.deepEqual(calculateNotenPayments([true,true,true,false]), [1000,1000,1000,-3000]);
+  assert.deepEqual(calculateNotenPayments([true,true,true,true]), [0,0,0,0]);
+});
+
 test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
   const ready = hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1','z2']);
   const choices = getRiichiDiscardOptions(ready);
@@ -59,6 +72,11 @@ test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
 test('리치와 멘젠쯔모 및 탕야오를 판정한다', () => {
   const result = evaluateBasicRiichiYaku({ concealed:hand(['m2','m3','m4','m3','m4','m5','p2','p3','p4','s6','s7','s8','p5','p5']), riichi:true, winType:'tsumo' });
   assert.deepEqual(result.map((yaku) => yaku.name), ['리치','멘젠쯔모','탕야오']);
+});
+
+test('리치 직후 방해 없이 완성하면 일발을 더한다', () => {
+  const result = evaluateBasicRiichiYaku({ concealed:hand(['m2','m3','m4','m3','m4','m5','p2','p3','p4','s6','s7','s8','p5','p5']), riichi:true, ippatsu:true, winType:'tsumo' });
+  assert.equal(result.some((yaku) => yaku.name === '일발'), true);
 });
 
 test('역패와 동 중각의 자풍·장풍을 각각 판정한다', () => {
