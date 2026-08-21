@@ -59,16 +59,17 @@ import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type Si
 import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
 import { dealHoldem, dealOmaha, madeHandCards, resolveHoldem, resolveOmaha } from './src/texasholdem';
 import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
+import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCardDraw } from './src/fivecarddraw';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -116,7 +117,7 @@ const gameCategories: GameCategory[] = [
     { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
     { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'playable' },
     { name: '세븐 포커', icon: '7♠', description: '공개·비공개 카드 일곱 장 중 최고의 다섯 장으로 승부', status: 'playable' },
-    { name: '파이브 카드 드로우', icon: '5', description: '카드를 교환해 족보를 완성', status: 'planned' },
+    { name: '파이브 카드 드로우', icon: '5', description: '원하는 카드를 보관하고 한 번 교환해 족보를 완성', status: 'playable' },
     { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
     { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패를 함께 겨루기', status: 'planned' },
   ]},
@@ -385,7 +386,7 @@ export default function App() {
     setRecords((current) => { const record: GameRecord = { id: `${Date.now()}-video-poker-${current.length}`, game: '비디오 포커', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${result.label} · ${hand.map((card) => `${card.rank}${card.suit}`).join(' ')}` }; const next = [record, ...current].slice(0, 100); AsyncStorage.setItem(STORAGE_KEYS.records, JSON.stringify(next)); return next; });
   };
 
-  const settlePoker = (game: '텍사스 홀덤'|'오마하'|'세븐 포커', stake: number, result: 'win' | 'loss' | 'push', detail: string) => {
+  const settlePoker = (game: '텍사스 홀덤'|'오마하'|'세븐 포커'|'파이브 카드 드로우', stake: number, result: 'win' | 'loss' | 'push', detail: string) => {
     const payout = result === 'win' ? stake * 2 : result === 'push' ? stake : 0;
     if (payout) setCoins((current) => { const next=current+payout; AsyncStorage.setItem(STORAGE_KEYS.coins,String(next)); return next; });
     setRecords((current) => { const record: GameRecord={ id:`${Date.now()}-poker-${current.length}`, game, result, difficulty, bet:stake, net:result==='win'?stake:result==='push'?0:-stake, playedAt:new Date().toISOString(), detail }; const next=[record,...current].slice(0,100); AsyncStorage.setItem(STORAGE_KEYS.records,JSON.stringify(next)); return next; });
@@ -422,7 +423,7 @@ export default function App() {
             onBack={() => setAppScreen('tabs')}
             onOpenGame={(game) => {
               setSelectedCatalogGame(game);
-              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : 'gamePreview');
+              setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : 'gamePreview');
             }}
           />
         )}
@@ -493,6 +494,8 @@ export default function App() {
         {appScreen === 'omahaGame' && <PokerGameScreen mode="omaha" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('오마하',stake,result,detail)} />}
         {appScreen === 'sevenPokerSetup' && <SevenPokerSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sevenPokerGame')} />}
         {appScreen === 'sevenPokerGame' && <SevenPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('세븐 포커',stake,result,detail)} />}
+        {appScreen === 'fiveDrawSetup' && <FiveDrawSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('fiveDrawGame')} />}
+        {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onPlaceBet={placeRouletteBet} onSettle={(stake,result,detail)=>settlePoker('파이브 카드 드로우',stake,result,detail)} />}
         {appScreen === 'tabs' && renderTab(tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration, refillTestCoins, coins, records, (category) => {
           setSelectedCategory(category);
           setAppScreen('categoryCatalog');
@@ -502,7 +505,7 @@ export default function App() {
         }, (category, game) => {
           setSelectedCategory(category);
           setSelectedCatalogGame(game);
-          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : 'gamePreview');
+          setAppScreen(game.name === '블랙잭' ? 'blackjackSetup' : game.name === '룰렛' ? 'rouletteGame' : game.name === '바카라' ? 'baccaratSetup' : game.name === '크랩스' ? 'crapsSetup' : game.name === '슬롯' ? 'slotSetup' : game.name === '식보' ? 'sicboSetup' : game.name === '비디오 포커' ? 'videoPokerGame' : game.name === '텍사스 홀덤' ? 'holdemSetup' : game.name === '오마하' ? 'omahaSetup' : game.name === '세븐 포커' ? 'sevenPokerSetup' : game.name === '파이브 카드 드로우' ? 'fiveDrawSetup' : 'gamePreview');
         })}
       </View>
       {appScreen === 'tabs' && <View style={styles.tabBar}>
@@ -1061,6 +1064,20 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
     <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>게임 방법</Text><Text style={styles.slotRuleText}>실제 비디오 포커 기계처럼 카드 화면을 눌러 HOLD할 카드를 고릅니다.</Text><Text style={styles.slotRuleText}>DEAL로 시작하고 DRAW를 누르면 선택하지 않은 카드만 한 번 교환됩니다.</Text></View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>첫 5장을 받은 뒤 한 번만 교환합니다 · 게임 전용 가상 코인</Text>
   </ScrollView></View>;
+}
+
+function FiveDrawSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
+  const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
+  return <View style={styles.detailScreen}><ScreenHeader title="파이브 카드 드로우(Five-card Draw) 준비" onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage}><View style={styles.holdemGuide}><Text style={styles.detailLead}>다섯 장을 한 번 교환해 완성하는 포커</Text><Text style={styles.slotRuleText}>나와 컴퓨터가 비공개 카드 5장씩을 받습니다.</Text><Text style={styles.slotRuleText}>남길 카드를 눌러 보관하고, 나머지 카드는 한 번만 교환합니다.</Text><Text style={styles.slotRuleText}>교환 뒤 체크·콜, 레이즈 또는 폴드를 선택하고 마지막에 족보를 비교합니다.</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>드로우 포커 시작</Text></Pressable></ScrollView></View>;
+}
+
+function FiveDrawGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+  const [phase,setPhase]=useState<'ready'|'draw'|'bet'|'result'>('ready'); const [player,setPlayer]=useState<Card[]>([]); const [opponent,setOpponent]=useState<Card[]>([]); const [drawPile,setDrawPile]=useState<Card[]>([]); const [held,setHeld]=useState([false,false,false,false,false]); const [totalBet,setTotalBet]=useState(0); const [opponentExchanged,setOpponentExchanged]=useState(0); const [outcome,setOutcome]=useState(''); const [showdown,setShowdown]=useState<ReturnType<typeof resolveFiveCardDraw>|null>(null);
+  const start=()=>{if(!onPlaceBet(selectedBet))return;const deal=dealFiveCardDraw();setPlayer(deal.player);setOpponent(deal.opponent);setDrawPile(deal.drawPile);setHeld([false,false,false,false,false]);setTotalBet(selectedBet);setOpponentExchanged(0);setOutcome('남길 카드를 눌러 보관하세요');setShowdown(null);setPhase('draw');};
+  const exchange=()=>{const mine=exchangeDrawCards(player,held,drawPile);const computerKeep=opponentKeepCards(opponent);const theirs=exchangeDrawCards(opponent,computerKeep,mine.drawPile);setPlayer(mine.hand);setOpponent(theirs.hand);setDrawPile(theirs.drawPile);setOpponentExchanged(theirs.exchanged);setOutcome(`나는 ${mine.exchanged}장 · 컴퓨터는 ${theirs.exchanged}장 교환`);setPhase('bet');};
+  const finish=(fold=false,raise=false)=>{if(fold){setOutcome('폴드 · 상대 카드는 공개하지 않습니다');setShowdown(null);onSettle(totalBet,'loss','상대 패 비공개 · 폴드');setPhase('result');return;}let stake=totalBet;if(raise){if(!onPlaceBet(selectedBet))return;stake+=selectedBet;setTotalBet(stake);}const resolved=resolveFiveCardDraw(player,opponent);setShowdown(resolved);setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'무승부입니다');onSettle(stake,resolved.result,`${resolved.playerHand.label} vs ${resolved.opponentHand.label}`);setPhase('result');};
+  const emphasis=(card:Card,side:'player'|'opponent'):'winner'|'selected'|'dim'|undefined=>{if(!showdown)return undefined;const own=madeHandCards(side==='player'?showdown.playerHand:showdown.opponentHand);if(!own.some((used)=>used.id===card.id))return'dim';if(showdown.result==='push')return'selected';return(side==='player')===(showdown.result==='win')?'winner':'selected';};
+  return <View style={styles.detailScreen}><ScreenHeader title="파이브 카드 드로우(Five-card Draw)" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={[styles.holdemTable,styles.fiveDrawTable]}><Text style={styles.holdemSeat}>컴퓨터</Text><View style={styles.fiveDrawHand}>{opponent.map((card)=><PlayingCard key={card.id} card={card} compact hidden={!showdown} emphasis={emphasis(card,'opponent')}/>)}</View>{phase==='bet'||phase==='result'?<Text style={styles.sevenPokerHint}>컴퓨터가 {opponentExchanged}장 교환</Text>:null}<Text style={styles.holdemPot}>POT {(totalBet*2).toLocaleString()} WC</Text><Text style={styles.holdemSeat}>나</Text><View style={styles.fiveDrawHand}>{player.map((card,index)=><Pressable key={card.id} disabled={phase!=='draw'} onPress={()=>setHeld((current)=>current.map((value,i)=>i===index?!value:value))} style={[styles.videoPokerCardWrap,held[index]&&phase==='draw'&&styles.videoPokerHeld]}><PlayingCard card={card} compact emphasis={emphasis(card,'player')}/>{phase==='draw'?<Text style={[styles.videoPokerHoldLabel,held[index]&&styles.videoPokerHoldActive]}>{held[index]?'보관':'교환'}</Text>:null}</Pressable>)}</View><Text style={styles.holdemOutcome}>{outcome||'카드 5장을 받아 시작하세요'}</Text>{showdown?<Text style={styles.pokerInlineResult}>내 패: {showdown.playerHand.label} · 상대 패: {showdown.opponentHand.label}</Text>:null}</View>{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 플레이':'카드 5장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:phase==='draw'?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={exchange}><Text style={styles.primaryButtonText}>선택 완료 · 카드 교환</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={()=>finish(true)}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable style={styles.holdemAction} onPress={()=>finish()}><Text style={styles.primaryButtonText}>체크/콜</Text></Pressable><Pressable disabled={selectedBet>coins} style={styles.holdemAction} onPress={()=>finish(false,true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet}</Text></Pressable></View>}<Text style={styles.disclaimer}>상대 카드는 끝까지 승부했을 때만 공개됩니다 · 교환은 한 번</Text></ScrollView></View>;
 }
 
 function SevenPokerSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
@@ -1965,6 +1982,8 @@ const styles = StyleSheet.create({
   sevenPokerVisibility: { overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, fontSize: 8, fontWeight: '900' },
   sevenPokerPrivate: { color: '#FFF1B8', backgroundColor: '#694C18' },
   sevenPokerPublic: { color: '#DDF5E8', backgroundColor: '#17613E' },
+  fiveDrawTable: { minHeight: 520 },
+  fiveDrawHand: { width: '100%', minHeight: 105, flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 4 },
   holdemCommunity: { minHeight: 90, flexDirection: 'row', justifyContent: 'center', gap: 4 },
   holdemPot: { color: '#FFE080', fontSize: 16, fontWeight: '900', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
   holdemOutcome: { color: '#FFF4C7', fontSize: 15, fontWeight: '900', textAlign: 'center' },
