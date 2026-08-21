@@ -4,6 +4,8 @@ export type MahjongCallKind = 'chi' | 'pon' | 'kan';
 export type MahjongCallOption = { kind: MahjongCallKind; tiles: MahjongTile[]; label: string };
 export type RiichiDiscardOption = { tile: MahjongTile; waits: MahjongTile[] };
 export type RiichiYaku = { name: string; japanese: string; han: number; detail: string; yakuman?: boolean };
+export type MahjongGroup = { kind:'sequence'|'triplet'; suit:MahjongSuit; value:number; open:boolean };
+export type MahjongDecomposition = { pair:{suit:MahjongSuit;value:number}; groups:MahjongGroup[] };
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -92,6 +94,18 @@ export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = tru
 
 const isTripletMeld = (meld: MahjongTile[]) => meld.every((tile) => sameTile(tile, meld[0]));
 
+const indexToTileValue = (index:number) => ({ suit:(['m','p','s','z'] as MahjongSuit[])[Math.floor(index/9)], value:index%9+1 });
+
+export function getStandardMahjongDecompositions(hand:MahjongTile[],openMelds:MahjongTile[][]=[]):MahjongDecomposition[] {
+  const needed=4-openMelds.length;if(hand.length!==needed*3+2)return [];
+  const counts=Array(34).fill(0) as number[];hand.forEach((tile)=>counts[tileIndex(tile)]++);
+  const openGroups:MahjongGroup[]=openMelds.map((meld)=>{const sorted=sortMahjongHand(meld);return {kind:isTripletMeld(sorted)?'triplet':'sequence',suit:sorted[0].suit,value:sorted[0].value,open:true};});
+  const results:MahjongDecomposition[]=[];
+  const collect=(next:number[],groups:MahjongGroup[])=>{const first=next.findIndex((count)=>count>0);if(first<0){if(groups.length===needed)results.push({pair:{suit:'m',value:0},groups:[...openGroups,...groups]});return;}if(groups.length>=needed)return;const tile=indexToTileValue(first);if(next[first]>=3){next[first]-=3;collect(next,[...groups,{kind:'triplet',...tile,open:false}]);next[first]+=3;}if(tile.suit!=='z'&&tile.value<=7&&next[first+1]>0&&next[first+2]>0){next[first]--;next[first+1]--;next[first+2]--;collect(next,[...groups,{kind:'sequence',...tile,open:false}]);next[first]++;next[first+1]++;next[first+2]++;}};
+  for(let pair=0;pair<counts.length;pair++)if(counts[pair]>=2){const copy=[...counts];copy[pair]-=2;const before=results.length;collect(copy,[]);const pairTile=indexToTileValue(pair);for(let index=before;index<results.length;index++)results[index].pair=pairTile;}
+  return results;
+}
+
 function concealedCanBeAllTriplets(hand: MahjongTile[]) {
   const counts = Array(34).fill(0) as number[]; hand.forEach((tile) => counts[tileIndex(tile)]++);
   for (let pair = 0; pair < counts.length; pair++) if (counts[pair] >= 2) {
@@ -118,6 +132,18 @@ export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMe
   if (numberedSuits.size === 1 && hasHonors) yaku.push({ name:'혼일색', japanese:'混一色', han:closed?3:2, detail:'한 종류의 숫자패와 자패만 사용' });
   if (numberedSuits.size === 1 && !hasHonors) yaku.push({ name:'청일색', japanese:'清一色', han:closed?6:5, detail:'한 종류의 숫자패만 사용' });
   if (!sevenPairs && openMelds.every(isTripletMeld) && concealedCanBeAllTriplets(args.concealed)) yaku.push({ name:'또이또이', japanese:'対々和', han:2, detail:'모든 몸통이 같은 패 세 장 또는 네 장' });
+  if (!sevenPairs) {
+    const decompositions=getStandardMahjongDecompositions(args.concealed,openMelds);
+    if(closed&&decompositions.some(({groups})=>{const sequences=groups.filter((group)=>group.kind==='sequence');return sequences.some((group,index)=>sequences.findIndex((other)=>other.suit===group.suit&&other.value===group.value)!==index);})) yaku.push({name:'이페코',japanese:'一盃口',han:1,detail:'같은 종류·같은 숫자의 연속 몸통 두 개'});
+    if(decompositions.some(({groups})=>(['m','p','s'] as MahjongSuit[]).some((suit)=>[1,4,7].every((value)=>groups.some((group)=>group.kind==='sequence'&&group.suit===suit&&group.value===value))))) yaku.push({name:'일기통관',japanese:'一気通貫',han:closed?2:1,detail:'한 종류에서 123·456·789를 모두 완성'});
+    if(decompositions.some(({groups})=>[1,2,3,4,5,6,7].some((value)=>(['m','p','s'] as MahjongSuit[]).every((suit)=>groups.some((group)=>group.kind==='sequence'&&group.suit===suit&&group.value===value))))) yaku.push({name:'삼색동순',japanese:'三色同順',han:closed?2:1,detail:'만수·통수·삭수에서 같은 숫자의 연속 몸통'});
+    if(decompositions.some(({groups})=>[1,2,3,4,5,6,7,8,9].some((value)=>(['m','p','s'] as MahjongSuit[]).every((suit)=>groups.some((group)=>group.kind==='triplet'&&group.suit===suit&&group.value===value))))) yaku.push({name:'삼색동각',japanese:'三色同刻',han:2,detail:'만수·통수·삭수에서 같은 숫자 세 장씩'});
+    const terminal=(suit:MahjongSuit,value:number)=>suit==='z'||value===1||value===9;const pureTerminal=(suit:MahjongSuit,value:number)=>suit!=='z'&&(value===1||value===9);
+    const junchan=decompositions.some(({pair,groups})=>pureTerminal(pair.suit,pair.value)&&groups.some((group)=>group.kind==='sequence')&&groups.every((group)=>group.kind==='sequence'?(group.value===1||group.value===7):pureTerminal(group.suit,group.value)));
+    if(junchan)yaku.push({name:'준찬타',japanese:'純全帯么九',han:closed?3:2,detail:'모든 몸통과 머리에 1 또는 9가 포함되고 자패는 없음'});
+    else if(decompositions.some(({pair,groups})=>terminal(pair.suit,pair.value)&&groups.some((group)=>group.kind==='sequence')&&groups.every((group)=>group.kind==='sequence'?(group.value===1||group.value===7):terminal(group.suit,group.value))))yaku.push({name:'찬타',japanese:'混全帯么九',han:closed?2:1,detail:'모든 몸통과 머리에 1·9 또는 자패가 포함'});
+  }
+  if(allTiles.every((tile)=>tile.suit==='z'||tile.value===1||tile.value===9))yaku.push({name:'혼노두',japanese:'混老頭',han:2,detail:'1·9와 자패로만 완성'});
   return yaku;
 }
 

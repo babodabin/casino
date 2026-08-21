@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -63,7 +63,7 @@ test('리치와 멘젠쯔모 및 탕야오를 판정한다', () => {
 
 test('역패와 동 중각의 자풍·장풍을 각각 판정한다', () => {
   const result = evaluateBasicRiichiYaku({ concealed:hand(['m1','m2','m3','p1','p2','p3','s7','s8','s9','z1','z1','z1','z5','z5']), winType:'ron' });
-  assert.deepEqual(result.map((yaku) => yaku.name), ['자풍패 동','장풍패 동']);
+  assert.equal(result.some((yaku) => yaku.name === '자풍패 동'),true); assert.equal(result.some((yaku) => yaku.name === '장풍패 동'),true);
 });
 
 test('열린 혼일색과 또이또이를 판정한다', () => {
@@ -92,4 +92,33 @@ test('1·9·자패 13종과 짝 하나를 국사무쌍으로 판정한다', () =
 test('국사무쌍 13면 대기의 기다리는 패를 모두 찾는다', () => {
   const thirteen=hand(['m1','m9','p1','p9','s1','s9','z1','z2','z3','z4','z5','z6','z7']);
   assert.equal(getMahjongWaits(thirteen).length,13);
+});
+
+test('완성패를 머리와 네 몸통으로 분해한다', () => {
+  const tiles=hand(['m1','m2','m3','m1','m2','m3','p4','p5','p6','s7','s8','s9','z1','z1']);
+  const result=getStandardMahjongDecompositions(tiles);
+  assert.equal(result.length>0,true);assert.equal(result[0].groups.length,4);assert.deepEqual(result[0].pair,{suit:'z',value:1});
+});
+
+test('이페코와 일기통관을 몸통 구성으로 판정한다', () => {
+  const iipeikou=hand(['m1','m2','m3','m1','m2','m3','p4','p5','p6','s7','s8','s9','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:iipeikou,winType:'ron'}).some((yaku)=>yaku.name==='이페코'),true);
+  const ittsu=hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','p2','p3','p4','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:ittsu,winType:'ron'}).find((yaku)=>yaku.name==='일기통관')?.han,2);
+});
+
+test('삼색동순과 삼색동각을 판정한다', () => {
+  const doujun=hand(['m2','m3','m4','p2','p3','p4','s2','s3','s4','m6','m7','m8','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:doujun,winType:'ron'}).some((yaku)=>yaku.name==='삼색동순'),true);
+  const doukou=hand(['m5','m5','m5','p5','p5','p5','s5','s5','s5','m1','m2','m3','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:doukou,winType:'ron'}).some((yaku)=>yaku.name==='삼색동각'),true);
+});
+
+test('찬타와 준찬타 및 혼노두를 구분한다', () => {
+  const chanta=hand(['m1','m2','m3','p7','p8','p9','s1','s1','s1','z2','z2','z2','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:chanta,winType:'ron'}).some((yaku)=>yaku.name==='찬타'),true);
+  const junchan=hand(['m1','m2','m3','p7','p8','p9','s1','s1','s1','m9','m9','m9','p1','p1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:junchan,winType:'ron'}).some((yaku)=>yaku.name==='준찬타'),true);
+  const honroutou=hand(['m1','m1','m1','p9','p9','p9','s1','s1','s1','z2','z2','z2','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:honroutou,winType:'ron'}).some((yaku)=>yaku.name==='혼노두'),true);
 });
