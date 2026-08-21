@@ -119,6 +119,15 @@ export function advanceRiichiMatch(state:RiichiMatchState,result:{winner?:number
   next.finished=next.roundIndex>=8;return next;
 }
 
+export function settleRiichiWin(state:RiichiMatchState,args:{winner:number;score:RiichiScoreResult;winType:'tsumo'|'ron';loser?:number}){
+  const next:RiichiMatchState={...state,scores:[...state.scores] as RiichiMatchState['scores']};const dealer=state.roundIndex%4;
+  if(args.winType==='ron'){if(args.loser===undefined||args.loser===args.winner)throw new Error('론에는 승자와 다른 방총자가 필요합니다');const amount=args.score.total+state.honba*300;next.scores[args.loser]-=amount;next.scores[args.winner]+=amount;}
+  else{const losers=[0,1,2,3].filter((seat)=>seat!==args.winner);losers.forEach((seat,index)=>{const base=args.winner===dealer?args.score.payments[0]:seat===dealer?args.score.payments[0]:args.score.payments[Math.min(index+1,args.score.payments.length-1)];const amount=base+state.honba*100;next.scores[seat]-=amount;next.scores[args.winner]+=amount;});}
+  next.scores[args.winner]+=state.riichiSticks*1000;next.riichiSticks=0;return advanceRiichiMatch(next,{winner:args.winner});
+}
+
+export function rankRiichiScores(scores:RiichiMatchState['scores']){return scores.map((score,seat)=>({seat,score})).sort((a,b)=>b.score-a.score||a.seat-b.seat).map((entry,index)=>({...entry,rank:index+1}));}
+
 export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true): RiichiDiscardOption[] {
   if (hand.length !== 14) return [];
   return hand.flatMap((tile) => {

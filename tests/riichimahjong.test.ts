@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, riichiRoundLabel, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -81,6 +81,24 @@ test('유국 때 친이 노텐이면 다음 국, 텐파이면 연장한다', () 
 test('승자가 테이블의 리치 공탁봉을 모두 가져간다', () => {
   const state={roundIndex:1,honba:0,riichiSticks:2,scores:[24000,25000,25000,24000] as [number,number,number,number],finished:false};
   const next=advanceRiichiMatch(state,{winner:2});assert.equal(next.riichiSticks,0);assert.equal(next.scores[2],27000);
+});
+
+test('론 점수와 본장 및 공탁봉을 승자와 방총자 사이에서 이동한다', () => {
+  const state={roundIndex:1,honba:2,riichiSticks:1,scores:[24000,25000,25000,25000] as [number,number,number,number],finished:false};
+  const score=calculateRiichiScore({han:3,fu:40,dealer:true,winType:'ron'});
+  const next=settleRiichiWin(state,{winner:1,loser:3,score,winType:'ron'});
+  assert.equal(next.scores[1],34300);assert.equal(next.scores[3],16700);assert.equal(next.riichiSticks,0);assert.equal(next.honba,3);
+});
+
+test('자가 쯔모하면 친은 더 내고 본장은 각자 100점씩 더 낸다', () => {
+  const state={roundIndex:0,honba:1,riichiSticks:0,scores:[25000,25000,25000,25000] as [number,number,number,number],finished:false};
+  const score=calculateRiichiScore({han:3,fu:30,dealer:false,winType:'tsumo'});
+  const next=settleRiichiWin(state,{winner:2,score,winType:'tsumo'});
+  assert.equal(next.scores[0],22900);assert.equal(next.scores[1],23900);assert.equal(next.scores[3],23900);assert.equal(next.scores[2],29300);
+});
+
+test('최종 점수가 높은 순서로 순위를 매긴다', () => {
+  assert.deepEqual(rankRiichiScores([28000,19000,31000,22000]).map(({seat,rank})=>[seat,rank]),[[2,1],[0,2],[3,3],[1,4]]);
 });
 
 test('보통 컴퓨터는 텐파이를 유지하는 버림패를 고른다', () => {
