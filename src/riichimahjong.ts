@@ -280,10 +280,11 @@ export function chooseComputerCall(hand:MahjongTile[],discarded:MahjongTile,canC
   return choice.score>=threshold?choice.call:null;
 }
 
-export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;riichiDeclared?:boolean;points?:number;openMeldCount?:number}={}) {
+export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;riichiDeclared?:boolean;points?:number;openMeldCount?:number;openMelds?:MahjongTile[][];requireYaku?:boolean}={}) {
   const draw = drawTile(hand, wall);
   if (!draw.drawn) return { hand, wall, discarded: null, win: false };
-  if (isWinningMahjongHand(draw.hand,options.openMeldCount??0)) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true };
+  const complete=isWinningMahjongHand(draw.hand,options.openMeldCount??0);const hasYaku=!options.requireYaku||evaluateBasicRiichiYaku({concealed:draw.hand,openMelds:options.openMelds,riichi:options.riichiDeclared,winType:'tsumo',winningTile:draw.drawn}).length>0;
+  if (complete&&hasYaku) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true,winningTile:draw.drawn };
   const discarded=options.riichiDeclared?draw.drawn:chooseComputerDiscard(draw.hand,{...options,random});
   const nextHand=sortMahjongHand(draw.hand.filter((tile) => tile.id !== discarded.id));const riichi=!options.riichiDeclared&&!(options.openMeldCount??0)&&shouldComputerDeclareRiichi(nextHand,options.level,options.points,options.includeHonors);
   return { hand:nextHand, wall: draw.wall, discarded, win: false, riichi };

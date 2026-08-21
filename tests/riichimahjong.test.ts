@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -265,4 +265,11 @@ test('녹일색과 구련보등 및 사암각을 판정한다', () => {
   assert.equal(evaluateBasicRiichiYaku({concealed:nineGates,winType:'tsumo'}).some((yaku)=>yaku.name==='구련보등'),true);
   const concealedTriplets=hand(['m1','m1','m1','m2','m2','m2','p3','p3','p3','s4','s4','s4','z1','z1']);
   assert.equal(evaluateBasicRiichiYaku({concealed:concealedTriplets,winType:'tsumo'}).some((yaku)=>yaku.name==='사암각'),true);
+});
+
+test('컴퓨터도 역이 없는 공개 완성패로는 화료하지 않는다', () => {
+  const concealed=hand(['m4','m5','m6','p2','p3','p4','s6','s7','z1','z1']);
+  const openMeld=hand(['m1','m2','m3']);
+  const result=playOneComputerTurn(concealed,hand(['s8']),()=>0,{openMeldCount:1,openMelds:[openMeld],requireYaku:true});
+  assert.equal(result.win,false);
 });
