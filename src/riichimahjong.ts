@@ -2,6 +2,7 @@ export type MahjongSuit = 'm' | 'p' | 's' | 'z';
 export type MahjongTile = { id: string; suit: MahjongSuit; value: number; glyph: string };
 export type MahjongCallKind = 'chi' | 'pon' | 'kan';
 export type MahjongCallOption = { kind: MahjongCallKind; tiles: MahjongTile[]; label: string };
+export type RiichiDiscardOption = { tile: MahjongTile; waits: MahjongTile[] };
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -59,6 +60,19 @@ const sameTile = (a: MahjongTile, b: MahjongTile) => a.suit === b.suit && a.valu
 
 export function canRonMahjong(hand: MahjongTile[], discarded: MahjongTile, openMeldCount = 0) {
   return isWinningMahjongHand([...hand, discarded], openMeldCount);
+}
+
+export function getMahjongWaits(hand: MahjongTile[], openMeldCount = 0, includeHonors = true) {
+  const candidates = createMahjongTiles(includeHonors).filter((tile) => tile.id.endsWith('-0'));
+  return candidates.filter((tile) => canRonMahjong(hand, tile, openMeldCount));
+}
+
+export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true): RiichiDiscardOption[] {
+  if (hand.length !== 14) return [];
+  return hand.flatMap((tile) => {
+    const waits = getMahjongWaits(hand.filter((candidate) => candidate.id !== tile.id), 0, includeHonors);
+    return waits.length ? [{ tile, waits }] : [];
+  });
 }
 
 export function getMahjongCallOptions(hand: MahjongTile[], discarded: MahjongTile, canChi: boolean): MahjongCallOption[] {

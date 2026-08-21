@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, getMahjongCallOptions, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -43,4 +43,15 @@ test('퐁을 하면 손패 두 장을 빼고 공개 몸통을 만든다', () => 
 
 test('공개 몸통이 있는 완성패도 판정한다', () => {
   assert.equal(isWinningMahjongHand(hand(['m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1']), 1), true);
+});
+
+test('텐파이 손패에서 기다리는 패를 알려준다', () => {
+  const waiting = hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1']);
+  assert.deepEqual(getMahjongWaits(waiting).map((tile) => `${tile.suit}${tile.value}`), ['m1','m4','z1']);
+});
+
+test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
+  const ready = hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1','z2']);
+  const choices = getRiichiDiscardOptions(ready);
+  assert.equal(choices.some((choice) => choice.tile.suit === 'z' && choice.tile.value === 2), true);
 });
