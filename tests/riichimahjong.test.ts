@@ -210,3 +210,21 @@ test('만관 이상과 친 쯔모 지불액을 계산한다', () => {
 test('실제 역만은 판수와 별도로 역만 점수를 계산한다', () => {
   const result=calculateRiichiScore({han:0,fu:0,dealer:true,winType:'ron',yakumanCount:1});assert.equal(result.limitName,'역만');assert.equal(result.total,48000);
 });
+
+test('대삼원과 자일색 및 청노두 역만을 판정한다', () => {
+  const daisangen=hand(['z5','z5','z5','z6','z6','z6','z7','z7','z7','m1','m1','m1','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:daisangen,winType:'ron'}).some((yaku)=>yaku.name==='대삼원'&&yaku.yakuman),true);
+  const honours=hand(['z1','z1','z1','z2','z2','z2','z3','z3','z3','z5','z5','z5','z7','z7']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:honours,winType:'ron'}).some((yaku)=>yaku.name==='자일색'&&yaku.yakuman),true);
+  const terminals=hand(['m1','m1','m1','m9','m9','m9','p1','p1','p1','s9','s9','s9','p9','p9']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:terminals,winType:'ron'}).some((yaku)=>yaku.name==='청노두'&&yaku.yakuman),true);
+});
+
+test('녹일색과 구련보등 및 사암각을 판정한다', () => {
+  const green=hand(['s2','s2','s2','s3','s3','s3','s4','s4','s4','s6','s6','s6','z6','z6']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:green,winType:'ron'}).some((yaku)=>yaku.name==='녹일색'),true);
+  const nineGates=hand(['m1','m1','m1','m2','m3','m4','m5','m5','m6','m7','m8','m9','m9','m9']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:nineGates,winType:'tsumo'}).some((yaku)=>yaku.name==='구련보등'),true);
+  const concealedTriplets=hand(['m1','m1','m1','m2','m2','m2','p3','p3','p3','s4','s4','s4','z1','z1']);
+  assert.equal(evaluateBasicRiichiYaku({concealed:concealedTriplets,winType:'tsumo'}).some((yaku)=>yaku.name==='사암각'),true);
+});

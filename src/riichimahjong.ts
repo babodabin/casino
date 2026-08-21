@@ -179,7 +179,20 @@ export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMe
     const junchan=decompositions.some(({pair,groups})=>pureTerminal(pair.suit,pair.value)&&groups.some((group)=>group.kind==='sequence')&&groups.every((group)=>group.kind==='sequence'?(group.value===1||group.value===7):pureTerminal(group.suit,group.value)));
     if(junchan)yaku.push({name:'준찬타',japanese:'純全帯么九',han:closed?3:2,detail:'모든 몸통과 머리에 1 또는 9가 포함되고 자패는 없음'});
     else if(decompositions.some(({pair,groups})=>terminal(pair.suit,pair.value)&&groups.some((group)=>group.kind==='sequence')&&groups.every((group)=>group.kind==='sequence'?(group.value===1||group.value===7):terminal(group.suit,group.value))))yaku.push({name:'찬타',japanese:'混全帯么九',han:closed?2:1,detail:'모든 몸통과 머리에 1·9 또는 자패가 포함'});
+    if(decompositions.some(({pair,groups})=>pair.suit==='z'&&pair.value>=5&&groups.filter((group)=>group.kind==='triplet'&&group.suit==='z'&&group.value>=5).length===2))yaku.push({name:'소삼원',japanese:'小三元',han:2,detail:'삼원패 두 종류를 커쯔로, 나머지 한 종류를 머리로 완성'});
+    if(decompositions.some(({groups})=>groups.filter((group)=>group.kind==='triplet'&&!group.open).length>=3))yaku.push({name:'삼암각',japanese:'三暗刻',han:2,detail:'공개하지 않은 커쯔 또는 깡 세 개'});
   }
+  const tripletValues=(suit:MahjongSuit,values:number[])=>values.every((value)=>allTiles.filter((tile)=>tile.suit===suit&&tile.value===value).length>=3);
+  if(tripletValues('z',[5,6,7]))yaku.push({name:'대삼원',japanese:'大三元',han:13,yakuman:true,detail:'백·발·중을 모두 커쯔 또는 깡으로 완성'});
+  const windTriplets=[1,2,3,4].filter((value)=>allTiles.filter((tile)=>tile.suit==='z'&&tile.value===value).length>=3);
+  if(windTriplets.length===4)yaku.push({name:'대사희',japanese:'大四喜',han:13,yakuman:true,detail:'동·남·서·북을 모두 커쯔 또는 깡으로 완성'});
+  else if(windTriplets.length===3&&[1,2,3,4].some((value)=>allTiles.filter((tile)=>tile.suit==='z'&&tile.value===value).length===2))yaku.push({name:'소사희',japanese:'小四喜',han:13,yakuman:true,detail:'바람패 세 종류를 커쯔로, 나머지 한 종류를 머리로 완성'});
+  if(allTiles.every((tile)=>tile.suit==='z'))yaku.push({name:'자일색',japanese:'字一色',han:13,yakuman:true,detail:'자패로만 완성'});
+  if(allTiles.every((tile)=>tile.suit!=='z'&&(tile.value===1||tile.value===9)))yaku.push({name:'청노두',japanese:'清老頭',han:13,yakuman:true,detail:'숫자패의 1과 9만으로 완성'});
+  if(allTiles.every((tile)=>(tile.suit==='s'&&[2,3,4,6,8].includes(tile.value))||(tile.suit==='z'&&tile.value===6)))yaku.push({name:'녹일색',japanese:'緑一色',han:13,yakuman:true,detail:'삭수 2·3·4·6·8과 발만으로 완성'});
+  if(closed&&!hasHonors&&numberedSuits.size===1){const counts=Array(10).fill(0);allTiles.forEach((tile)=>counts[tile.value]++);if(counts[1]>=3&&counts[9]>=3&&[2,3,4,5,6,7,8].every((value)=>counts[value]>=1))yaku.push({name:'구련보등',japanese:'九蓮宝燈',han:13,yakuman:true,detail:'한 종류에서 1112345678999에 같은 종류 한 장을 더해 완성'});}
+  if(closed&&args.winType==='tsumo'&&getStandardMahjongDecompositions(args.concealed).some(({groups})=>groups.every((group)=>group.kind==='triplet'&&!group.open)))yaku.push({name:'사암각',japanese:'四暗刻',han:13,yakuman:true,detail:'공개하지 않은 커쯔 또는 깡 네 개를 쯔모로 완성'});
+  const quadCount=openMelds.filter((meld)=>meld.length===4).length;if(quadCount===4)yaku.push({name:'사깡쯔',japanese:'四槓子',han:13,yakuman:true,detail:'깡 네 개로 완성'});else if(quadCount===3)yaku.push({name:'삼깡쯔',japanese:'三槓子',han:2,detail:'깡 세 개로 완성'});
   if(allTiles.every((tile)=>tile.suit==='z'||tile.value===1||tile.value===9))yaku.push({name:'혼노두',japanese:'混老頭',han:2,detail:'1·9와 자패로만 완성'});
   return yaku;
 }
