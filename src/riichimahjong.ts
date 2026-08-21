@@ -10,6 +10,7 @@ export type MahjongWaitShape = 'ryanmen'|'kanchan'|'penchan'|'tanki'|'shanpon';
 export type RiichiFuResult = { fu:number; wait:MahjongWaitShape; details:string[]; pinfu:boolean };
 export type RiichiScoreResult={basePoints:number;total:number;payments:number[];limitName:string};
 export type MahjongAiLevel='beginner'|'easy'|'normal'|'hard'|'expert';
+export type RiichiMatchState={roundIndex:number;honba:number;riichiSticks:number;scores:[number,number,number,number];finished:boolean};
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; deadWall:MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -106,6 +107,16 @@ export function calculateNotenPayments(tenpai: boolean[]) {
   const receive = 3000 / ready;
   const pay = 3000 / (4 - ready);
   return tenpai.map((isReady) => isReady ? receive : -pay);
+}
+
+export function riichiRoundLabel(roundIndex:number){const wind=roundIndex<4?'동':'남';return `${wind}${roundIndex%4+1}국`;}
+
+export function advanceRiichiMatch(state:RiichiMatchState,result:{winner?:number;exhaustive?:boolean;tenpai?:boolean[];riichiDeposits?:number}){
+  const next:RiichiMatchState={...state,scores:[...state.scores] as RiichiMatchState['scores'],riichiSticks:state.riichiSticks+(result.riichiDeposits??0)};
+  const dealer=state.roundIndex%4;
+  if(result.winner!==undefined){if(next.riichiSticks){next.scores[result.winner]+=next.riichiSticks*1000;next.riichiSticks=0;}if(result.winner===dealer)next.honba++;else{next.honba=0;next.roundIndex++;}}
+  else if(result.exhaustive){const payments=calculateNotenPayments(result.tenpai??[false,false,false,false]);payments.forEach((value,index)=>next.scores[index]+=value);next.honba++;if(!(result.tenpai?.[dealer]??false))next.roundIndex++;}
+  next.finished=next.roundIndex>=8;return next;
 }
 
 export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true): RiichiDiscardOption[] {

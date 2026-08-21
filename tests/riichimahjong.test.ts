@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, riichiRoundLabel, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -61,6 +61,26 @@ test('유국 때 텐파이 인원이 노텐에게서 총 3000점을 받는다', 
   assert.deepEqual(calculateNotenPayments([true,true,false,false]), [1500,1500,-1500,-1500]);
   assert.deepEqual(calculateNotenPayments([true,true,true,false]), [1000,1000,1000,-3000]);
   assert.deepEqual(calculateNotenPayments([true,true,true,true]), [0,0,0,0]);
+});
+
+test('친이 이기면 같은 국에서 본장이 늘고 자가 이기면 다음 국으로 간다', () => {
+  const state={roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000] as [number,number,number,number],finished:false};
+  const dealerWin=advanceRiichiMatch(state,{winner:0});assert.equal(dealerWin.roundIndex,0);assert.equal(dealerWin.honba,1);
+  const otherWin=advanceRiichiMatch(dealerWin,{winner:1});assert.equal(otherWin.roundIndex,1);assert.equal(otherWin.honba,0);assert.equal(riichiRoundLabel(otherWin.roundIndex),'동2국');
+});
+
+test('유국 때 친이 노텐이면 다음 국, 텐파이면 연장한다', () => {
+  const state={roundIndex:3,honba:0,riichiSticks:1,scores:[25000,25000,25000,25000] as [number,number,number,number],finished:false};
+  const dealer=state.roundIndex%4;
+  const repeat=advanceRiichiMatch(state,{exhaustive:true,tenpai:[false,false,false,true]});assert.equal(repeat.roundIndex,3);assert.equal(repeat.honba,1);
+  const advance=advanceRiichiMatch(state,{exhaustive:true,tenpai:[true,false,false,false]});assert.equal(advance.roundIndex,4);assert.equal(riichiRoundLabel(advance.roundIndex),'남1국');assert.equal(advance.riichiSticks,1);
+  assert.equal(advance.scores.reduce((sum,value)=>sum+value,0),100000);
+  assert.equal(dealer,3);
+});
+
+test('승자가 테이블의 리치 공탁봉을 모두 가져간다', () => {
+  const state={roundIndex:1,honba:0,riichiSticks:2,scores:[24000,25000,25000,24000] as [number,number,number,number],finished:false};
+  const next=advanceRiichiMatch(state,{winner:2});assert.equal(next.riichiSticks,0);assert.equal(next.scores[2],27000);
 });
 
 test('보통 컴퓨터는 텐파이를 유지하는 버림패를 고른다', () => {
