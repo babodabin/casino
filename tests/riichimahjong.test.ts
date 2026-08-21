@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -71,4 +71,25 @@ test('열린 혼일색과 또이또이를 판정한다', () => {
   const openMelds = [hand(['m3','m3','m3']),hand(['z5','z5','z5'])];
   const result = evaluateBasicRiichiYaku({ concealed,openMelds,winType:'ron' });
   assert.equal(result.find((yaku)=>yaku.name==='혼일색')?.han,2); assert.equal(result.find((yaku)=>yaku.name==='또이또이')?.han,2);
+});
+
+test('서로 다른 일곱 쌍을 칠대자로 완성 판정한다', () => {
+  const tiles=hand(['m1','m1','m3','m3','p2','p2','p7','p7','s4','s4','s8','s8','z1','z1']);
+  assert.equal(isSevenPairsHand(tiles),true); assert.equal(isWinningMahjongHand(tiles),true);
+  assert.equal(evaluateBasicRiichiYaku({concealed:tiles,winType:'ron'}).some((yaku)=>yaku.name==='칠대자'),true);
+});
+
+test('한 종류를 네 장 모은 것은 칠대자의 두 쌍으로 세지 않는다', () => {
+  assert.equal(isSevenPairsHand(hand(['m1','m1','m1','m1','m3','m3','p2','p2','p7','p7','s4','s4','z1','z1'])),false);
+});
+
+test('1·9·자패 13종과 짝 하나를 국사무쌍으로 판정한다', () => {
+  const tiles=hand(['m1','m9','p1','p9','s1','s9','z1','z2','z3','z4','z5','z6','z7','z7']);
+  assert.equal(isThirteenOrphansHand(tiles),true); assert.equal(isWinningMahjongHand(tiles),true);
+  assert.equal(evaluateBasicRiichiYaku({concealed:tiles,winType:'ron'})[0].yakuman,true);
+});
+
+test('국사무쌍 13면 대기의 기다리는 패를 모두 찾는다', () => {
+  const thirteen=hand(['m1','m9','p1','p9','s1','s9','z1','z2','z3','z4','z5','z6','z7']);
+  assert.equal(getMahjongWaits(thirteen).length,13);
 });
