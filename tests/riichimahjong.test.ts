@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, shouldComputerDeclareRiichi, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -73,6 +73,19 @@ test('전문가 컴퓨터는 상대 리치 때 상대가 이미 버린 현물패
   const tiles=hand(['m1','m2','m3','p2','p3','p4','s4','s5','s6','z1','z1','z2','z3','z4']);
   const discarded=chooseComputerDiscard(tiles,{level:'expert',opponentRiichi:true,opponentRiver:hand(['z3']),random:()=>0});
   assert.equal(`${discarded.suit}${discarded.value}`,'z3');
+});
+
+test('텐파이이고 1000점 이상인 컴퓨터는 실력에 따라 리치를 선언한다', () => {
+  const waiting=hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1']);
+  assert.equal(shouldComputerDeclareRiichi(waiting,'normal',25000),true);
+  assert.equal(shouldComputerDeclareRiichi(waiting,'beginner',25000),false);
+  assert.equal(shouldComputerDeclareRiichi(waiting,'expert',900),false);
+});
+
+test('컴퓨터는 가치패 퐁처럼 패를 개선하는 부름을 선택한다', () => {
+  const tiles=hand(['m1','m2','m3','p2','p3','p4','s4','s5','s7','z5','z5','z2','z3']);
+  const call=chooseComputerCall(tiles,hand(['z5'])[0],false,{level:'expert'});
+  assert.equal(call?.kind,'pon');
 });
 
 test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {

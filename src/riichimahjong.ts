@@ -212,26 +212,48 @@ export function applyMahjongCall(hand: MahjongTile[], discarded: MahjongTile, op
   };
 }
 
-function computerHandPotential(hand:MahjongTile[],includeHonors=true){
-  const waits=getMahjongWaits(hand,0,includeHonors);if(waits.length)return 10000+waits.length*100;
+function computerHandPotential(hand:MahjongTile[],includeHonors=true,openMeldCount=0){
+  const waits=getMahjongWaits(hand,openMeldCount,includeHonors);if(waits.length)return 10000+waits.length*100;
   return hand.reduce((score,tile)=>{const same=hand.filter((other)=>sameTile(tile,other)).length-1;if(tile.suit==='z')return score+same*7;const adjacent=hand.filter((other)=>other.suit===tile.suit&&Math.abs(other.value-tile.value)===1).length;const gap=hand.filter((other)=>other.suit===tile.suit&&Math.abs(other.value-tile.value)===2).length;const middle=tile.value>=3&&tile.value<=7?1:0;return score+same*7+adjacent*4+gap*2+middle;},0);
 }
 
-export function chooseComputerDiscard(hand:MahjongTile[],options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;random?:()=>number}={}){
+export function chooseComputerDiscard(hand:MahjongTile[],options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;openMeldCount?:number;random?:()=>number}={}){
   const level=options.level??'normal',random=options.random??Math.random;if(!hand.length)throw new Error('버릴 패가 없습니다');
   if(level==='beginner')return hand[Math.floor(random()*hand.length)];
-  const scored=hand.map((tile,index)=>{const remaining=hand.filter((_,candidate)=>candidate!==index);let score=computerHandPotential(remaining,options.includeHonors??true);if(level==='easy')score=Math.floor(score/20);
+  const scored=hand.map((tile,index)=>{const remaining=hand.filter((_,candidate)=>candidate!==index);let score=computerHandPotential(remaining,options.includeHonors??true,options.openMeldCount??0);if(level==='easy')score=Math.floor(score/20);
     if((level==='hard'||level==='expert')&&options.opponentRiichi){const safe=options.opponentRiver?.some((discarded)=>sameTile(discarded,tile))??false;if(safe)score+=level==='expert'?5000:1200;else if(tile.suit==='z')score+=300;}
     return {tile,score,tie:random()};});
   scored.sort((a,b)=>b.score-a.score||b.tie-a.tie);return scored[0].tile;
 }
 
-export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean}={}) {
+const aiStrength:Record<MahjongAiLevel,number>={beginner:0,easy:1,normal:2,hard:3,expert:4};
+
+export function shouldComputerDeclareRiichi(hand:MahjongTile[],level:MahjongAiLevel='normal',points=25000,includeHonors=true){
+  if(points<1000||aiStrength[level]<1)return false;
+  const waits=getMahjongWaits(hand,0,includeHonors);
+  if(!waits.length)return false;
+  if(level==='easy')return waits.length>=2;
+  return true;
+}
+
+export function chooseComputerCall(hand:MahjongTile[],discarded:MahjongTile,canChi:boolean,options:{level?:MahjongAiLevel;openMeldCount?:number;includeHonors?:boolean}={}):MahjongCallOption|null{
+  const level=options.level??'normal';if(level==='beginner')return null;
+  const calls=getMahjongCallOptions(hand,discarded,canChi);if(!calls.length)return null;
+  const before=computerHandPotential(hand,options.includeHonors??true,options.openMeldCount??0);
+  const ranked=calls.map((call)=>{const called=applyMahjongCall(hand,discarded,call);let best=-Infinity;
+    called.hand.forEach((tile,index)=>{const after=called.hand.filter((_,candidate)=>candidate!==index);best=Math.max(best,computerHandPotential(after,options.includeHonors??true,(options.openMeldCount??0)+1));});
+    const valueTriplet=call.kind!=='chi'&&discarded.suit==='z'&&(discarded.value>=5||discarded.value===1);const bonus=valueTriplet?250:call.kind==='kan'&&aiStrength[level]>=3?80:0;return {call,score:best+bonus};});
+  ranked.sort((a,b)=>b.score-a.score);const choice=ranked[0];const threshold=level==='easy'?before+120:level==='normal'?before+40:before-20;
+  return choice.score>=threshold?choice.call:null;
+}
+
+export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;includeHonors?:boolean;riichiDeclared?:boolean;points?:number;openMeldCount?:number}={}) {
   const draw = drawTile(hand, wall);
   if (!draw.drawn) return { hand, wall, discarded: null, win: false };
-  if (isWinningMahjongHand(draw.hand)) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true };
-  const discarded=chooseComputerDiscard(draw.hand,{...options,random});
-  return { hand: sortMahjongHand(draw.hand.filter((tile) => tile.id !== discarded.id)), wall: draw.wall, discarded, win: false };
+  if (isWinningMahjongHand(draw.hand,options.openMeldCount??0)) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true };
+  const discarded=options.riichiDeclared?draw.drawn:chooseComputerDiscard(draw.hand,{...options,random});
+  const nextHand=sortMahjongHand(draw.hand.filter((tile) => tile.id !== discarded.id));const riichi=!options.riichiDeclared&&!(options.openMeldCount??0)&&shouldComputerDeclareRiichi(nextHand,options.level,options.points,options.includeHonors);
+  return { hand:nextHand, wall: draw.wall, discarded, win: false, riichi };
 }
 
 export function drawTile(hand: MahjongTile[], wall: MahjongTile[]) {
