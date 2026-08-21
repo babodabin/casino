@@ -8,7 +8,8 @@ export type MahjongGroup = { kind:'sequence'|'triplet'; suit:MahjongSuit; value:
 export type MahjongDecomposition = { pair:{suit:MahjongSuit;value:number}; groups:MahjongGroup[] };
 export type MahjongWaitShape = 'ryanmen'|'kanchan'|'penchan'|'tanki'|'shanpon';
 export type RiichiFuResult = { fu:number; wait:MahjongWaitShape; details:string[]; pinfu:boolean };
-export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; rivers: MahjongTile[][] };
+export type RiichiScoreResult={basePoints:number;total:number;payments:number[];limitName:string};
+export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; deadWall:MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
   m: ['🀇','🀈','🀉','🀊','🀋','🀌','🀍','🀎','🀏'],
@@ -40,8 +41,14 @@ export function dealRiichi(random: () => number = Math.random, includeHonors = t
   const deck = shuffleMahjong(createMahjongTiles(includeHonors), random); let cursor = 0;
   const hands = [[],[],[],[]] as MahjongTile[][];
   for (let count = 0; count < 13; count++) for (let player = 0; player < 4; player++) hands[player].push(deck[cursor++]);
-  return { player: sortMahjongHand(hands[0]), opponents: hands.slice(1).map(sortMahjongHand), wall: deck.slice(cursor), rivers: [[],[],[],[]] };
+  const remaining=deck.slice(cursor);
+  return { player: sortMahjongHand(hands[0]), opponents: hands.slice(1).map(sortMahjongHand), wall: remaining.slice(0,-14), deadWall:remaining.slice(-14), rivers: [[],[],[],[]] };
 }
+
+export function doraFromIndicator(indicator:MahjongTile):{suit:MahjongSuit;value:number}{if(indicator.suit!=='z')return {suit:indicator.suit,value:indicator.value===9?1:indicator.value+1};if(indicator.value<=4)return {suit:'z',value:indicator.value===4?1:indicator.value+1};return {suit:'z',value:indicator.value===7?5:indicator.value+1};}
+export function countMahjongDora(tiles:MahjongTile[],indicators:MahjongTile[]){return indicators.reduce((total,indicator)=>{const dora=doraFromIndicator(indicator);return total+tiles.filter((tile)=>tile.suit===dora.suit&&tile.value===dora.value).length;},0);}
+const roundHundred=(value:number)=>Math.ceil(value/100)*100;
+export function calculateRiichiScore(args:{han:number;fu:number;dealer:boolean;winType:'tsumo'|'ron';yakumanCount?:number}):RiichiScoreResult{let base:number,limitName='';const yakuman=args.yakumanCount??0;if(yakuman>0){base=8000*yakuman;limitName=yakuman>1?`${yakuman}배 역만`:'역만';}else if(args.han>=11){base=6000;limitName='삼배만';}else if(args.han>=8){base=4000;limitName='배만';}else if(args.han>=6){base=3000;limitName='하네만';}else{const raw=args.fu*2**(args.han+2);if(args.han>=5||raw>=1920){base=2000;limitName='만관';}else base=raw;}if(args.winType==='ron'){const payment=roundHundred(base*(args.dealer?6:4));return {basePoints:base,total:payment,payments:[payment],limitName};}if(args.dealer){const each=roundHundred(base*2);return {basePoints:base,total:each*3,payments:[each,each,each],limitName};}const dealerPay=roundHundred(base*2),otherPay=roundHundred(base);return {basePoints:base,total:dealerPay+otherPay*2,payments:[dealerPay,otherPay,otherPay],limitName};}
 
 const tileIndex = (tile: MahjongTile) => suitOrder[tile.suit] * 9 + tile.value - 1;
 const meldable = (counts: number[]): boolean => {

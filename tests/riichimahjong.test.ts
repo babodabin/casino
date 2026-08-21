@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, calculateRiichiFu, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, calculateRiichiFu, calculateRiichiScore, canRonMahjong, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -13,7 +13,7 @@ test('사천식은 자패를 제외한 108장을 사용한다', () => {
 });
 
 test('네 명에게 13장씩 나누고 벽패를 남긴다', () => {
-  const round = dealRiichi(() => 0.42); assert.equal(round.player.length, 13); assert.deepEqual(round.opponents.map((cards) => cards.length), [13,13,13]); assert.equal(round.wall.length, 84);
+  const round = dealRiichi(() => 0.42); assert.equal(round.player.length, 13); assert.deepEqual(round.opponents.map((cards) => cards.length), [13,13,13]); assert.equal(round.wall.length, 70); assert.equal(round.deadWall.length,14);
 });
 
 test('머리 하나와 몸통 네 개의 완성패를 판정한다', () => {
@@ -143,4 +143,27 @@ test('간짱 대기와 멘젠 론을 더한 뒤 10부 단위로 올린다', () =
 test('칠대자는 다른 부를 더하지 않고 25부 고정이다', () => {
   const tiles=hand(['m1','m1','m3','m3','p2','p2','p7','p7','s4','s4','s8','s8','z1','z1']);
   assert.equal(calculateRiichiFu({concealed:tiles,winningTile:tiles[13],winType:'ron'})?.fu,25);
+});
+
+test('도라 표시패의 다음 패를 순환해 찾는다', () => {
+  assert.deepEqual(doraFromIndicator(hand(['m9'])[0]),{suit:'m',value:1});assert.deepEqual(doraFromIndicator(hand(['z4'])[0]),{suit:'z',value:1});assert.deepEqual(doraFromIndicator(hand(['z7'])[0]),{suit:'z',value:5});
+});
+
+test('여러 도라 표시패가 가리키는 도라를 중복해 센다', () => {
+  const tiles=hand(['m2','m2','z1']);const indicators=hand(['m1','m1','z4']);
+  assert.equal(countMahjongDora(tiles,indicators),5);
+});
+
+test('판과 부로 론 점수를 계산한다', () => {
+  assert.equal(calculateRiichiScore({han:3,fu:40,dealer:false,winType:'ron'}).total,5200);
+  assert.equal(calculateRiichiScore({han:3,fu:40,dealer:true,winType:'ron'}).total,7700);
+});
+
+test('만관 이상과 친 쯔모 지불액을 계산한다', () => {
+  const mangan=calculateRiichiScore({han:5,fu:30,dealer:true,winType:'tsumo'});assert.equal(mangan.limitName,'만관');assert.deepEqual(mangan.payments,[4000,4000,4000]);assert.equal(mangan.total,12000);
+  assert.equal(calculateRiichiScore({han:8,fu:30,dealer:false,winType:'ron'}).limitName,'배만');assert.equal(calculateRiichiScore({han:13,fu:30,dealer:false,winType:'ron'}).limitName,'삼배만');
+});
+
+test('실제 역만은 판수와 별도로 역만 점수를 계산한다', () => {
+  const result=calculateRiichiScore({han:0,fu:0,dealer:true,winType:'ron',yakumanCount:1});assert.equal(result.limitName,'역만');assert.equal(result.total,48000);
 });
