@@ -3,6 +3,7 @@ export type MahjongTile = { id: string; suit: MahjongSuit; value: number; glyph:
 export type MahjongCallKind = 'chi' | 'pon' | 'kan';
 export type MahjongCallOption = { kind: MahjongCallKind; tiles: MahjongTile[]; label: string };
 export type RiichiDiscardOption = { tile: MahjongTile; waits: MahjongTile[] };
+export type RiichiYaku = { name: string; japanese: string; han: number; detail: string };
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -73,6 +74,34 @@ export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = tru
     const waits = getMahjongWaits(hand.filter((candidate) => candidate.id !== tile.id), 0, includeHonors);
     return waits.length ? [{ tile, waits }] : [];
   });
+}
+
+const isTripletMeld = (meld: MahjongTile[]) => meld.every((tile) => sameTile(tile, meld[0]));
+
+function concealedCanBeAllTriplets(hand: MahjongTile[]) {
+  const counts = Array(34).fill(0) as number[]; hand.forEach((tile) => counts[tileIndex(tile)]++);
+  for (let pair = 0; pair < counts.length; pair++) if (counts[pair] >= 2) {
+    const copy = [...counts]; copy[pair] -= 2;
+    if (copy.every((count) => count % 3 === 0)) return true;
+  }
+  return false;
+}
+
+export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMelds?: MahjongTile[][]; riichi?: boolean; winType: 'tsumo'|'ron'; seatWind?: number; roundWind?: number }) {
+  const openMelds = args.openMelds ?? []; const allTiles = [...args.concealed, ...openMelds.flat()]; const yaku: RiichiYaku[] = [];
+  const closed = openMelds.length === 0;
+  if (args.riichi && closed) yaku.push({ name:'리치', japanese:'立直', han:1, detail:'패를 공개하지 않은 텐파이에서 선언' });
+  if (args.winType === 'tsumo' && closed) yaku.push({ name:'멘젠쯔모', japanese:'門前清自摸和', han:1, detail:'패를 공개하지 않고 직접 뽑아 완성' });
+  if (allTiles.every((tile) => tile.suit !== 'z' && tile.value >= 2 && tile.value <= 8)) yaku.push({ name:'탕야오', japanese:'断么九', han:1, detail:'1·9·자패 없이 완성' });
+  [5,6,7].forEach((value) => { if (allTiles.filter((tile) => tile.suit === 'z' && tile.value === value).length >= 3) yaku.push({ name:`역패 ${['백','발','중'][value-5]}`, japanese:'役牌', han:1, detail:'삼원패 세 장' }); });
+  const seatWind = args.seatWind ?? 1; const roundWind = args.roundWind ?? 1;
+  if (allTiles.filter((tile) => tile.suit === 'z' && tile.value === seatWind).length >= 3) yaku.push({ name:'자풍패 동', japanese:'自風牌', han:1, detail:'내 자리의 바람패 세 장' });
+  if (allTiles.filter((tile) => tile.suit === 'z' && tile.value === roundWind).length >= 3) yaku.push({ name:'장풍패 동', japanese:'場風牌', han:1, detail:'현재 판의 바람패 세 장' });
+  const numberedSuits = new Set(allTiles.filter((tile) => tile.suit !== 'z').map((tile) => tile.suit)); const hasHonors = allTiles.some((tile) => tile.suit === 'z');
+  if (numberedSuits.size === 1 && hasHonors) yaku.push({ name:'혼일색', japanese:'混一色', han:closed?3:2, detail:'한 종류의 숫자패와 자패만 사용' });
+  if (numberedSuits.size === 1 && !hasHonors) yaku.push({ name:'청일색', japanese:'清一色', han:closed?6:5, detail:'한 종류의 숫자패만 사용' });
+  if (openMelds.every(isTripletMeld) && concealedCanBeAllTriplets(args.concealed)) yaku.push({ name:'또이또이', japanese:'対々和', han:2, detail:'모든 몸통이 같은 패 세 장 또는 네 장' });
+  return yaku;
 }
 
 export function getMahjongCallOptions(hand: MahjongTile[], discarded: MahjongTile, canChi: boolean): MahjongCallOption[] {

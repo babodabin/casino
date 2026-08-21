@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -54,4 +54,21 @@ test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
   const ready = hand(['m1','m1','m1','m2','m3','p2','p3','p4','s7','s8','s9','z1','z1','z2']);
   const choices = getRiichiDiscardOptions(ready);
   assert.equal(choices.some((choice) => choice.tile.suit === 'z' && choice.tile.value === 2), true);
+});
+
+test('리치와 멘젠쯔모 및 탕야오를 판정한다', () => {
+  const result = evaluateBasicRiichiYaku({ concealed:hand(['m2','m3','m4','m3','m4','m5','p2','p3','p4','s6','s7','s8','p5','p5']), riichi:true, winType:'tsumo' });
+  assert.deepEqual(result.map((yaku) => yaku.name), ['리치','멘젠쯔모','탕야오']);
+});
+
+test('역패와 동 중각의 자풍·장풍을 각각 판정한다', () => {
+  const result = evaluateBasicRiichiYaku({ concealed:hand(['m1','m2','m3','p1','p2','p3','s7','s8','s9','z1','z1','z1','z5','z5']), winType:'ron' });
+  assert.deepEqual(result.map((yaku) => yaku.name), ['자풍패 동','장풍패 동']);
+});
+
+test('열린 혼일색과 또이또이를 판정한다', () => {
+  const concealed = hand(['m1','m1','m1','m2','m2','m2','z1','z1']);
+  const openMelds = [hand(['m3','m3','m3']),hand(['z5','z5','z5'])];
+  const result = evaluateBasicRiichiYaku({ concealed,openMelds,winType:'ron' });
+  assert.equal(result.find((yaku)=>yaku.name==='혼일색')?.han,2); assert.equal(result.find((yaku)=>yaku.name==='또이또이')?.han,2);
 });
