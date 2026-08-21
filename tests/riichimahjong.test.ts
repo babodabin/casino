@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyMahjongCall, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
+import { applyMahjongCall, calculateRiichiFu, canRonMahjong, createMahjongTiles, dealRiichi, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -121,4 +121,26 @@ test('찬타와 준찬타 및 혼노두를 구분한다', () => {
   assert.equal(evaluateBasicRiichiYaku({concealed:junchan,winType:'ron'}).some((yaku)=>yaku.name==='준찬타'),true);
   const honroutou=hand(['m1','m1','m1','p9','p9','p9','s1','s1','s1','z2','z2','z2','z1','z1']);
   assert.equal(evaluateBasicRiichiYaku({concealed:honroutou,winType:'ron'}).some((yaku)=>yaku.name==='혼노두'),true);
+});
+
+test('양면 대기의 비공개 연속패 손을 핑후로 판정한다', () => {
+  const tiles=hand(['m1','m2','m3','m4','m5','m6','p2','p3','p4','s6','s7','s8','p5','p5']);const winning=tiles.find((tile)=>tile.suit==='s'&&tile.value===8)!;
+  const fu=calculateRiichiFu({concealed:tiles,winningTile:winning,winType:'ron'});
+  assert.equal(fu?.pinfu,true);assert.equal(fu?.fu,30);assert.equal(evaluateBasicRiichiYaku({concealed:tiles,winningTile:winning,winType:'ron'}).some((yaku)=>yaku.name==='핑후'),true);
+});
+
+test('핑후 쯔모는 쯔모 2부를 더하지 않고 20부다', () => {
+  const tiles=hand(['m1','m2','m3','m4','m5','m6','p2','p3','p4','s6','s7','s8','p5','p5']);const winning=tiles.find((tile)=>tile.suit==='s'&&tile.value===8)!;
+  assert.equal(calculateRiichiFu({concealed:tiles,winningTile:winning,winType:'tsumo'})?.fu,20);
+});
+
+test('간짱 대기와 멘젠 론을 더한 뒤 10부 단위로 올린다', () => {
+  const tiles=hand(['m1','m2','m3','m4','m5','m6','p2','p3','p4','s6','s7','s8','p5','p5']);const winning=tiles.find((tile)=>tile.suit==='p'&&tile.value===3)!;
+  const result=calculateRiichiFu({concealed:tiles,winningTile:winning,winType:'ron'});
+  assert.equal(result?.wait,'kanchan');assert.equal(result?.fu,40);
+});
+
+test('칠대자는 다른 부를 더하지 않고 25부 고정이다', () => {
+  const tiles=hand(['m1','m1','m3','m3','p2','p2','p7','p7','s4','s4','s8','s8','z1','z1']);
+  assert.equal(calculateRiichiFu({concealed:tiles,winningTile:tiles[13],winType:'ron'})?.fu,25);
 });

@@ -4,8 +4,10 @@ export type MahjongCallKind = 'chi' | 'pon' | 'kan';
 export type MahjongCallOption = { kind: MahjongCallKind; tiles: MahjongTile[]; label: string };
 export type RiichiDiscardOption = { tile: MahjongTile; waits: MahjongTile[] };
 export type RiichiYaku = { name: string; japanese: string; han: number; detail: string; yakuman?: boolean };
-export type MahjongGroup = { kind:'sequence'|'triplet'; suit:MahjongSuit; value:number; open:boolean };
+export type MahjongGroup = { kind:'sequence'|'triplet'; suit:MahjongSuit; value:number; open:boolean; quad?:boolean };
 export type MahjongDecomposition = { pair:{suit:MahjongSuit;value:number}; groups:MahjongGroup[] };
+export type MahjongWaitShape = 'ryanmen'|'kanchan'|'penchan'|'tanki'|'shanpon';
+export type RiichiFuResult = { fu:number; wait:MahjongWaitShape; details:string[]; pinfu:boolean };
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; rivers: MahjongTile[][] };
 
 const glyphs: Record<MahjongSuit, string[]> = {
@@ -99,11 +101,22 @@ const indexToTileValue = (index:number) => ({ suit:(['m','p','s','z'] as Mahjong
 export function getStandardMahjongDecompositions(hand:MahjongTile[],openMelds:MahjongTile[][]=[]):MahjongDecomposition[] {
   const needed=4-openMelds.length;if(hand.length!==needed*3+2)return [];
   const counts=Array(34).fill(0) as number[];hand.forEach((tile)=>counts[tileIndex(tile)]++);
-  const openGroups:MahjongGroup[]=openMelds.map((meld)=>{const sorted=sortMahjongHand(meld);return {kind:isTripletMeld(sorted)?'triplet':'sequence',suit:sorted[0].suit,value:sorted[0].value,open:true};});
+  const openGroups:MahjongGroup[]=openMelds.map((meld)=>{const sorted=sortMahjongHand(meld);return {kind:isTripletMeld(sorted)?'triplet':'sequence',suit:sorted[0].suit,value:sorted[0].value,open:true,quad:meld.length===4};});
   const results:MahjongDecomposition[]=[];
   const collect=(next:number[],groups:MahjongGroup[])=>{const first=next.findIndex((count)=>count>0);if(first<0){if(groups.length===needed)results.push({pair:{suit:'m',value:0},groups:[...openGroups,...groups]});return;}if(groups.length>=needed)return;const tile=indexToTileValue(first);if(next[first]>=3){next[first]-=3;collect(next,[...groups,{kind:'triplet',...tile,open:false}]);next[first]+=3;}if(tile.suit!=='z'&&tile.value<=7&&next[first+1]>0&&next[first+2]>0){next[first]--;next[first+1]--;next[first+2]--;collect(next,[...groups,{kind:'sequence',...tile,open:false}]);next[first]++;next[first+1]++;next[first+2]++;}};
   for(let pair=0;pair<counts.length;pair++)if(counts[pair]>=2){const copy=[...counts];copy[pair]-=2;const before=results.length;collect(copy,[]);const pairTile=indexToTileValue(pair);for(let index=before;index<results.length;index++)results[index].pair=pairTile;}
   return results;
+}
+
+type WinningPlacement={wait:MahjongWaitShape;groupIndex?:number};
+function winningPlacements(decomposition:MahjongDecomposition,tile:MahjongTile):WinningPlacement[]{const placements:WinningPlacement[]=[];if(decomposition.pair.suit===tile.suit&&decomposition.pair.value===tile.value)placements.push({wait:'tanki'});decomposition.groups.forEach((group,index)=>{if(group.suit!==tile.suit)return;if(group.kind==='triplet'&&group.value===tile.value)placements.push({wait:'shanpon',groupIndex:index});if(group.kind==='sequence'&&tile.value>=group.value&&tile.value<=group.value+2){const wait=tile.value===group.value+1?'kanchan':(group.value===1&&tile.value===3)||(group.value===7&&tile.value===7)?'penchan':'ryanmen';placements.push({wait,groupIndex:index});}});return placements;}
+const valuePairFu=(pair:MahjongDecomposition['pair'],seatWind:number,roundWind:number)=>pair.suit==='z'?((pair.value>=5?2:0)+(pair.value===seatWind?2:0)+(pair.value===roundWind?2:0)):0;
+
+export function calculateRiichiFu(args:{concealed:MahjongTile[];openMelds?:MahjongTile[][];winningTile:MahjongTile;winType:'tsumo'|'ron';seatWind?:number;roundWind?:number}):RiichiFuResult|null {
+  const openMelds=args.openMelds??[];if(!openMelds.length&&isSevenPairsHand(args.concealed))return {fu:25,wait:'tanki',details:['칠대자 고정 25부'],pinfu:false};if(isThirteenOrphansHand(args.concealed))return null;
+  const seat=args.seatWind??1,round=args.roundWind??1,closed=!openMelds.length;const candidates:RiichiFuResult[]=[];
+  getStandardMahjongDecompositions(args.concealed,openMelds).forEach((decomposition)=>winningPlacements(decomposition,args.winningTile).forEach((placement)=>{const allSequences=decomposition.groups.every((group)=>group.kind==='sequence');const pairFu=valuePairFu(decomposition.pair,seat,round);const pinfu=closed&&allSequences&&pairFu===0&&placement.wait==='ryanmen';if(pinfu){candidates.push({fu:args.winType==='tsumo'?20:30,wait:placement.wait,details:[args.winType==='tsumo'?'핑후 쯔모 20부':'핑후 론 30부'],pinfu:true});return;}let raw=20;const details=['기본 20부'];if(closed&&args.winType==='ron'){raw+=10;details.push('멘젠 론 +10부');}if(args.winType==='tsumo'){raw+=2;details.push('쯔모 +2부');}if(pairFu){raw+=pairFu;details.push(`가치패 머리 +${pairFu}부`);}if(['kanchan','penchan','tanki'].includes(placement.wait)){raw+=2;details.push(`${placement.wait==='kanchan'?'간짱':placement.wait==='penchan'?'변짱':'단기'} 대기 +2부`);}decomposition.groups.forEach((group,index)=>{if(group.kind!=='triplet')return;const terminal=group.suit==='z'||group.value===1||group.value===9;const ronOpened=args.winType==='ron'&&!group.open&&placement.wait==='shanpon'&&placement.groupIndex===index;const open=group.open||ronOpened;let points=group.quad?(open?8:16):(open?2:4);if(terminal)points*=2;raw+=points;details.push(`${open?'공개':'비공개'} ${group.quad?'깡':'커쯔'}${terminal?'(1·9·자패)':''} +${points}부`);});if(!closed&&raw===20){raw+=2;details.push('열린 평화형 +2부');}const fu=Math.ceil(raw/10)*10;if(fu!==raw)details.push(`${raw}부 → ${fu}부 올림`);candidates.push({fu,wait:placement.wait,details,pinfu:false});}));
+  return candidates.sort((a,b)=>(b.pinfu?1:0)-(a.pinfu?1:0)||b.fu-a.fu)[0]??null;
 }
 
 function concealedCanBeAllTriplets(hand: MahjongTile[]) {
@@ -115,12 +128,13 @@ function concealedCanBeAllTriplets(hand: MahjongTile[]) {
   return false;
 }
 
-export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMelds?: MahjongTile[][]; riichi?: boolean; winType: 'tsumo'|'ron'; seatWind?: number; roundWind?: number }) {
+export function evaluateBasicRiichiYaku(args: { concealed: MahjongTile[]; openMelds?: MahjongTile[][]; riichi?: boolean; winType: 'tsumo'|'ron'; winningTile?:MahjongTile; seatWind?: number; roundWind?: number }) {
   const openMelds = args.openMelds ?? []; const allTiles = [...args.concealed, ...openMelds.flat()]; const yaku: RiichiYaku[] = [];
   const closed = openMelds.length === 0;
   if (closed && isThirteenOrphansHand(args.concealed)) return [{ name:'국사무쌍', japanese:'国士無双', han:13, yakuman:true, detail:'서로 다른 1·9·자패 13종을 모두 모으고 그중 하나를 한 장 더 모은 역만' }];
   if (args.riichi && closed) yaku.push({ name:'리치', japanese:'立直', han:1, detail:'패를 공개하지 않은 텐파이에서 선언' });
   if (args.winType === 'tsumo' && closed) yaku.push({ name:'멘젠쯔모', japanese:'門前清自摸和', han:1, detail:'패를 공개하지 않고 직접 뽑아 완성' });
+  if(args.winningTile&&calculateRiichiFu({concealed:args.concealed,openMelds,winningTile:args.winningTile,winType:args.winType,seatWind:args.seatWind,roundWind:args.roundWind})?.pinfu)yaku.push({name:'핑후',japanese:'平和',han:1,detail:'비공개 손패의 몸통이 모두 연속패이고 가치 없는 머리·양면 대기로 완성'});
   const sevenPairs = closed && isSevenPairsHand(args.concealed);
   if (sevenPairs) yaku.push({ name:'칠대자', japanese:'七対子', han:2, detail:'서로 다른 일곱 종류의 똑같은 패 두 장씩으로 완성' });
   if (allTiles.every((tile) => tile.suit !== 'z' && tile.value >= 2 && tile.value <= 8)) yaku.push({ name:'탕야오', japanese:'断么九', han:1, detail:'1·9·자패 없이 완성' });
