@@ -4,6 +4,7 @@ import { evaluateLow, compareLow } from './highlow.ts';
 import { opponentKeepCards } from './fivecarddraw.ts';
 import { type HwatuCard } from './hwatu.ts';
 import { compareSeotda, createSeotdaDeck, evaluateSeotda, type SeotdaRules } from './seotda.ts';
+import { compareDori, evaluateDori } from './dorijitgottaeng.ts';
 
 /**
  * 컴퓨터 상대의 베팅 판단.
@@ -252,5 +253,35 @@ export function seotdaEquity(mine: HwatuCard[], rules: SeotdaRules): number {
       count += 1;
     }
   }
+  return count === 0 ? 0.5 : score / count;
+}
+
+/**
+ * 도리짓고땡에서 내 다섯 장이 이길 확률.
+ *
+ * 남은 15장에서 상대가 받을 다섯 장을 고르는 경우가 3,003가지뿐이라
+ * 무작위 시뮬레이션 없이 전부 세어 계산합니다.
+ */
+export function doriEquity(mine: HwatuCard[]): number {
+  const seen = new Set(mine.map((card) => card.id));
+  const rest = createSeotdaDeck().filter((card) => !seen.has(card.id));
+  const myHand = evaluateDori(mine);
+  let score = 0;
+  let count = 0;
+  const pick = (start: number, chosen: HwatuCard[]) => {
+    if (chosen.length === 5) {
+      const compared = compareDori(myHand, evaluateDori(chosen));
+      score += compared > 0 ? 1 : compared < 0 ? 0 : 0.5;
+      count += 1;
+      return;
+    }
+    // 남은 자리보다 카드가 모자라면 더 볼 필요가 없습니다.
+    for (let index = start; index <= rest.length - (5 - chosen.length); index += 1) {
+      chosen.push(rest[index]);
+      pick(index + 1, chosen);
+      chosen.pop();
+    }
+  };
+  pick(0, []);
   return count === 0 ? 0.5 : score / count;
 }
