@@ -155,3 +155,23 @@ test('섰다 승률은 족보 서열과 맞아떨어진다', async () => {
   assert.equal(ali > mangtong, true);
   assert.equal(mangtong < 0.15, true, `망통 ${mangtong}`);
 });
+
+test('도리짓고땡 승률이 족보 서열과 맞는다', async () => {
+  const { doriEquity } = await import('../src/pokerai.ts');
+  const { createSeotdaDeck } = await import('../src/seotda.ts');
+  const deck = createSeotdaDeck();
+  const used = new Map<number, number>();
+  const pick = (month: number) => {
+    const at = used.get(month) ?? 0; used.set(month, at + 1);
+    return deck.filter((c) => c.month === month)[at];
+  };
+  const build = (...months: number[]) => { used.clear(); return months.map(pick); };
+  const jang = doriEquity(build(1, 2, 7, 10, 10));   // 장땡
+  const gabo = doriEquity(build(1, 2, 7, 4, 5));     // 갑오
+  const mang = doriEquity(build(1, 2, 7, 2, 8));     // 망통
+  const none = doriEquity(build(1, 1, 2, 2, 3));     // 못 지음
+  assert.equal(jang > 0.95, true, `장땡 ${jang}`);
+  assert.equal(jang > gabo && gabo > mang, true, `장땡 ${jang} 갑오 ${gabo} 망통 ${mang}`);
+  assert.equal(none < mang, true, `못 지음 ${none} 이 망통 ${mang} 보다 낮아야 합니다`);
+  assert.equal(none < 0.35, true, `못 지음 ${none}`);
+});
