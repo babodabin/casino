@@ -16,18 +16,22 @@
     <title>World Casino</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
+      /* These styles make the body full-height */
       html,
       body {
         height: 100%;
       }
+      /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
       }
+      /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
       }
+      /* 상태바 자리까지 앱 배경색이 깔리게 합니다(흰 띠 방지). */
       html,
       body {
         background-color: #080B12;
@@ -36,68 +40,12 @@
   </head>
 
   <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
+    <!-- The root element for your Expo app. -->
     <div id="root"></div>
-    <script src="/_expo/static/js/web/AppEntry-6e4eac38ad168845ba1d637eb23fc8e9.js" defer></script>
-    <script>
-      (function () {
-        const round = (v) => Number.isFinite(v) ? Math.round(v * 10) / 10 : '-';
-        function envPx(name) {
-          const p = document.createElement('div');
-          p.style.cssText = `position:fixed;visibility:hidden;pointer-events:none;padding-top:env(${name});`;
-          document.body.appendChild(p);
-          const n = parseFloat(getComputedStyle(p).paddingTop) || 0;
-          p.remove();
-          return round(n);
-        }
-        function rectText(el) {
-          if (!el) return '-';
-          const r = el.getBoundingClientRect();
-          return `${round(r.top)}..${round(r.bottom)} h${round(r.height)}`;
-        }
-        function findTabBar() {
-          const labels = ['홈', '게임', '지갑', '기록', '설정'];
-          const matches = [];
-          document.querySelectorAll('div').forEach((el) => {
-            const text = (el.textContent || '').replace(/\s+/g, '');
-            if (!labels.every((x) => text.includes(x))) return;
-            const r = el.getBoundingClientRect();
-            if (r.width < innerWidth * 0.75 || r.height < 45 || r.height > 180) return;
-            matches.push({ el, r });
-          });
-          matches.sort((a, b) => a.r.height - b.r.height || b.r.bottom - a.r.bottom);
-          return matches[0] && matches[0].el;
-        }
-        function show() {
-          let box = document.getElementById('__wc_diag');
-          if (!box) {
-            box = document.createElement('pre');
-            box.id = '__wc_diag';
-            box.style.cssText = 'position:fixed;z-index:2147483647;left:6px;top:70px;margin:0;padding:7px 9px;background:rgba(255,255,255,.96);color:#000;border:2px solid #ff2d55;border-radius:7px;font:11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;pointer-events:none;white-space:pre;max-width:94vw;';
-            document.body.appendChild(box);
-          }
-          const vv = window.visualViewport;
-          const root = document.getElementById('root');
-          const tab = findTabBar();
-          box.textContent = [
-            'WC-DIAG-1',
-            `screen ${screen.width}x${screen.height}`,
-            `inner  ${innerWidth}x${innerHeight}`,
-            `client ${document.documentElement.clientWidth}x${document.documentElement.clientHeight}`,
-            `vv     ${vv ? round(vv.width) + 'x' + round(vv.height) + ' top' + round(vv.offsetTop) : '-'}`,
-            `body   ${rectText(document.body)}`,
-            `root   ${rectText(root)}`,
-            `tab    ${rectText(tab)}`,
-            `safe   top${envPx('safe-area-inset-top')} bottom${envPx('safe-area-inset-bottom')}`,
-            `stand  ${!!(matchMedia && matchMedia('(display-mode: standalone)').matches)}/${navigator.standalone === true}`
-          ].join('\n');
-        }
-        addEventListener('load', () => { setTimeout(show, 250); setTimeout(show, 1200); });
-        addEventListener('resize', () => setTimeout(show, 50));
-        if (window.visualViewport) window.visualViewport.addEventListener('resize', () => setTimeout(show, 50));
-      })();
-    </script>
-  </body>
+  <script src="/_expo/static/js/web/AppEntry-6e4eac38ad168845ba1d637eb23fc8e9.js" defer></script>
+</body>
 </html>
