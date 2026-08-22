@@ -47,10 +47,10 @@ jobs:
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
 
-          # iPhone 홈 화면 전용 180x180 아이콘을 빌드 결과물에 직접 넣습니다.
-          cp assets/world-casino-touch-v3.png dist/world-casino-touch-v3.png
+          # 홈 화면 아이콘은 assets/icon.png 하나만 사용합니다.
+          cp assets/icon.png dist/icon.png
           sed -i '/apple-touch-icon/d' dist/index.html
-          sed -i 's|</head>|  <link rel="apple-touch-icon" sizes="180x180" href="./world-casino-touch-v3.png?v=3" />\n</head>|' dist/index.html
+          sed -i 's|</head>|  <link rel="apple-touch-icon" href="./icon.png?v=4" />\n</head>|' dist/index.html
 
           touch dist/.nojekyll
 
