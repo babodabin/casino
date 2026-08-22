@@ -41,9 +41,8 @@ jobs:
       - name: Lock bottom tab bar layout
         shell: bash
         run: |
-          # iPhone의 safe-area 값이 달라져도 하단 메뉴는 항상 원래 72px 위치를 유지합니다.
-          # 예전 App.tsx가 다시 올라와도 배포 전에 자동으로 고치며,
-          # 예상한 코드가 없으면 잘못된 화면을 배포하지 않고 여기서 중단합니다.
+          # 하단 메뉴 자체는 72px로 유지합니다.
+          # iPhone의 하단 안전영역은 index.html의 전체화면 viewport가 담당합니다.
           python - <<'PY'
           from pathlib import Path
 
@@ -68,7 +67,6 @@ jobs:
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
 
-          # 홈 화면 아이콘만 교체하고, 같은 줄의 viewport/theme/style 등은 절대 지우지 않습니다.
           cp assets/icon.png dist/icon.png
           python - <<'PY'
           from pathlib import Path
@@ -76,13 +74,50 @@ jobs:
 
           path = Path('dist/index.html')
           html = path.read_text()
-          icon = '<link rel="apple-touch-icon" href="./icon.png?v=5" />'
-          pattern = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
 
-          if re.search(pattern, html, flags=re.IGNORECASE):
-              html = re.sub(pattern, icon, html, count=1, flags=re.IGNORECASE)
+          # iPhone이 홈 인디케이터 아래까지 앱의 실제 viewport로 잡도록
+          # JS가 실행되기 전 HTML 단계에서 viewport-fit=cover를 강제합니다.
+          viewport_re = re.compile(r'<meta[^>]+name=["\']viewport["\'][^>]*>', re.IGNORECASE)
+          match = viewport_re.search(html)
+          if match:
+              tag = match.group(0)
+              content_match = re.search(r'content=["\']([^"\']*)["\']', tag, re.IGNORECASE)
+              content = content_match.group(1) if content_match else 'width=device-width, initial-scale=1'
+              if 'viewport-fit=cover' not in content:
+                  content = content.rstrip(' ,') + ', viewport-fit=cover'
+              replacement = f'<meta name="viewport" content="{content}" />'
+              html = html[:match.start()] + replacement + html[match.end():]
           else:
-              html = html.replace('</head>', f'{icon}\n</head>')
+              html = html.replace('<head>', '<head>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />', 1)
+
+          # 홈 화면 전체화면 모드도 빌드 결과에 항상 남겨 둡니다.
+          if 'apple-mobile-web-app-capable' not in html:
+              html = html.replace('</head>', '<meta name="apple-mobile-web-app-capable" content="yes" />\n</head>', 1)
+          if 'apple-mobile-web-app-status-bar-style' not in html:
+              html = html.replace('</head>', '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n</head>', 1)
+
+          # Expo의 100% 높이가 iOS에서 safe-area 위에서 끝나는 경우를 막고
+          # 실제 화면 높이(dvh)를 root까지 사용하게 합니다.
+          full_height_style = '''<style id="world-casino-fullscreen-fix">
+html, body, #root {
+  width: 100%;
+  height: 100dvh !important;
+  min-height: 100dvh !important;
+  margin: 0;
+  padding: 0;
+  background: #080B12;
+}
+body { overflow: hidden; }
+</style>'''
+          if 'world-casino-fullscreen-fix' not in html:
+              html = html.replace('</head>', full_height_style + '\n</head>', 1)
+
+          icon = '<link rel="apple-touch-icon" href="./icon.png?v=6" />'
+          icon_re = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
+          if re.search(icon_re, html, flags=re.IGNORECASE):
+              html = re.sub(icon_re, icon, html, count=1, flags=re.IGNORECASE)
+          else:
+              html = html.replace('</head>', f'{icon}\n</head>', 1)
 
           path.write_text(html)
           PY
