@@ -1008,7 +1008,7 @@ type TabProps = {
 };
 
 function renderTab(props: TabProps) {
-  if (props.tab === '게임') return <GamesScreen onOpenCategory={props.onOpenCategory} onOpenBlackjack={props.onOpenBlackjack} onOpenCatalogGame={props.onOpenCatalogGame} />;
+  if (props.tab === '게임') return <GamesScreen onOpenCategory={props.onOpenCategory} onOpenBlackjack={props.onOpenBlackjack} onOpenCatalogGame={props.onOpenCatalogGame} records={props.records} lastGame={props.lastGame} />;
   if (props.tab === '지갑') return <WalletScreen coins={props.coins} records={props.records} />;
   if (props.tab === '기록') return <RecordsScreen records={props.records} totalPlays={props.totalPlays} />;
   if (props.tab === '설정') {
@@ -1141,25 +1141,43 @@ function GamesScreen({
   onOpenCategory,
   onOpenBlackjack,
   onOpenCatalogGame,
+  records,
+  lastGame,
 }: {
   onOpenCategory: (category: GameCategory) => void;
   onOpenBlackjack: () => void;
   onOpenCatalogGame: (category: GameCategory, game: CatalogGame) => void;
+  records: GameRecord[];
+  lastGame: GameRecord['game'] | '';
 }) {
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'favorites' | 'playable'>('all');
+  const [filter, setFilter] = useState<'all' | 'favorites' | 'recent'>('all');
   const [favorites, setFavorites] = useState<string[]>([]);
   const allGames = gameCategories.flatMap((category) => category.games.map((game) => ({ category, game })));
+  // 최근: 마지막으로 고른 게임을 맨 앞에 두고, 그다음은 최근에 플레이한 순서입니다.
+  const recentNames: string[] = [];
+  [lastGame, ...records.map((record) => record.game)].forEach((name) => {
+    if (name && !recentNames.includes(name)) recentNames.push(name);
+  });
   const visibleGames = allGames.filter(({ game }) => {
     const matchesQuery = game.name.toLowerCase().includes(query.trim().toLowerCase());
-    const matchesFilter = filter === 'all' || (filter === 'playable' && game.status === 'playable') || (filter === 'favorites' && favorites.includes(game.name));
+    const matchesFilter = filter === 'all' || (filter === 'recent' && recentNames.includes(game.name)) || (filter === 'favorites' && favorites.includes(game.name));
     return matchesQuery && matchesFilter;
   });
+  // 최근 목록은 가나다순이 아니라 최근에 본 순서로 보여 줍니다.
+  if (filter === 'recent') visibleGames.sort((a, b) => recentNames.indexOf(a.game.name) - recentNames.indexOf(b.game.name));
 
   useEffect(() => {
+    // 저장값이 깨져 있어도 즐겨찾기 때문에 화면이 멈추면 안 됩니다.
     AsyncStorage.getItem('world-casino.favorites').then((saved) => {
-      if (saved) setFavorites(JSON.parse(saved));
-    });
+      if (!saved) return;
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setFavorites(parsed.filter((name) => typeof name === 'string'));
+      } catch {
+        AsyncStorage.removeItem('world-casino.favorites').catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const toggleFavorite = (gameName: string) => {
@@ -1192,7 +1210,7 @@ function GamesScreen({
         {([
           ['all', '전체'],
           ['favorites', `즐겨찾기 ${favorites.length}`],
-          ['playable', '플레이 가능'],
+          ['recent', `최근 ${recentNames.length}`],
         ] as const).map(([value, label]) => (
           <Pressable key={value} accessibilityRole="button" onPress={() => setFilter(value)} style={[styles.chip, filter === value && styles.chipActive]}>
             <Text style={filter === value ? styles.chipActiveText : styles.chipText}>{label}</Text>
@@ -1226,7 +1244,7 @@ function GamesScreen({
               </Pressable>
             </View>
           ))}
-          {visibleGames.length === 0 && <View style={styles.panel}><Text style={styles.emptyText}>{filter === 'favorites' ? '즐겨찾기한 게임이 없습니다.' : '검색 결과가 없습니다.'}</Text></View>}
+          {visibleGames.length === 0 && <View style={styles.panel}><Text style={styles.emptyText}>{query.trim() ? '검색 결과가 없습니다.' : filter === 'favorites' ? '즐겨찾기한 게임이 없습니다. 게임 옆의 별을 눌러 추가하세요.' : filter === 'recent' ? '아직 연 게임이 없습니다. 게임을 하나 골라 보세요.' : '게임이 없습니다.'}</Text></View>}
         </View>
       </>}
     </Page>
