@@ -38,6 +38,27 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Lock bottom tab bar layout
+        shell: bash
+        run: |
+          # iPhone의 safe-area 값이 달라져도 하단 메뉴는 항상 원래 72px 위치를 유지합니다.
+          # 예전 App.tsx가 다시 올라와도 배포 전에 자동으로 고치며,
+          # 예상한 코드가 없으면 잘못된 화면을 배포하지 않고 여기서 중단합니다.
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('App.tsx')
+          text = path.read_text()
+          dynamic = "style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}"
+          fixed = "style={styles.tabBar}"
+
+          if dynamic in text:
+              text = text.replace(dynamic, fixed, 1)
+              path.write_text(text)
+          elif fixed not in text:
+              raise SystemExit('Bottom tab bar layout marker not found; refusing to deploy a possibly shifted tab bar.')
+          PY
+
       - name: Build web app
         run: pnpm exec expo export --platform web --output-dir dist
 
