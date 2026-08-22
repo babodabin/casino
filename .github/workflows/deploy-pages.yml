@@ -24,32 +24,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Keep top safe area in header only
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('App.tsx')
-          text = path.read_text()
-
-          root_old = '<View style={[styles.app, { paddingTop: insets.top }]}>'
-          root_new = '<View style={styles.app}>'
-          header_old = '<Header coins={coins} totalPlays={totalPlays} />'
-          header_new = '''<View style={{ paddingTop: insets.top }}>
-        <Header coins={coins} totalPlays={totalPlays} />
-      </View>'''
-
-          if text.count(root_old) != 1:
-              raise SystemExit(f'Expected one main root marker, found {text.count(root_old)}')
-          if text.count(header_old) != 1:
-              raise SystemExit(f'Expected one Header marker, found {text.count(header_old)}')
-
-          text = text.replace(root_old, root_new, 1)
-          text = text.replace(header_old, header_new, 1)
-          path.write_text(text)
-          PY
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
