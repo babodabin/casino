@@ -405,7 +405,7 @@ function CasinoApp() {
   const motion = accessibility.reduceMotion ? 0.08 : gameSpeedFactor(gameSpeed);
 
   // 노치와 홈 인디케이터가 차지하는 높이. 웹에서는 CSS env()를 재서 가져옵니다.
-  // (네이티브에서는 SafeAreaView가 이미 처리하므로 0으로 둡니다.)
+  // (네이티브에서는 0으로 두고 화면이 알아서 처리하게 합니다.)
   const [insets, setInsets] = useState({ top: 0, bottom: 0 });
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -714,10 +714,13 @@ function CasinoApp() {
   }
 
   return (
-    <SafeAreaView style={[styles.app, { paddingTop: insets.top }]}>
+    // SafeAreaView(웹)는 스스로 env(safe-area-inset-*) 여백을 붙입니다.
+    // 아래 탭바에서도 같은 값을 쓰기 때문에 여기서 쓰면 여백이 두 번 들어갑니다.
+    // 그래서 일반 View를 쓰고, 여백은 이 아래에서 한 번만 줍니다.
+    <View style={[styles.app, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
       <Header coins={coins} totalPlays={totalPlays} />
-      <View style={styles.screen}>
+      <View style={[styles.screen, appScreen !== 'tabs' && { paddingBottom: insets.bottom }]}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
             category={selectedCategory}
@@ -923,7 +926,7 @@ function CasinoApp() {
         })}
       </View>}
       {!loaded && <View style={styles.loadingCover}><Text style={styles.muted}>저장 정보 불러오는 중…</Text></View>}
-    </SafeAreaView>
+    </View>
   );
 }
 
