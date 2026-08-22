@@ -44,14 +44,13 @@ jobs:
       - name: Prepare GitHub Pages output
         shell: bash
         run: |
-          # 속성 이름을 가리지 않고 절대 경로를 전부 상대 경로로 바꿉니다
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
 
-          # iPhone 홈 화면 아이콘은 빌드 결과물에 직접 넣고 새 파일명으로 연결합니다.
-          cp assets/icon.png dist/world-casino-icon-v2.png
+          # iPhone 홈 화면 전용 180x180 아이콘을 빌드 결과물에 직접 넣습니다.
+          cp assets/world-casino-touch-v3.png dist/world-casino-touch-v3.png
           sed -i '/apple-touch-icon/d' dist/index.html
-          sed -i 's|</head>|  <link rel="apple-touch-icon" sizes="180x180" href="./world-casino-icon-v2.png?v=2" />\n</head>|' dist/index.html
+          sed -i 's|</head>|  <link rel="apple-touch-icon" sizes="180x180" href="./world-casino-touch-v3.png?v=3" />\n</head>|' dist/index.html
 
           touch dist/.nojekyll
 
