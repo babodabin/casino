@@ -5,25 +5,32 @@
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
 
+    <!-- 홈 화면 전체화면 모드는 유지하되 iOS 26에서 하단 여백을 만드는
+         black-translucent 상태바 모드는 사용하지 않습니다. -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="World Casino" />
     <meta name="theme-color" content="#080B12" />
     <link rel="apple-touch-icon" href="./icon.png" />
     <title>World Casino</title>
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
+      /* These styles make the body full-height */
       html,
       body {
         height: 100%;
       }
+      /* These styles disable body scrolling if you are using <ScrollView> */
       body {
         overflow: hidden;
       }
+      /* These styles make the root element full-height */
       #root {
         display: flex;
         height: 100%;
         flex: 1;
       }
+      /* 상태바 자리까지 앱 배경색이 깔리게 합니다(흰 띠 방지). */
       html,
       body {
         background-color: #080B12;
@@ -32,9 +39,12 @@
   </head>
 
   <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
     <noscript>
       You need to enable JavaScript to run this app.
     </noscript>
+    <!-- The root element for your Expo app. -->
     <div id="root"></div>
-  </body>
+  <script src="/_expo/static/js/web/AppEntry-6e4eac38ad168845ba1d637eb23fc8e9.js" defer></script>
+</body>
 </html>
