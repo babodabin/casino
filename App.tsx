@@ -414,22 +414,31 @@ function CasinoApp() {
       const content = viewport.getAttribute('content') ?? '';
       if (!content.includes('viewport-fit')) viewport.setAttribute('content', `${content}, viewport-fit=cover`);
     }
+    // 홈 화면에 추가해서 전체화면으로 열었는지. 이때만 상태바 자리를 앱이 직접 비워야 합니다.
+    const standalone = window.matchMedia?.('(display-mode: standalone)').matches
+      || (window.navigator as { standalone?: boolean }).standalone === true;
     const measure = () => {
       const probe = document.createElement('div');
       probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
       document.body.appendChild(probe);
       const style = window.getComputedStyle(probe);
-      const next = { top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
+      let top = parseFloat(style.paddingTop) || 0;
+      const bottom = parseFloat(style.paddingBottom) || 0;
       probe.remove();
+      // 전체화면인데 값을 못 읽으면 헤더가 시계와 겹칩니다. 그럴 때만 최소값을 둡니다.
+      if (standalone && top === 0) top = 44;
+      const next = { top, bottom };
       setInsets((current) => (current.top === next.top && current.bottom === next.bottom ? current : next));
     };
     measure();
-    // 뷰포트를 막 바꾼 직후에는 값이 아직 반영되지 않을 수 있어 한 번 더 잽니다.
+    // 켜자마자는 값이 아직 0으로 나올 수 있어 몇 번 더 잽니다.
     const again = window.requestAnimationFrame(measure);
+    const later = window.setTimeout(measure, 400);
     window.addEventListener('resize', measure);
     window.addEventListener('orientationchange', measure);
     return () => {
       window.cancelAnimationFrame(again);
+      window.clearTimeout(later);
       window.removeEventListener('resize', measure);
       window.removeEventListener('orientationchange', measure);
     };
@@ -1194,10 +1203,17 @@ function GamesScreen({
 function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
   return (
     <View style={styles.detailHeader}>
-      <Pressable accessibilityRole="button" style={styles.backButton} onPress={onBack}>
-        <Text style={styles.backButtonText}>‹</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="뒤로"
+        style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+        onPress={onBack}
+        hitSlop={10}
+      >
+        <Text style={styles.backButtonArrow}>‹</Text>
+        <Text style={styles.backButtonLabel}>뒤로</Text>
       </Pressable>
-      <Text style={styles.detailHeaderTitle}>{title}</Text>
+      <Text style={styles.detailHeaderTitle} numberOfLines={1}>{title}</Text>
       <View style={styles.backButtonSpacer} />
     </View>
   );
@@ -3527,11 +3543,14 @@ const styles = StyleSheet.create({
   categoryCount: { color: colors.goldLight, fontSize: 10, fontWeight: '800', marginTop: 10 },
   comingSoon: { alignSelf: 'flex-start', color: colors.muted, fontSize: 10, marginTop: 9, paddingHorizontal: 7, paddingVertical: 4, backgroundColor: '#252C37', borderRadius: 8 },
   detailScreen: { flex: 1, backgroundColor: colors.bg },
-  detailHeader: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-  detailHeaderTitle: { color: colors.text, fontSize: 17, fontWeight: '800' },
-  backButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  backButtonSpacer: { width: 44, height: 44 },
-  backButtonText: { color: colors.goldLight, fontSize: 36, lineHeight: 38, fontWeight: '400' },
+  detailHeader: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  detailHeaderTitle: { color: colors.text, fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center', marginHorizontal: 6 },
+  // 밀어서 뒤로 가기를 쓰지 않으므로, 뒤로 버튼은 손가락으로 누르기 쉽게 크고 뚜렷하게 둡니다.
+  backButton: { minWidth: 84, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  backButtonPressed: { backgroundColor: '#232B39', borderColor: colors.gold },
+  backButtonSpacer: { minWidth: 84, height: 48 },
+  backButtonArrow: { color: colors.goldLight, fontSize: 28, lineHeight: 30, fontWeight: '400', marginTop: -2 },
+  backButtonLabel: { color: colors.goldLight, fontSize: 15, fontWeight: '700' },
   detailPage: { padding: 18, paddingBottom: 38 },
   detailLead: { color: colors.text, fontSize: 25, fontWeight: '900', marginBottom: 18 },
   catalogList: { gap: 10, marginTop: 16 },
@@ -3595,11 +3614,11 @@ const styles = StyleSheet.create({
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
   blackjackTable: { flex: 1, backgroundColor: '#07251D' },
-  gameTopBar: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
+  gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
   gameTopActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  gameExitButton: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, borderWidth: 1, borderColor: '#A58145', backgroundColor: '#24180E' },
-  gameExitButtonText: { color: '#F9D985', fontSize: 12, fontWeight: '900' },
+  gameExitButton: { minWidth: 84, height: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#A58145', backgroundColor: '#24180E' },
+  gameExitButtonText: { color: '#F9D985', fontSize: 15, fontWeight: '900' },
   gameBetPill: { minWidth: 82, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, borderRadius: 24, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
   gameBetText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
   tableContent: { padding: 18, paddingBottom: 38 },
