@@ -1,6 +1,6 @@
 import {
   isWinningMahjongHand, evaluateBasicRiichiYaku, calculateRiichiFu, calculateRiichiScore,
-  countMahjongDora, countYakumanMultiplier, seatWindFor, roundWindFor,
+  countMahjongDora, countYakumanMultiplier, seatWindFor, roundWindFor, countRedFives,
   type MahjongTile, type RiichiScoreResult,
 } from './riichimahjong.ts';
 import {
@@ -36,6 +36,12 @@ export type MahjongWinContext = {
   roundIndex: number;
   /** 리치 전용 */
   riichi?: boolean;
+  /** 적도라를 쓸지. 기본은 사용 */
+  redFives?: boolean;
+  /** 쿠이탕(아리아리). 끄면 울고 만든 탕야오를 인정하지 않습니다. */
+  openTanyao?: boolean;
+  /** 첫 순번에 누가 울었는지 (인화 판정용) */
+  anyCallMade?: boolean;
   doubleRiichi?: boolean;
   ippatsu?: boolean;
   doraIndicators?: MahjongTile[];
@@ -45,6 +51,7 @@ export type MahjongWinContext = {
   activeOpponents?: number;
   /** 홍콩 전용 */
   flowers?: HongKongFlower[];
+  minFaan?: number;
   /** 공통 상황 */
   afterKan?: boolean;
   robbingKan?: boolean;
@@ -103,6 +110,12 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
   const seatWind = seatWindFor(context.seat, context.dealerSeat);
   const roundWind = roundWindFor(context.roundIndex);
 
+  // 어떤 종목이든 먼저 화료형인지 확인합니다. 역 평가 함수들은 완성 패를 전제로 하기 때문에
+  // 이 검사를 건너뛰면 미완성 패에도 역이 붙어 버립니다.
+  if (!isModeWinningShape(context.mode, context.hand, melds.length + concealedKans.length)) {
+    return { allowed: false, blockedReason: '아직 완성된 패가 아닙니다', lines: [], grade: '', scoreText: '', rawPoints: 0 };
+  }
+
   if (context.mode === 'sichuan') {
     const voidSuit = context.voidSuit ?? 'p';
     if (!canSichuanWin(context.hand, melds, voidSuit)) {
@@ -134,10 +147,11 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
       seatWind, roundWind, flowers: context.flowers, seat: context.seat,
       afterKan: context.afterKan, robbingKan: context.robbingKan, lastTile: context.lastTile, firstTurn: context.firstTurn,
     });
-    if (!canHongKongDeclareWin(faan)) {
+    const minimum = context.minFaan ?? HONG_KONG_MIN_FAAN;
+    if (!canHongKongDeclareWin(faan, minimum)) {
       return {
         allowed: false,
-        blockedReason: `${totalFaan(faan)}번이라 최소 ${HONG_KONG_MIN_FAAN}번에 미치지 못합니다`,
+        blockedReason: `${totalFaan(faan)}번이라 최소 ${minimum}번에 미치지 못합니다`,
         lines: faan.map((entry) => ({ name: entry.name, value: `${entry.faan}번`, detail: entry.detail })),
         grade: '', scoreText: '', rawPoints: totalFaan(faan),
       };
@@ -190,6 +204,7 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
     riichi: context.riichi, doubleRiichi: context.doubleRiichi, ippatsu: context.ippatsu,
     winType: context.winType, winningTile: context.winningTile, seatWind, roundWind,
     afterKan: context.afterKan, robbingKan: context.robbingKan, lastTile: context.lastTile, firstTurn: context.firstTurn,
+    openTanyao: context.openTanyao, anyCallMade: context.anyCallMade,
   });
   if (!yaku.length) {
     return { allowed: false, blockedReason: '역이 하나도 없어 화료할 수 없습니다', lines: [], grade: '', scoreText: '', rawPoints: 0 };
@@ -200,8 +215,10 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
   const allTiles = [...context.hand, ...melds.flat(), ...concealedKans.flat()];
   const dora = countMahjongDora(allTiles, context.doraIndicators ?? []);
   const ura = context.riichi ? countMahjongDora(allTiles, context.uraIndicators ?? []) : 0;
+  // 적도라는 리치 전용입니다. 다른 종목은 이 분기에 오지 않습니다.
+  const red = context.redFives === false ? 0 : countRedFives(allTiles);
   const yakumanCount = countYakumanMultiplier(yaku);
-  const han = yakumanCount ? 0 : yaku.reduce((sum, entry) => sum + entry.han, 0) + dora + ura;
+  const han = yakumanCount ? 0 : yaku.reduce((sum, entry) => sum + entry.han, 0) + dora + ura + red;
   const score = calculateRiichiScore({
     han, fu: fu?.fu ?? 0, dealer: context.seat === context.dealerSeat,
     winType: context.winType, yakumanCount,
@@ -214,6 +231,7 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
   }));
   if (!yakumanCount && dora) lines.push({ name: '도라', value: `${dora}판`, detail: '도라 표시패가 가리키는 패' });
   if (!yakumanCount && ura) lines.push({ name: '뒷도라', value: `${ura}판`, detail: '리치를 선언해야 볼 수 있는 도라' });
+  if (!yakumanCount && red) lines.push({ name: '적도라', value: `${red}판`, detail: '빨간 5 한 장당 1판' });
 
   return {
     allowed: true,

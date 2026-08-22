@@ -192,6 +192,7 @@ export function evaluateSichuanFan(args: {
   lastTile?: boolean;
 }): SichuanFan[] {
   const melds = args.melds ?? [];
+  const concealed = melds.length === 0;
   const all = [...args.hand, ...melds.flat()];
   const fans: SichuanFan[] = [];
 
@@ -207,7 +208,7 @@ export function evaluateSichuanFan(args: {
     else if (pure) fans.push({ name: '청칠대자', chinese: '清七对', multiplier: 16, detail: '한 종류로만 만든 칠대자' });
     else if (withQuad) fans.push({ name: '용칠대자', chinese: '龙七对', multiplier: 8, detail: '같은 패 네 장이 포함된 칠대자' });
     else fans.push({ name: '칠대자', chinese: '七对', multiplier: 4, detail: '서로 다른 일곱 종류를 두 장씩' });
-    if (fans.length) return finishFans(fans, args);
+    if (fans.length) return finishFans(fans, { ...args, concealed });
   }
 
   const decompositions = getStandardMahjongDecompositions(args.hand, melds);
@@ -222,11 +223,12 @@ export function evaluateSichuanFan(args: {
   else if (allTriplets) fans.push({ name: '대대화', chinese: '碰碰胡', multiplier: 2, detail: '모든 몸통이 같은 패 세 장 또는 네 장' });
   else fans.push({ name: '평화', chinese: '平胡', multiplier: 1, detail: '기본 완성형' });
 
-  return finishFans(fans, args);
+  return finishFans(fans, { ...args, concealed });
 }
 
-function finishFans(fans: SichuanFan[], args: { winType: SichuanWinType; afterKan?: boolean; robbingKan?: boolean; lastTile?: boolean }) {
+function finishFans(fans: SichuanFan[], args: { winType: SichuanWinType; afterKan?: boolean; robbingKan?: boolean; lastTile?: boolean; concealed?: boolean }) {
   const extra: SichuanFan[] = [];
+  if (args.concealed) extra.push({ name: '금구', chinese: '門清', multiplier: 2, detail: '한 번도 울지 않고 완성' });
   if (args.winType === 'tsumo') extra.push({ name: '자모', chinese: '自摸', multiplier: 2, detail: '직접 뽑아 완성' });
   if (args.afterKan) extra.push({ name: '깡상화', chinese: '杠上花', multiplier: 2, detail: '깡을 하고 가져온 패로 완성' });
   if (args.robbingKan) extra.push({ name: '창깡', chinese: '抢杠', multiplier: 2, detail: '상대가 가깡하려는 패를 가로채 완성' });
@@ -256,6 +258,54 @@ export function sichuanScore(args: {
   // 혈전도저에서는 이미 화료해 빠진 사람은 내지 않습니다.
   const payers = args.winType === 'tsumo' ? Math.max(1, args.activeOpponents ?? 3) : 1;
   return { fans: args.fans, roots, multiplier, capped: raw > MAX_MULTIPLIER, perPlayer, total: perPlayer * payers };
+}
+
+// ── 과수(刮風下雨): 깡 즉시 정산 ────────────────────────────────────
+
+export type SichuanKanKind = 'ankan' | 'minkan' | 'kakan';
+
+/**
+ * 사천 마작은 깡을 하는 순간 점수를 받습니다.
+ * - 암깡(暗杠, 하우): 남은 사람 각자에게 2점
+ * - 대명깡(明杠, 괄풍): 패를 버린 사람에게 2점
+ * - 가깡(下雨): 남은 사람 각자에게 1점
+ */
+export function kanInstantPoints(kind: SichuanKanKind, basePoints = 1) {
+  if (kind === 'ankan') return { perPlayer: basePoints * 2, fromDiscarder: false, label: '암깡(하우)' };
+  if (kind === 'minkan') return { perPlayer: basePoints * 2, fromDiscarder: true, label: '대명깡(괄풍)' };
+  return { perPlayer: basePoints * 1, fromDiscarder: false, label: '가깡(하우)' };
+}
+
+/** 깡 즉시 정산을 점수판에 반영합니다. 이미 화료해 빠진 사람은 주고받지 않습니다. */
+export function settleSichuanKan(state: SichuanBloodState, args: {
+  kanner: number;
+  kind: SichuanKanKind;
+  discarder?: number;
+  basePoints?: number;
+}): { state: SichuanBloodState; gained: number; label: string } {
+  const rule = kanInstantPoints(args.kind, args.basePoints ?? 1);
+  const next: SichuanBloodState = {
+    scores: [...state.scores] as SichuanBloodState['scores'],
+    finished: [...state.finished] as SichuanBloodState['finished'],
+    winners: [...state.winners],
+    over: state.over,
+  };
+  let gained = 0;
+  if (rule.fromDiscarder) {
+    if (args.discarder === undefined) throw new Error('대명깡에는 패를 버린 사람이 필요합니다.');
+    if (!next.finished[args.discarder]) {
+      next.scores[args.discarder] -= rule.perPlayer;
+      next.scores[args.kanner] += rule.perPlayer;
+      gained = rule.perPlayer;
+    }
+  } else {
+    activeSichuanSeats(state).filter((seat) => seat !== args.kanner).forEach((seat) => {
+      next.scores[seat] -= rule.perPlayer;
+      next.scores[args.kanner] += rule.perPlayer;
+      gained += rule.perPlayer;
+    });
+  }
+  return { state: next, gained, label: rule.label };
 }
 
 // ── 혈전도저 진행 ──────────────────────────────────────────────────
@@ -310,8 +360,57 @@ export function settleSichuanWin(state: SichuanBloodState, args: {
 }
 
 /**
+ * 차대각(査大叫) · 차화저(査花豬).
+ *
+ * 유국이면 텐파이하지 못한 사람이 텐파이한 사람에게 물어줍니다.
+ * 낼 금액은 상대가 그 손으로 화료했을 때 받았을 점수입니다.
+ * 정결을 끝내지 못한 사람(화저)은 텐파이한 모든 사람에게 물어줍니다.
+ */
+export function settleSichuanFullDraw(state: SichuanBloodState, args: {
+  hands: MahjongTile[][];
+  melds: MahjongTile[][][];
+  voidSuits: SichuanSuit[];
+  basePoints?: number;
+}): { state: SichuanBloodState; tenpai: boolean[]; cleared: boolean[]; log: string[] } {
+  const base = args.basePoints ?? 1;
+  const next: SichuanBloodState = {
+    scores: [...state.scores] as SichuanBloodState['scores'],
+    finished: [...state.finished] as SichuanBloodState['finished'],
+    winners: [...state.winners],
+    over: true,
+  };
+  const remaining = activeSichuanSeats(state);
+  const cleared = [0, 1, 2, 3].map((seat) => isSichuanVoidCleared(args.hands[seat], args.melds[seat], args.voidSuits[seat]));
+  const tenpai = [0, 1, 2, 3].map((seat) =>
+    cleared[seat] && getSichuanWaits(args.hands[seat], args.melds[seat], args.voidSuits[seat]).length > 0);
+  const log: string[] = [];
+
+  const seatLabelOf = (seat: number) => seat === 0 ? '나' : `컴퓨터 ${seat}`;
+
+  remaining.forEach((payer) => {
+    // 화저: 정결을 못 끝낸 사람
+    const isPig = !cleared[payer];
+    if (tenpai[payer] && !isPig) return;
+    remaining.filter((seat) => seat !== payer && tenpai[seat]).forEach((receiver) => {
+      // 받는 사람이 그 대기로 화료했다면 받았을 점수
+      const waits = getSichuanWaits(args.hands[receiver], args.melds[receiver], args.voidSuits[receiver]);
+      const best = waits.reduce((top, tile) => {
+        const fans = evaluateSichuanFan({ hand: [...args.hands[receiver], tile], melds: args.melds[receiver], winType: 'ron' });
+        const score = sichuanScore({ fans, roots: countRoots([...args.hands[receiver], tile], args.melds[receiver]), basePoints: base, winType: 'ron' });
+        return Math.max(top, score.perPlayer);
+      }, base);
+      next.scores[payer] -= best;
+      next.scores[receiver] += best;
+      log.push(`${seatLabelOf(payer)} → ${seatLabelOf(receiver)} ${best}점 (${isPig ? '화저' : '노텐'})`);
+    });
+  });
+
+  return { state: next, tenpai, cleared, log };
+}
+
+/**
  * 유국. 아직 화료하지 못한 사람 중 정결을 끝내지 못한 사람이
- * 정결을 끝낸 사람에게 물어줍니다(사천식 '차대각' 정산의 단순형).
+ * 정결을 끝낸 사람에게 물어줍니다(간단형).
  */
 export function settleSichuanDraw(state: SichuanBloodState, voidCleared: boolean[], penalty = 1): SichuanBloodState {
   const next: SichuanBloodState = {

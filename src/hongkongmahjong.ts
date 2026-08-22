@@ -47,6 +47,10 @@ export type HongKongScore = {
 export const HONG_KONG_MIN_FAAN = 3;
 export const HONG_KONG_LIMIT = 13;
 
+/** 집마다 최소 번을 다르게 씁니다. 보통 1·3·5번 중 하나입니다. */
+export const HONG_KONG_MIN_OPTIONS = [1, 3, 5] as const;
+export type HongKongMinFaan = typeof HONG_KONG_MIN_OPTIONS[number];
+
 // ── 꽃패 ───────────────────────────────────────────────────────────
 
 const flowerGlyphs = ['🀢', '🀣', '🀤', '🀥'];
@@ -98,6 +102,45 @@ export function drawFlower(flowerWall: HongKongFlower[]) {
   if (!flowerWall.length) return { flowerWall, drawn: null };
   const [drawn, ...rest] = flowerWall;
   return { flowerWall: rest, drawn };
+}
+
+/**
+ * 게임 중 꽃패를 뽑았을 때의 처리(補花).
+ * 꽃패는 옆으로 빼고 산에서 보충패를 한 장 가져옵니다.
+ * 보충패가 또 꽃패면 계속 반복합니다.
+ *
+ * 실제 대국에서는 꽃패가 산에 섞여 있지만, 여기서는 산을 뽑을 때마다
+ * flowerChance 확률로 꽃패가 나온 것으로 처리합니다.
+ */
+export function resolveFlowerDraws(args: {
+  hand: MahjongTile[];
+  wall: MahjongTile[];
+  flowerWall: HongKongFlower[];
+  collected: HongKongFlower[];
+  flowerChance?: number;
+  random?: () => number;
+}) {
+  const random = args.random ?? Math.random;
+  const chance = args.flowerChance ?? 0;
+  let wall = [...args.wall];
+  let flowerWall = [...args.flowerWall];
+  const collected = [...args.collected];
+  let hand = [...args.hand];
+  let drawnFlowers = 0;
+
+  while (flowerWall.length && wall.length && random() < chance) {
+    const picked = drawFlower(flowerWall);
+    if (!picked.drawn) break;
+    flowerWall = picked.flowerWall;
+    collected.push(picked.drawn);
+    drawnFlowers++;
+    // 보충패 한 장
+    const [replacement, ...rest] = wall;
+    hand = sortMahjongHand([...hand, replacement]);
+    wall = rest;
+  }
+
+  return { hand, wall, flowerWall, collected, drawnFlowers };
 }
 
 // ── 완성 판정 ──────────────────────────────────────────────────────
@@ -220,6 +263,30 @@ export function evaluateHongKongFaan(args: {
 
   if (isSevenPairsHand(args.hand) && closed) faan.push({ name: '칠대자', chinese: '七對子', faan: 2, detail: '서로 다른 일곱 종류를 두 장씩' });
 
+  // 그 밖의 홍콩식 번
+  if (decompositions.some(({ groups }) => (['m', 'p', 's'] as MahjongSuit[]).some((suit) =>
+    [1, 4, 7].every((value) => groups.some((group) => group.kind === 'sequence' && group.suit === suit && group.value === value)))))
+    faan.push({ name: '일기통관', chinese: '一氣通貫', faan: 1, detail: '한 종류에서 123·456·789를 모두 완성' });
+  if (decompositions.some(({ groups }) => [1, 2, 3, 4, 5, 6, 7].some((value) =>
+    (['m', 'p', 's'] as MahjongSuit[]).every((suit) => groups.some((group) => group.kind === 'sequence' && group.suit === suit && group.value === value)))))
+    faan.push({ name: '삼색동순', chinese: '三色同順', faan: 1, detail: '세 종류에서 같은 자리의 연속 몸통' });
+  if (decompositions.some(({ groups }) => [1, 2, 3, 4, 5, 6, 7, 8, 9].some((value) =>
+    (['m', 'p', 's'] as MahjongSuit[]).every((suit) => groups.some((group) => group.kind === 'triplet' && group.suit === suit && group.value === value)))))
+    faan.push({ name: '삼색동각', chinese: '三色同刻', faan: 2, detail: '세 종류에서 같은 숫자를 커쯔로 완성' });
+  if (decompositions.some(({ pair, groups }) =>
+    (pair.suit === 'z' || pair.value === 1 || pair.value === 9) &&
+    groups.every((group) => group.suit === 'z' || (group.kind === 'sequence' ? group.value === 1 || group.value === 7 : group.value === 1 || group.value === 9))))
+    faan.push({ name: '혼전대요', chinese: '混全帶么', faan: 1, detail: '모든 몸통과 머리에 1·9 또는 자패가 포함' });
+  if (closed && decompositions.some(({ groups }) => {
+    const seen = new Map<string, number>();
+    groups.filter((group) => group.kind === 'sequence' && !group.open)
+      .forEach((group) => { const id = `${group.suit}${group.value}`; seen.set(id, (seen.get(id) ?? 0) + 1); });
+    return [...seen.values()].some((count) => count >= 2);
+  })) faan.push({ name: '이배구', chinese: '一般高', faan: 1, detail: '같은 종류·같은 숫자의 연속 몸통 두 개' });
+  if (quadCount === 1) faan.push({ name: '깡', chinese: '槓', faan: 1, detail: '깡 하나' });
+  else if (quadCount === 2) faan.push({ name: '쌍깡', chinese: '雙槓', faan: 2, detail: '깡 두 개' });
+  else if (quadCount === 3) faan.push({ name: '삼깡', chinese: '三槓', faan: 8, detail: '깡 세 개' });
+
   // 아무 번도 없으면 계산에서 0번으로 남습니다(최소 번 미달로 화료 불가).
   return faan;
 }
@@ -228,7 +295,7 @@ export function totalFaan(faan: HongKongFaan[]) {
   return faan.reduce((total, entry) => total + entry.faan, 0);
 }
 
-export function canHongKongDeclareWin(faan: HongKongFaan[], minimum = HONG_KONG_MIN_FAAN) {
+export function canHongKongDeclareWin(faan: HongKongFaan[], minimum: number = HONG_KONG_MIN_FAAN) {
   return faan.some((entry) => entry.limit) || totalFaan(faan) >= minimum;
 }
 

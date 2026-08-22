@@ -39,12 +39,17 @@ export function sortMahjongHand(hand: MahjongTile[]) {
   return [...hand].sort((a, b) => suitOrder[a.suit] - suitOrder[b.suit] || a.value - b.value || a.id.localeCompare(b.id));
 }
 
-export function dealRiichi(random: () => number = Math.random, includeHonors = true): RiichiRound {
+/**
+ * 배패. 왕패(죽은 산)는 리치마작에만 있습니다. 중국식·홍콩·사천은 왕패를 두지 않으므로
+ * deadWallSize 0으로 부르면 산의 마지막 패까지 모두 뽑을 수 있습니다.
+ */
+export function dealRiichi(random: () => number = Math.random, includeHonors = true, deadWallSize = 14): RiichiRound {
   const deck = shuffleMahjong(createMahjongTiles(includeHonors), random); let cursor = 0;
   const hands = [[],[],[],[]] as MahjongTile[][];
   for (let count = 0; count < 13; count++) for (let player = 0; player < 4; player++) hands[player].push(deck[cursor++]);
   const remaining=deck.slice(cursor);
-  return { player: sortMahjongHand(hands[0]), opponents: hands.slice(1).map(sortMahjongHand), wall: remaining.slice(0,-14), deadWall:remaining.slice(-14), rivers: [[],[],[],[]] };
+  const reserved=Math.max(0,Math.min(deadWallSize,remaining.length));
+  return { player: sortMahjongHand(hands[0]), opponents: hands.slice(1).map(sortMahjongHand), wall: reserved?remaining.slice(0,-reserved):remaining, deadWall: reserved?remaining.slice(-reserved):[], rivers: [[],[],[],[]] };
 }
 
 export function doraFromIndicator(indicator:MahjongTile):{suit:MahjongSuit;value:number}{if(indicator.suit!=='z')return {suit:indicator.suit,value:indicator.value===9?1:indicator.value+1};if(indicator.value<=4)return {suit:'z',value:indicator.value===4?1:indicator.value+1};return {suit:'z',value:indicator.value===7?5:indicator.value+1};}
@@ -269,6 +274,10 @@ export function evaluateBasicRiichiYaku(args: {
   seatWind?: number; roundWind?: number;
   lastTile?: boolean; afterKan?: boolean; robbingKan?: boolean; firstTurn?: boolean;
   concealedKans?: MahjongTile[][];
+  /** 쿠이탕(아리아리) 여부. 기본은 인정 */
+  openTanyao?: boolean;
+  /** 첫 순번에 누가 울었는지 (인화 판정용) */
+  anyCallMade?: boolean;
 }) {
   const openMelds = args.openMelds ?? []; const concealedKans = args.concealedKans ?? [];
   const allTiles = [...args.concealed, ...openMelds.flat(), ...concealedKans.flat()]; const yaku: RiichiYaku[] = [];
@@ -321,6 +330,9 @@ export function evaluateBasicRiichiYaku(args: {
   if (yakuman.length) return yakuman;
 
   // ── 일반 역 ────────────────────────────────────────────────────────
+  // 인화: 자가가 첫 순번에 남의 패로 완성 (기본은 만관 취급이라 5판)
+  if (closed && args.firstTurn && !args.anyCallMade && args.winType === 'ron' && seatWind !== 1)
+    yaku.push({ name: '인화', japanese: '人和', han: 5, detail: '자가가 첫 순번에 아무도 울지 않은 상태에서 남의 패로 완성' });
   if (args.doubleRiichi && closed) yaku.push({ name: '더블리치', japanese: 'ダブル立直', han: 2, detail: '첫 순번에 아무도 울지 않은 상태에서 선언한 리치' });
   else if (args.riichi && closed) yaku.push({ name: '리치', japanese: '立直', han: 1, detail: '패를 공개하지 않은 텐파이에서 선언' });
   if (args.riichi && args.ippatsu && closed) yaku.push({ name: '일발', japanese: '一発', han: 1, detail: '리치 뒤 다음 내 차례가 끝나기 전, 아무도 치·퐁·깡하지 않은 동안 완성' });
@@ -336,7 +348,8 @@ export function evaluateBasicRiichiYaku(args: {
   const identicalPairs = decompositions.reduce((best, { groups }) => Math.max(best, identicalSequencePairs(groups)), 0);
   const sevenPairs = closed && !concealedKans.length && identicalPairs < 2 && isSevenPairsHand(args.concealed);
   if (sevenPairs) yaku.push({ name: '칠대자', japanese: '七対子', han: 2, detail: '서로 다른 일곱 종류의 똑같은 패 두 장씩으로 완성' });
-  if (allTiles.every((tile) => tile.suit !== 'z' && tile.value >= 2 && tile.value <= 8)) yaku.push({ name: '탕야오', japanese: '断么九', han: 1, detail: '1·9·자패 없이 완성' });
+  const openTanyao = args.openTanyao ?? true;
+  if ((closed || openTanyao) && allTiles.every((tile) => tile.suit !== 'z' && tile.value >= 2 && tile.value <= 8)) yaku.push({ name: '탕야오', japanese: '断么九', han: 1, detail: openTanyao ? '1·9·자패 없이 완성' : '울지 않고 1·9·자패 없이 완성' });
   [5, 6, 7].forEach((value) => { if (countOf(allTiles, 'z', value) >= 3) yaku.push({ name: `역패 ${dragonNames[value]}`, japanese: '役牌', han: 1, detail: '삼원패 세 장' }); });
   if (countOf(allTiles, 'z', seatWind) >= 3) yaku.push({ name: `자풍패 ${windNames[seatWind]}`, japanese: '自風牌', han: 1, detail: `내 자리의 바람패(${windNames[seatWind]}) 세 장` });
   if (countOf(allTiles, 'z', roundWind) >= 3) yaku.push({ name: `장풍패 ${windNames[roundWind]}`, japanese: '場風牌', han: 1, detail: `현재 판의 바람패(${windNames[roundWind]}) 세 장` });
@@ -646,11 +659,13 @@ export function canRobKan(hand: MahjongTile[], declared: MahjongTile, openMeldCo
 // 14장 구성: 0~3 영상패 4장, 4·6·8·10·12 도라 표시패, 5·7·9·11·13 뒷도라 표시패
 export const MAX_KAN_PER_ROUND = 4;
 
+/** 깡을 할 때마다 표시패가 한 장씩 늘어납니다(깡도라). */
 export function deadWallDoraIndicators(deadWall: MahjongTile[], kanCount = 0) {
   return [4, 6, 8, 10, 12].slice(0, Math.min(kanCount, MAX_KAN_PER_ROUND) + 1)
     .map((index) => deadWall[index]).filter(Boolean);
 }
 
+/** 리치했을 때만 볼 수 있는 뒷도라. 깡을 하면 뒷도라도 함께 늘어납니다. */
 export function deadWallUraIndicators(deadWall: MahjongTile[], kanCount = 0) {
   return [5, 7, 9, 11, 13].slice(0, Math.min(kanCount, MAX_KAN_PER_ROUND) + 1)
     .map((index) => deadWall[index]).filter(Boolean);
@@ -769,4 +784,63 @@ export function nagashiManganPayments(winnerSeat: number, dealerSeat: number): n
     payments[winnerSeat] += amount;
   });
   return payments;
+}
+
+// ── 적도라(赤ドラ)와 룰 옵션 ────────────────────────────────────────
+
+/** 적도라: 각 종류의 5 한 장씩을 빨간 패로 씁니다. 한 장당 1판. */
+export const RED_FIVE_IDS = ['m5-0', 'p5-0', 's5-0'] as const;
+
+export function isRedFive(tile: MahjongTile) {
+  return (RED_FIVE_IDS as readonly string[]).includes(tile.id);
+}
+
+export function countRedFives(tiles: MahjongTile[]) {
+  return tiles.filter(isRedFive).length;
+}
+
+/** 화면에 빨간 5를 따로 표시할 때 씁니다. */
+export function redFiveLabel(tile: MahjongTile) {
+  return isRedFive(tile) ? `${tile.glyph}(적)` : tile.glyph;
+}
+
+export type RiichiRuleOptions = {
+  /** 적도라를 쓸지 */
+  redFives: boolean;
+  /** 쿠이탕: 울어도 탕야오를 인정할지 (아리아리) */
+  openTanyao: boolean;
+  /** 형식텐파이만으로 노텐 벌부를 면할 수 있는지 */
+  formalTenpai: boolean;
+  /** 들통(점수가 마이너스가 되면 즉시 종료) */
+  bankruptcyEnds: boolean;
+  /** 3만점을 넘긴 사람이 없으면 서장으로 연장할지 */
+  westRoundExtension: boolean;
+  /** 다중 론을 인정할지 (false면 두절만) */
+  multipleRon: boolean;
+};
+
+export const DEFAULT_RIICHI_RULES: RiichiRuleOptions = {
+  redFives: true,
+  openTanyao: true,
+  formalTenpai: true,
+  bankruptcyEnds: true,
+  westRoundExtension: true,
+  multipleRon: true,
+};
+
+export const riichiRuleLabels: Record<keyof RiichiRuleOptions, { name: string; detail: string }> = {
+  redFives: { name: '적도라', detail: '각 종류의 5 한 장이 빨간 패이며 한 장당 1판' },
+  openTanyao: { name: '쿠이탕(아리아리)', detail: '울어도 탕야오를 인정' },
+  formalTenpai: { name: '형식텐파이', detail: '역이 없어도 텐파이 모양이면 노텐 벌부 면제' },
+  bankruptcyEnds: { name: '들통', detail: '점수가 마이너스가 되면 그 자리에서 종료' },
+  westRoundExtension: { name: '서입', detail: '3만점을 넘긴 사람이 없으면 서장으로 연장' },
+  multipleRon: { name: '다중 론', detail: '두 명 이상 동시 론을 모두 인정' },
+};
+
+/**
+ * 인화(人和): 자가가 첫 순번에 아무도 울지 않은 상태에서 남의 패로 완성.
+ * 지역마다 취급이 달라 기본은 만관으로 둡니다.
+ */
+export function isHumanWin(args: { firstTurn: boolean; anyCallMade: boolean; winType: 'tsumo' | 'ron'; seatWind: number }) {
+  return args.firstTurn && !args.anyCallMade && args.winType === 'ron' && args.seatWind !== 1;
 }
