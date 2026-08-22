@@ -7,7 +7,6 @@ import {
   ImageBackground,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -695,7 +694,7 @@ function CasinoApp() {
 
   if (!entered) {
     return (
-      <SafeAreaView style={styles.splash}>
+      <View style={[styles.splash, { paddingTop: insets.top }]}>
         <StatusBar style="light" />
         <ImageBackground source={casinoEntranceSource} resizeMode="cover" style={styles.splashBackground}>
           <View style={styles.splashShade} />
@@ -709,7 +708,7 @@ function CasinoApp() {
             <Text style={styles.splashDisclaimer}>WC 게임 전용 코인 · 현금 환전 불가</Text>
           </View>
         </ImageBackground>
-      </SafeAreaView>
+      </View>
     );
   }
 
