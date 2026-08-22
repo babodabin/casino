@@ -38,26 +38,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lock bottom tab bar layout
-        shell: bash
-        run: |
-          # 하단 메뉴 자체는 72px로 유지합니다.
-          # iPhone의 하단 안전영역은 index.html의 전체화면 viewport가 담당합니다.
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('App.tsx')
-          text = path.read_text()
-          dynamic = "style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}"
-          fixed = "style={styles.tabBar}"
-
-          if dynamic in text:
-              text = text.replace(dynamic, fixed, 1)
-              path.write_text(text)
-          elif fixed not in text:
-              raise SystemExit('Bottom tab bar layout marker not found; refusing to deploy a possibly shifted tab bar.')
-          PY
-
       - name: Build web app
         run: pnpm exec expo export --platform web --output-dir dist
 
@@ -75,8 +55,7 @@ jobs:
           path = Path('dist/index.html')
           html = path.read_text()
 
-          # iPhone이 홈 인디케이터 아래까지 앱의 실제 viewport로 잡도록
-          # JS가 실행되기 전 HTML 단계에서 viewport-fit=cover를 강제합니다.
+          # Keep edge-to-edge viewport support, but do not use black-translucent.
           viewport_re = re.compile(r'<meta[^>]+name=["\']viewport["\'][^>]*>', re.IGNORECASE)
           match = viewport_re.search(html)
           if match:
@@ -90,29 +69,27 @@ jobs:
           else:
               html = html.replace('<head>', '<head>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />', 1)
 
-          # 홈 화면 전체화면 모드도 빌드 결과에 항상 남겨 둡니다.
           if 'apple-mobile-web-app-capable' not in html:
               html = html.replace('</head>', '<meta name="apple-mobile-web-app-capable" content="yes" />\n</head>', 1)
-          if 'apple-mobile-web-app-status-bar-style' not in html:
-              html = html.replace('</head>', '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n</head>', 1)
 
-          # Expo의 100% 높이가 iOS에서 safe-area 위에서 끝나는 경우를 막고
-          # 실제 화면 높이(dvh)를 root까지 사용하게 합니다.
-          full_height_style = '''<style id="world-casino-fullscreen-fix">
-html, body, #root {
-  width: 100%;
-  height: 100dvh !important;
-  min-height: 100dvh !important;
-  margin: 0;
-  padding: 0;
-  background: #080B12;
-}
-body { overflow: hidden; }
-</style>'''
-          if 'world-casino-fullscreen-fix' not in html:
-              html = html.replace('</head>', full_height_style + '\n</head>', 1)
+          # iOS 26 standalone PWA can create a bottom chin gap when this is combined
+          # with viewport-fit=cover, so remove it from every deployment.
+          html = re.sub(
+              r'<meta[^>]+name=["\']apple-mobile-web-app-status-bar-style["\'][^>]*>\s*',
+              '',
+              html,
+              flags=re.IGNORECASE,
+          )
 
-          icon = '<link rel="apple-touch-icon" href="./icon.png?v=6" />'
+          # Remove the temporary fullscreen workaround if it ever appears.
+          html = re.sub(
+              r'<style[^>]+id=["\']world-casino-fullscreen-fix["\'][^>]*>.*?</style>\s*',
+              '',
+              html,
+              flags=re.IGNORECASE | re.DOTALL,
+          )
+
+          icon = '<link rel="apple-touch-icon" href="./icon.png?v=7" />'
           icon_re = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
           if re.search(icon_re, html, flags=re.IGNORECASE):
               html = re.sub(icon_re, icon, html, count=1, flags=re.IGNORECASE)
