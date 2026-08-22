@@ -31,6 +31,13 @@
         height: 100%;
         flex: 1;
       }
+      /* iOS 홈 화면 앱에서는 100% 높이가 위 safe-area만큼 짧게 계산되는 경우가 있습니다.
+         그 빠진 높이만 루트에 되돌려 하단 탭바가 실제 화면 끝까지 내려가게 합니다. */
+      @media (display-mode: standalone) {
+        #root {
+          height: calc(100% + env(safe-area-inset-top));
+        }
+      }
       /* 상태바 자리까지 앱 배경색이 깔리게 합니다(흰 띠 방지). */
       html,
       body {
