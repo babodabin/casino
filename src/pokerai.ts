@@ -2,6 +2,8 @@ import { createDeck, type Card } from './blackjack.ts';
 import { compareHands, evaluateFive, evaluateHoldem, evaluateOmaha, type PokerHand } from './texasholdem.ts';
 import { evaluateLow, compareLow } from './highlow.ts';
 import { opponentKeepCards } from './fivecarddraw.ts';
+import { type HwatuCard } from './hwatu.ts';
+import { compareSeotda, createSeotdaDeck, evaluateSeotda, type SeotdaRules } from './seotda.ts';
 
 /**
  * 컴퓨터 상대의 베팅 판단.
@@ -226,4 +228,29 @@ export function estimateDrawEquity(args: {
   // 조건에 맞는 표본을 하나도 못 모으면 교환 장수를 무시하고 다시 계산합니다.
   if (counted === 0) return estimateDrawEquity({ hole: args.hole, trials, random });
   return score / counted;
+}
+
+/**
+ * 섰다에서 내 두 장이 이길 확률.
+ *
+ * 상대 두 장은 남은 18장에서 나올 수 있는 조합을 전부 세어 계산합니다.
+ * 경우의 수가 153가지뿐이라 무작위 시뮬레이션이 아니라 완전 탐색입니다.
+ */
+export function seotdaEquity(mine: HwatuCard[], rules: SeotdaRules): number {
+  const seen = new Set(mine.map((card) => card.id));
+  const rest = createSeotdaDeck().filter((card) => !seen.has(card.id));
+  const myHand = evaluateSeotda(mine, rules);
+  let score = 0;
+  let count = 0;
+  for (let a = 0; a < rest.length; a += 1) {
+    for (let b = a + 1; b < rest.length; b += 1) {
+      const theirs = evaluateSeotda([rest[a], rest[b]], rules);
+      const compared = compareSeotda(myHand, theirs);
+      // 구사로 무효가 되는 판은 비긴 것으로 셉니다.
+      const voided = (myHand.special === 'guSa' && compared < 0) || (theirs.special === 'guSa' && compared > 0);
+      score += voided ? 0.5 : compared > 0 ? 1 : compared < 0 ? 0 : 0.5;
+      count += 1;
+    }
+  }
+  return count === 0 ? 0.5 : score / count;
 }
