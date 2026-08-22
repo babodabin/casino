@@ -24,37 +24,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Apply measured iPhone standalone inset fix
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('App.tsx')
-          text = path.read_text()
-
-          old = '''      let top = parseFloat(style.paddingTop) || 0;
-      const bottom = parseFloat(style.paddingBottom) || 0;
-      probe.remove();
-      // 전체화면인데 값을 못 읽으면 헤더가 시계와 겹칩니다. 그럴 때만 최소값을 둡니다.
-      if (standalone && top === 0) top = 44;
-      const next = { top, bottom };'''
-
-          new = '''      let top = parseFloat(style.paddingTop) || 0;
-      const bottom = parseFloat(style.paddingBottom) || 0;
-      probe.remove();
-      // iOS 홈 화면 실행에서는 실제 layout viewport가 이미 상단 safe-area를 제외합니다.
-      // 실측: screen 956, inner/root 894, safe-area top 62. 따라서 top을 다시 더하면 62px가 중복됩니다.
-      // 하단 safe-area는 viewport에서 빠지지 않으므로 bottom 값은 그대로 유지합니다.
-      if (standalone) top = 0;
-      const next = { top, bottom };'''
-
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected one safe-area measurement block, found {text.count(old)}')
-
-          path.write_text(text.replace(old, new, 1))
-          PY
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
