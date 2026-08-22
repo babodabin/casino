@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   ImageBackground,
+  PanResponder,
   Platform,
   Pressable,
   SafeAreaView,
@@ -54,6 +55,7 @@ import {
   type BaccaratWinner,
 } from './src/baccarat';
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
+import { backupFileName, buildBackup, checkBackup, type BackupData } from './src/backup';
 import { levelFromPlays } from './src/level';
 import { DAILY_MISSION_GOAL, DAILY_MISSION_REWARD, countPlayedOn, missionDayKey, shouldClaimMission } from './src/mission';
 import { decidePokerAction, estimateDrawEquity, estimateEquity, pokerActionLabel } from './src/pokerai';
@@ -178,6 +180,31 @@ const gameEntryScreens: Record<string, AppScreen> = {
 };
 const screenForGame = (name: string): AppScreen => gameEntryScreens[name] ?? 'gamePreview';
 
+/**
+ * 각 화면에서 뒤로 갔을 때 갈 화면.
+ * 사파리의 '밀어서 뒤로 가기'가 사이트를 나가는 대신 이 표를 따라가게 씁니다.
+ */
+const parentScreens: Partial<Record<AppScreen, AppScreen>> = {
+  categoryCatalog: 'tabs',
+  gamePreview: 'categoryCatalog',
+  blackjackSetup: 'categoryCatalog', blackjackGame: 'blackjackSetup',
+  rouletteSetup: 'categoryCatalog', rouletteGame: 'rouletteSetup',
+  baccaratSetup: 'categoryCatalog', baccaratGame: 'baccaratSetup',
+  crapsSetup: 'categoryCatalog', crapsGame: 'crapsSetup',
+  slotSetup: 'categoryCatalog', slotGame: 'slotSetup', pachislotGame: 'slotSetup',
+  sicboSetup: 'categoryCatalog', sicboGame: 'sicboSetup',
+  videoPokerSetup: 'categoryCatalog', videoPokerGame: 'videoPokerSetup',
+  holdemSetup: 'categoryCatalog', holdemGame: 'holdemSetup',
+  omahaSetup: 'categoryCatalog', omahaGame: 'omahaSetup',
+  sevenPokerSetup: 'categoryCatalog', sevenPokerGame: 'sevenPokerSetup',
+  fiveDrawSetup: 'categoryCatalog', fiveDrawGame: 'fiveDrawSetup',
+  highLowSetup: 'categoryCatalog', highLowGame: 'highLowSetup',
+  riichiSetup: 'categoryCatalog', riichiGame: 'riichiSetup',
+  chineseMahjongSetup: 'categoryCatalog', chineseMahjongGame: 'chineseMahjongSetup',
+  hongKongMahjongSetup: 'categoryCatalog', hongKongMahjongGame: 'hongKongMahjongSetup',
+  sichuanMahjongSetup: 'categoryCatalog', sichuanMahjongGame: 'sichuanMahjongSetup',
+};
+
 const gameCategoryOf = (game: string) => gameCategories.find((category) => category.games.some((item) => item.name === game))?.name ?? '기타';
 
 const europeanWheelOrder = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26];
@@ -228,7 +255,50 @@ const tabs: { name: Tab; icon: string }[] = [
 
 const categories = gameCategories.map(({ name, icon, detail }) => ({ name, icon, detail }));
 
+/**
+ * 화면 어딘가에서 에러가 나면 하얀 화면이 되는 대신 안내를 보여 줍니다.
+ * 렌더링 중에 난 에러만 잡을 수 있고, 버튼 누른 뒤 비동기로 나는 에러는 못 잡습니다.
+ */
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  componentDidCatch(error: Error) {
+    // 개발 중 원인을 찾을 수 있게 콘솔에는 남깁니다.
+    console.error('화면에서 에러가 발생했습니다', error);
+  }
+
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <View style={styles.errorScreen}>
+        <Text style={styles.errorMark}>◆</Text>
+        <Text style={styles.errorTitle}>화면을 그리다가 문제가 생겼습니다</Text>
+        <Text style={styles.errorText}>저장된 코인과 기록은 그대로 있습니다. 아래 버튼으로 다시 시작해 보세요.</Text>
+        <View style={styles.errorDetailBox}>
+          <Text style={styles.errorDetail}>{this.state.error.message || String(this.state.error)}</Text>
+        </View>
+        <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={() => this.setState({ error: null })}>
+          <Text style={styles.primaryButtonText}>다시 시도</Text>
+        </Pressable>
+        {Platform.OS === 'web' && (
+          <Pressable style={styles.errorSecondary} onPress={() => window.location.reload()}>
+            <Text style={styles.errorSecondaryText}>앱 새로 열기</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+}
+
 export default function App() {
+  return <AppErrorBoundary><CasinoApp /></AppErrorBoundary>;
+}
+
+function CasinoApp() {
   const [entered, setEntered] = useState(false);
   const [tab, setTab] = useState<Tab>('홈');
   const [appScreen, setAppScreen] = useState<AppScreen>('tabs');
@@ -342,6 +412,157 @@ export default function App() {
 
   // 애니메이션 길이에 곱하는 배수 하나로 룰렛·슬롯·파치슬롯·식보 연출을 모두 조절합니다.
   const motion = accessibility.reduceMotion ? 0.08 : gameSpeedFactor(gameSpeed);
+
+  // 노치와 홈 인디케이터가 차지하는 높이. 웹에서는 CSS env()를 재서 가져옵니다.
+  // (네이티브에서는 SafeAreaView가 이미 처리하므로 0으로 둡니다.)
+  const [insets, setInsets] = useState({ top: 0, bottom: 0 });
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    // 아이폰에서 env(safe-area-inset-*)이 실제 값을 주려면 뷰포트에 viewport-fit=cover가 있어야 합니다.
+    // Expo가 만드는 index.html에는 없어서 여기서 붙입니다.
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      const content = viewport.getAttribute('content') ?? '';
+      if (!content.includes('viewport-fit')) viewport.setAttribute('content', `${content}, viewport-fit=cover`);
+    }
+    const measure = () => {
+      const probe = document.createElement('div');
+      probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
+      document.body.appendChild(probe);
+      const style = window.getComputedStyle(probe);
+      const next = { top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
+      probe.remove();
+      setInsets((current) => (current.top === next.top && current.bottom === next.bottom ? current : next));
+    };
+    measure();
+    // 뷰포트를 막 바꾼 직후에는 값이 아직 반영되지 않을 수 있어 한 번 더 잽니다.
+    const again = window.requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    window.addEventListener('orientationchange', measure);
+    return () => {
+      window.cancelAnimationFrame(again);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('orientationchange', measure);
+    };
+  }, []);
+
+  // 사파리의 '밀어서 뒤로 가기'가 사이트를 나가는 대신 앱 안에서 한 단계 뒤로 가게 합니다.
+  // 더 갈 곳이 없으면(홈 탭) 막지 않고 그대로 나가게 둡니다.
+  const appScreenRef = useRef(appScreen);
+  appScreenRef.current = appScreen;
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onPop = () => {
+      const parent = parentScreens[appScreenRef.current];
+      if (!parent) return;
+      window.history.pushState(null, '');
+      setAppScreen(parent);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // 게임 화면으로 들어갈 때 히스토리 한 칸을 쌓아 두어야 뒤로 가기가 걸립니다.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    if (!parentScreens[appScreen]) return;
+    window.history.pushState(null, '');
+  }, [appScreen]);
+
+  // 백업 내보내기·가져오기. 가져오기는 검사를 통과한 뒤 확인을 받고 나서야 반영합니다.
+  const [backupNote, setBackupNote] = useState('');
+  const [pendingImport, setPendingImport] = useState<{ data: BackupData; summary: string } | null>(null);
+
+  const exportBackup = () => {
+    try {
+      const savedAt = new Date().toISOString();
+      const payload = buildBackup({ coins, totalPlays, difficulty, records, preferences: { sound, vibration, gameSpeed, accessibility }, savedAt });
+      if (Platform.OS !== 'web' || typeof document === 'undefined') { setBackupNote('이 기기에서는 파일로 내보낼 수 없습니다.'); return; }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = backupFileName(savedAt);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      // 브라우저가 저장을 끝낼 시간을 준 뒤 정리합니다.
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setBackupNote(`${backupFileName(savedAt)} 로 내보냈습니다 · 코인 ${coins.toLocaleString()} WC · 기록 ${records.length}건`);
+    } catch {
+      setBackupNote('내보내는 중 문제가 생겼습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const pickBackupFile = () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') { setBackupNote('이 기기에서는 파일을 열 수 없습니다.'); return; }
+    setBackupNote('');
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onerror = () => setBackupNote('파일을 여는 데 실패했습니다.');
+      reader.onload = () => {
+        const check = checkBackup(String(reader.result ?? ''));
+        if (!check.ok) { setPendingImport(null); setBackupNote(check.reason); return; }
+        setPendingImport({ data: check.data, summary: check.summary });
+        setBackupNote('');
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  // 확인을 누른 뒤에야 실제로 덮어씁니다.
+  const applyImport = () => {
+    if (!pendingImport) return;
+    const { data } = pendingImport;
+    setCoins(data.coins);
+    setTotalPlays(data.totalPlays);
+    setDifficulty(data.difficulty);
+    setRecords(data.records as GameRecord[]);
+    const preferences = data.preferences as Partial<{ sound: boolean; vibration: boolean; gameSpeed: GameSpeed; accessibility: Partial<AccessibilityOptions> }> | undefined;
+    if (preferences) {
+      if (typeof preferences.sound === 'boolean') setSound(preferences.sound);
+      if (typeof preferences.vibration === 'boolean') setVibration(preferences.vibration);
+      if (preferences.gameSpeed && gameSpeedOptions.some((option) => option.name === preferences.gameSpeed)) setGameSpeed(preferences.gameSpeed);
+      if (preferences.accessibility) setAccessibility({ ...DEFAULT_ACCESSIBILITY, ...preferences.accessibility });
+    }
+    setPendingImport(null);
+    setBackupNote(`가져왔습니다 · ${pendingImport.summary}`);
+  };
+
+  // 탭 화면에서 좌우로 밀면 옆 탭으로 넘어갑니다.
+  // 세로 스크롤과 부딪히지 않게 가로로 확실히 움직였을 때만 반응하고,
+  // 아이폰의 가장자리 '밀어서 뒤로 가기'와 겹치지 않게 왼쪽 24px에서 시작한 터치는 무시합니다.
+  const tabRef = useRef(tab);
+  tabRef.current = tab;
+  const tabSwipe = useRef(
+    PanResponder.create({
+      // 안쪽 스크롤 영역이 터치를 먼저 가져가 버리므로 capture 단계에서 판단합니다.
+      // 가로로 확실히 움직인 경우에만 가져오기 때문에 세로 스크롤은 그대로 동작합니다.
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => {
+        // 터치를 시작한 지점이 왼쪽 가장자리면 아이폰 '밀어서 뒤로 가기'에 양보합니다.
+        // (웹에서는 nativeEvent.pageX가 비어 있을 수 있어 제스처의 x0를 씁니다.)
+        return Math.abs(gesture.dx) > 28 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.8;
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        if (Math.abs(gesture.dx) < 56) return;
+        // 아이폰의 '왼쪽 가장자리에서 오른쪽으로 밀어 뒤로 가기'와 겹치지 않게,
+        // 화면 왼쪽 끝에서 시작한 오른쪽 스와이프는 브라우저에 양보합니다.
+        // (판정 콜백에서는 x0가 아직 비어 있어 여기서 확인합니다.)
+        const grantX = gesture.moveX - gesture.dx;
+        if (gesture.dx > 0 && grantX < 48) return;
+        const names = tabs.map((item) => item.name);
+        const at = names.indexOf(tabRef.current);
+        const next = names[at + (gesture.dx < 0 ? 1 : -1)];
+        if (next) setTab(next);
+      },
+    }),
+  ).current;
 
   useEffect(() => {
     if (!loaded) return;
@@ -533,10 +754,10 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={styles.app}>
+    <SafeAreaView style={[styles.app, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
       <Header coins={coins} totalPlays={totalPlays} />
-      <View style={styles.screen}>
+      <View style={styles.screen} {...(appScreen === 'tabs' ? tabSwipe.panHandlers : {})}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
             category={selectedCategory}
@@ -671,6 +892,9 @@ export default function App() {
           tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
           onRefillCoins: refillTestCoins, coins, records, totalPlays,
+          onExportBackup: exportBackup, onPickBackup: pickBackupFile,
+          onApplyImport: applyImport, onCancelImport: () => setPendingImport(null),
+          backupNote, pendingImport,
           onOpenCategory: (category) => {
             setSelectedCategory(category);
             setAppScreen('categoryCatalog');
@@ -686,7 +910,7 @@ export default function App() {
           },
         })}
       </View>
-      {appScreen === 'tabs' && <View style={styles.tabBar}>
+      {appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
         {tabs.map((item) => {
           const selected = item.name === tab;
           return (
@@ -744,6 +968,12 @@ type TabProps = {
   accessibility: AccessibilityOptions;
   setAccessibility: (value: AccessibilityOptions) => void;
   onRefillCoins: () => void;
+  onExportBackup: () => void;
+  onPickBackup: () => void;
+  onApplyImport: () => void;
+  onCancelImport: () => void;
+  backupNote: string;
+  pendingImport: { summary: string } | null;
   coins: number;
   records: GameRecord[];
   totalPlays: number;
@@ -769,6 +999,12 @@ function renderTab(props: TabProps) {
       accessibility={props.accessibility}
       setAccessibility={props.setAccessibility}
       onRefillCoins={props.onRefillCoins}
+      onExportBackup={props.onExportBackup}
+      onPickBackup={props.onPickBackup}
+      onApplyImport={props.onApplyImport}
+      onCancelImport={props.onCancelImport}
+      backupNote={props.backupNote}
+      pendingImport={props.pendingImport}
     />;
   }
   return <HomeScreen difficulty={props.difficulty} records={props.records} onContinue={(gameName) => {
@@ -2904,6 +3140,12 @@ function SettingsScreen(props: {
   accessibility: AccessibilityOptions;
   setAccessibility: (value: AccessibilityOptions) => void;
   onRefillCoins: () => void;
+  onExportBackup: () => void;
+  onPickBackup: () => void;
+  onApplyImport: () => void;
+  onCancelImport: () => void;
+  backupNote: string;
+  pendingImport: { summary: string } | null;
 }) {
   const [detail, setDetail] = useState<'speed' | 'accessibility' | null>(null);
 
@@ -2974,6 +3216,29 @@ function SettingsScreen(props: {
         <Text style={styles.refillButtonTitle}>100,000 WC로 다시 채우기</Text>
         <Text style={styles.refillButtonText}>게임 테스트용 가상 코인을 즉시 복구합니다</Text>
       </Pressable>
+      <Text style={styles.sectionTitle}>데이터 백업</Text>
+      <View style={styles.panel}>
+        <Pressable accessibilityRole="button" onPress={props.onExportBackup}>
+          <Row title="파일로 내보내기" subtitle="코인 · 기록 · 설정을 JSON 파일 하나로 저장합니다" value="내보내기" />
+        </Pressable>
+        <View style={styles.separator} />
+        <Pressable accessibilityRole="button" onPress={props.onPickBackup}>
+          <Row title="파일에서 가져오기" subtitle="다른 기기에서 내보낸 파일을 불러옵니다" value="가져오기" />
+        </Pressable>
+      </View>
+      {props.pendingImport && (
+        <View style={styles.importConfirm}>
+          <Text style={styles.importConfirmTitle}>이 내용으로 덮어쓸까요?</Text>
+          <Text style={styles.importConfirmSummary}>{props.pendingImport.summary}</Text>
+          <Text style={styles.smallText}>지금 기기에 있는 코인과 기록은 사라지고 위 내용으로 바뀝니다.</Text>
+          <View style={styles.importConfirmRow}>
+            <Pressable style={styles.importCancel} onPress={props.onCancelImport}><Text style={styles.holdemActionText}>취소</Text></Pressable>
+            <Pressable style={styles.importApply} onPress={props.onApplyImport}><Text style={styles.primaryButtonText}>덮어쓰기</Text></Pressable>
+          </View>
+        </View>
+      )}
+      {props.backupNote ? <Text style={styles.helperText}>{props.backupNote}</Text> : null}
+      <Text style={styles.helperText}>데이터는 이 기기 안에만 저장됩니다. 브라우저 데이터를 지우면 사라지니, 옮기거나 보관하려면 내보내기를 쓰세요.</Text>
       <Text style={styles.sectionTitle}>게임 환경</Text>
       <View style={styles.panel}>
         <ToggleRow title="효과음" value={props.sound} onValueChange={props.setSound} />
@@ -3513,6 +3778,20 @@ const styles = StyleSheet.create({
   chart: { height: 100, flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 20 },
   chartBar: { flex: 1, minHeight: 8, borderRadius: 4, backgroundColor: colors.gold },
   chartBarLoss: { backgroundColor: colors.red },
+  errorScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 },
+  errorMark: { color: colors.gold, fontSize: 40 },
+  errorTitle: { color: colors.text, fontSize: 19, fontWeight: '700', textAlign: 'center' },
+  errorText: { color: colors.muted, fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  errorDetailBox: { backgroundColor: colors.panel, borderRadius: 12, padding: 12, width: '100%', borderWidth: 1, borderColor: colors.border },
+  errorDetail: { color: colors.muted, fontSize: 12 },
+  errorSecondary: { paddingVertical: 12 },
+  errorSecondaryText: { color: colors.goldLight, fontSize: 14, fontWeight: '600' },
+  importConfirm: { backgroundColor: '#1B1608', borderRadius: 14, padding: 14, gap: 8, borderWidth: 1, borderColor: colors.gold, marginTop: 10 },
+  importConfirmTitle: { color: colors.goldLight, fontSize: 15, fontWeight: '700' },
+  importConfirmSummary: { color: colors.text, fontSize: 14 },
+  importConfirmRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  importCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.panel2 },
+  importApply: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.gold },
   levelCard: { backgroundColor: colors.panel, borderRadius: 16, padding: 16, gap: 8, marginBottom: 14, borderWidth: 1, borderColor: colors.border },
   levelHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   levelBadge: { color: colors.goldLight, fontSize: 20, fontWeight: '700' },
