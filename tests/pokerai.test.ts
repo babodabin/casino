@@ -135,3 +135,23 @@ test('불가능한 교환 장수를 넣어도 멈추지 않고 값을 돌려준�
   assert.equal(Number.isFinite(equity), true);
   assert.equal(equity >= 0 && equity <= 1, true);
 });
+
+test('섰다 승률은 족보 서열과 맞아떨어진다', async () => {
+  const { createSeotdaDeck } = await import('../src/seotda.ts');
+  const { seotdaEquity } = await import('../src/pokerai.ts');
+  const deck = createSeotdaDeck();
+  const rules = { ddaengJabi: false, amhaeng: false, guSa: false };
+  const pick = (month: number, bright = false) => {
+    const cards = deck.filter((c) => c.month === month);
+    return bright ? cards.find((c) => c.kind === '광')! : (cards.find((c) => c.kind !== '광') ?? cards[0]);
+  };
+  const samPal = seotdaEquity([pick(3, true), pick(8, true)], rules);
+  const jangDdaeng = seotdaEquity([pick(10), pick(10)], rules);
+  const ali = seotdaEquity([pick(1), pick(2)], rules);
+  const mangtong = seotdaEquity([pick(2), pick(8)], rules);
+  assert.equal(samPal > 0.99, true, `삼팔광땡 ${samPal}`);
+  assert.equal(samPal > jangDdaeng, true);
+  assert.equal(jangDdaeng > ali, true);
+  assert.equal(ali > mangtong, true);
+  assert.equal(mangtong < 0.15, true, `망통 ${mangtong}`);
+});
