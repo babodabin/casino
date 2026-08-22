@@ -41,31 +41,12 @@ jobs:
       - name: Build web app
         run: pnpm exec expo export --platform web --output-dir dist
 
-      - name: Prepare GitHub Pages output
+      - name: Make project-page asset paths relative
         shell: bash
         run: |
+          # 속성 이름을 가리지 않고 절대 경로를 전부 상대 경로로 바꿉니다
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
-
-          # 아이콘만 교체합니다. safe-area/레이아웃은 건드리지 않습니다.
-          cp assets/icon.png dist/icon.png
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          path = Path('dist/index.html')
-          html = path.read_text()
-          icon = '<link rel="apple-touch-icon" href="./icon.png?v=5" />'
-          pattern = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
-
-          if re.search(pattern, html, flags=re.IGNORECASE):
-              html = re.sub(pattern, icon, html, count=1, flags=re.IGNORECASE)
-          else:
-              html = html.replace('</head>', f'{icon}\n</head>')
-
-          path.write_text(html)
-          PY
-
           touch dist/.nojekyll
 
       - name: Configure GitHub Pages
