@@ -672,3 +672,55 @@ test('산이 거의 없으면 얇은 대기로 리치하지 않는다', () => {
   // 1,000점이 없으면 리치할 수 없습니다
   assert.equal(shouldComputerDeclareRiichi(tenpai, 'expert', 900, true, { wallRemaining: 40 }), false);
 });
+
+test('실제 리치마작 점수표와 일치한다', () => {
+  const total = (fu: number, han: number, dealer: boolean, winType: 'ron' | 'tsumo' = 'ron') =>
+    calculateRiichiScore({ han, fu, dealer, winType }).total;
+
+  // 만관 경계: 기본점 2000을 넘어야 만관이며, 1920은 만관이 아니다
+  assert.equal(total(30, 4, false), 7700);
+  assert.equal(total(60, 3, false), 7700);
+  assert.equal(total(30, 4, true), 11600);
+  assert.equal(total(40, 4, false), 8000);
+  assert.equal(total(70, 3, false), 8000);
+
+  // 일반 구간
+  assert.equal(total(30, 1, false), 1000);
+  assert.equal(total(30, 3, false), 3900);
+  assert.equal(total(40, 3, false), 5200);
+  assert.equal(total(25, 2, false), 1600);
+  assert.equal(total(25, 4, false), 6400);
+  assert.equal(total(30, 1, true), 1500);
+  assert.equal(total(30, 3, true), 5800);
+  assert.equal(total(40, 3, true), 7700);
+
+  // 만관 이상
+  assert.equal(total(30, 5, false), 8000);
+  assert.equal(total(30, 6, false), 12000);
+  assert.equal(total(30, 8, false), 16000);
+  assert.equal(total(30, 11, false), 24000);
+  assert.equal(total(30, 5, true), 12000);
+  assert.equal(total(30, 6, true), 18000);
+  assert.equal(total(30, 8, true), 24000);
+});
+
+test('쯔모 지불액이 점수표와 일치한다', () => {
+  const pay = (fu: number, han: number, dealer: boolean) =>
+    calculateRiichiScore({ han, fu, dealer, winType: 'tsumo' }).payments;
+
+  assert.deepEqual(pay(20, 2, false), [700, 400, 400]);
+  assert.deepEqual(pay(30, 3, false), [2000, 1000, 1000]);
+  assert.deepEqual(pay(40, 3, false), [2600, 1300, 1300]);
+  assert.deepEqual(pay(30, 5, false), [4000, 2000, 2000]);
+  assert.deepEqual(pay(30, 3, true), [2000, 2000, 2000]);
+  assert.deepEqual(pay(30, 5, true), [4000, 4000, 4000]);
+});
+
+test('역만과 더블 역만 총액이 맞다', () => {
+  const y = (mult: number, dealer: boolean) =>
+    calculateRiichiScore({ han: 0, fu: 0, dealer, winType: 'ron', yakumanCount: mult }).total;
+  assert.equal(y(1, false), 32000);
+  assert.equal(y(1, true), 48000);
+  assert.equal(y(2, false), 64000);
+  assert.equal(y(2, true), 96000);
+});
