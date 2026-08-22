@@ -44,7 +44,9 @@ jobs:
       - name: Make project-page asset paths relative
         shell: bash
         run: |
-          sed -i 's|src="/_expo/|src="./_expo/|g' dist/index.html
+          # 속성 이름을 가리지 않고 절대 경로를 전부 상대 경로로 바꿉니다
+          sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
+          sed -i 's|="/assets/|="./assets/|g' dist/index.html
           touch dist/.nojekyll
 
       - name: Configure GitHub Pages
