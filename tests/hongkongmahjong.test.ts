@@ -5,6 +5,7 @@ import {
   evaluateHongKongFaan, totalFaan, canHongKongDeclareWin, hongKongScore, createHongKongMatch,
   settleHongKongWin, settleHongKongDraw, rankHongKongScores, hongKongRoundLabel,
   getHongKongCallOptions, applyHongKongCall, HONG_KONG_MIN_FAAN, HONG_KONG_LIMIT,
+  resolveFlowerDraws, HONG_KONG_MIN_OPTIONS,
 } from '../src/hongkongmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -183,4 +184,58 @@ test('완성 판정과 대기패를 구한다', () => {
   const waiting = hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','m5','m6','m7','s2']);
   const waits = getHongKongWaits(waiting);
   assert.equal(waits.some((tile) => tile.suit === 's' && tile.value === 2), true);
+});
+
+test('게임 중 꽃패를 뽑으면 옆으로 빼고 보충패를 가져온다', () => {
+  const flowerWall = createFlowerTiles();
+  const wall = Array.from({ length: 20 }, (_, i) => ({ id: `m${(i % 9) + 1}-w${i}`, suit: 'm' as const, value: (i % 9) + 1, glyph: 'x' }));
+  const start = wall.length;
+
+  // 반드시 꽃패가 나오는 상황
+  const always = resolveFlowerDraws({ hand: [], wall, flowerWall, collected: [], flowerChance: 1, random: () => 0 });
+  assert.equal(always.drawnFlowers, 8, '꽃패 여덟 장을 다 뽑아야 합니다');
+  assert.equal(always.collected.length, 8);
+  assert.equal(always.hand.length, 8, '뽑은 꽃패 수만큼 보충패를 받아야 합니다');
+  assert.equal(always.wall.length, start - 8);
+  assert.equal(always.flowerWall.length, 0);
+
+  // 꽃패가 안 나오는 상황
+  const never = resolveFlowerDraws({ hand: [], wall, flowerWall, collected: [], flowerChance: 0, random: () => 0.9 });
+  assert.equal(never.drawnFlowers, 0);
+  assert.equal(never.wall.length, start);
+});
+
+test('최소 번은 집마다 다르게 정할 수 있다', () => {
+  const twoFaan = [{ name: 'x', chinese: 'x', faan: 2, detail: '' }];
+  assert.equal(canHongKongDeclareWin(twoFaan, 1), true);
+  assert.equal(canHongKongDeclareWin(twoFaan, 3), false);
+  assert.equal(canHongKongDeclareWin(twoFaan, 5), false);
+  assert.deepEqual([...HONG_KONG_MIN_OPTIONS], [1, 3, 5]);
+});
+
+test('일기통관·삼색동순·삼색동각을 판정한다', () => {
+  const straight = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','p2','p3','p4','s5','s5']);
+  assert.equal(names(evaluateHongKongFaan({ hand: straight, winType: 'ron' })).includes('일기통관'), true);
+
+  const threeSuits = hand(['m3','m4','m5','p3','p4','p5','s3','s4','s5','m7','m8','m9','p1','p1']);
+  assert.equal(names(evaluateHongKongFaan({ hand: threeSuits, winType: 'ron' })).includes('삼색동순'), true);
+
+  const threeTriplets = hand(['m5','m5','m5','p5','p5','p5','s5','s5','s5','m2','m3','m4','p1','p1']);
+  assert.equal(names(evaluateHongKongFaan({ hand: threeTriplets, winType: 'ron' })).includes('삼색동각'), true);
+});
+
+test('깡 개수에 따라 번이 오른다', () => {
+  const base = hand(['m1','m2','m3','p5','p5']);
+  const one = names(evaluateHongKongFaan({ hand: hand(['m1','m2','m3','p5','p6','p7','s9','s9']), melds: [hand(['m7','m8','m9'])], concealedKans: [hand(['s2','s2','s2','s2'])], winType: 'ron' }));
+  assert.equal(one.includes('깡'), true);
+  const two = names(evaluateHongKongFaan({ hand: hand(['m1','m2','m3','p5','p6','p7','s9','s9']), concealedKans: [hand(['s2','s2','s2','s2']), hand(['m5','m5','m5','m5'])], winType: 'ron' }));
+  assert.equal(two.includes('쌍깡'), true);
+});
+
+test('혼전대요와 이배구를 판정한다', () => {
+  const terminals = hand(['m1','m2','m3','p7','p8','p9','s1','s2','s3','z1','z1','z1','m9','m9']);
+  assert.equal(names(evaluateHongKongFaan({ hand: terminals, winType: 'ron', seatWind: 2, roundWind: 3 })).includes('혼전대요'), true);
+
+  const twin = hand(['m2','m3','m4','m2','m3','m4','p6','p7','p8','s2','s3','s4','s5','s5']);
+  assert.equal(names(evaluateHongKongFaan({ hand: twin, winType: 'ron' })).includes('이배구'), true);
 });

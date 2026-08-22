@@ -4,7 +4,7 @@ import {
   createSichuanTiles, dealSichuan, chooseVoidSuit, countBySuit, isSichuanVoidCleared, nextVoidDiscard,
   pickSwapTiles, swapThreeTiles, canSichuanWin, getSichuanWaits, countRoots, evaluateSichuanFan,
   sichuanScore, createBloodState, settleSichuanWin, settleSichuanDraw, activeSichuanSeats,
-  isSichuanSevenPairs, autoPlaySichuanRemainder, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
+  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
 } from '../src/sichuanmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -114,8 +114,14 @@ test('자모와 깡상화는 배수를 두 배씩 더한다', () => {
   const fans = evaluateSichuanFan({ hand: tiles, winType: 'tsumo', afterKan: true });
   assert.equal(fans.some((fan) => fan.name === '자모'), true);
   assert.equal(fans.some((fan) => fan.name === '깡상화'), true);
-  // 평화 1 × 자모 2 × 깡상화 2 = 4배
-  assert.equal(sichuanScore({ fans, winType: 'tsumo' }).multiplier, 4);
+  // 울지 않은 손이므로 금구도 붙습니다: 평화 1 × 금구 2 × 자모 2 × 깡상화 2 = 8배
+  assert.equal(fans.some((fan) => fan.name === '금구'), true);
+  assert.equal(sichuanScore({ fans, winType: 'tsumo' }).multiplier, 8);
+
+  // 울었으면 금구가 빠져 4배
+  const opened = evaluateSichuanFan({ hand: hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','s2','s2']), melds: [hand(['m5','m6','m7'])], winType: 'tsumo', afterKan: true });
+  assert.equal(opened.some((fan) => fan.name === '금구'), false);
+  assert.equal(sichuanScore({ fans: opened, winType: 'tsumo' }).multiplier, 4);
 });
 
 test('점수는 배수를 곱하고 64배에서 멈춘다', () => {
@@ -287,4 +293,86 @@ test('자동 진행이 여러 판에서도 규칙을 깨지 않는다', () => {
       assert.equal(result.melds[seat].flat().some((tile) => tile.suit === voids[seat]), false);
     });
   }
+});
+
+test('과수: 깡을 하면 그 자리에서 점수를 받는다', () => {
+  const state = createBloodState(0);
+
+  // 암깡은 남은 세 명에게 2점씩
+  const ankan = settleSichuanKan(state, { kanner: 0, kind: 'ankan', basePoints: 1 });
+  assert.equal(ankan.gained, 6);
+  assert.equal(ankan.state.scores[0], 6);
+  assert.equal(ankan.state.scores[1], -2);
+  assert.equal(ankan.state.scores.reduce((sum, value) => sum + value, 0), 0);
+
+  // 대명깡은 패를 버린 사람에게만 2점
+  const minkan = settleSichuanKan(state, { kanner: 1, kind: 'minkan', discarder: 3, basePoints: 1 });
+  assert.equal(minkan.gained, 2);
+  assert.equal(minkan.state.scores[1], 2);
+  assert.equal(minkan.state.scores[3], -2);
+  assert.equal(minkan.state.scores[0], 0);
+
+  // 가깡은 남은 세 명에게 1점씩
+  const kakan = settleSichuanKan(state, { kanner: 2, kind: 'kakan', basePoints: 1 });
+  assert.equal(kakan.gained, 3);
+  assert.equal(kakan.state.scores[2], 3);
+});
+
+test('이미 화료해 빠진 사람은 깡 정산에서 제외된다', () => {
+  let state = createBloodState(0);
+  const score = sichuanScore({ fans: [{ name: '평화', chinese: '平胡', multiplier: 1, detail: '' }], basePoints: 1, winType: 'ron' });
+  state = settleSichuanWin(state, { winner: 3, score, winType: 'ron', loser: 0 });
+
+  const before = [...state.scores];
+  const result = settleSichuanKan(state, { kanner: 1, kind: 'ankan', basePoints: 1 });
+  // 빠진 3번은 그대로, 남은 0·2번만 낸다
+  assert.equal(result.state.scores[3], before[3]);
+  assert.equal(result.gained, 4);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('금구: 한 번도 울지 않으면 배수가 두 배', () => {
+  const tiles = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7','s7']);
+  const closed = evaluateSichuanFan({ hand: tiles, winType: 'ron' });
+  assert.equal(closed.some((fan) => fan.name === '금구'), true);
+
+  const open = evaluateSichuanFan({ hand: hand(['m1','m2','m3','m4','m5','m6','s2','s3','s4','s7','s7']), melds: [hand(['m7','m8','m9'])], winType: 'ron' });
+  assert.equal(open.some((fan) => fan.name === '금구'), false);
+});
+
+test('차대각: 유국이면 노텐과 화저가 텐파이한 사람에게 물어준다', () => {
+  // 0번은 텐파이, 1번은 노텐, 2번은 정결 미완료(화저), 3번도 텐파이
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const notenHand = hand(['m1','m3','m5','m7','m9','s2','s4','s6','s8','m2','m4','m6','s1']);
+  const pigHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','p2','p3','p4','p7']);
+
+  const result = settleSichuanFullDraw(createBloodState(0), {
+    hands: [tenpaiHand, notenHand, pigHand, tenpaiHand],
+    melds: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'],
+    basePoints: 1,
+  });
+
+  assert.equal(result.tenpai[0], true, '0번은 텐파이여야 합니다');
+  assert.equal(result.cleared[2], false, '2번은 정결을 못 끝낸 화저여야 합니다');
+  assert.equal(result.tenpai[2], false);
+  // 점수 총합은 보존
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+  // 텐파이한 사람은 받고, 노텐·화저는 낸다
+  assert.equal(result.state.scores[0] > 0, true);
+  assert.equal(result.state.scores[1] < 0, true);
+  assert.equal(result.state.scores[2] < 0, true);
+  assert.equal(result.log.length > 0, true);
+});
+
+test('네 명이 모두 텐파이면 차대각에서 점수가 오가지 않는다', () => {
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const result = settleSichuanFullDraw(createBloodState(0), {
+    hands: [tenpaiHand, tenpaiHand, tenpaiHand, tenpaiHand],
+    melds: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'],
+    basePoints: 1,
+  });
+  assert.deepEqual(result.state.scores, [0, 0, 0, 0]);
+  assert.equal(result.log.length, 0);
 });

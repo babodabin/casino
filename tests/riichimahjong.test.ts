@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, seatWindFor, roundWindFor, countYakumanMultiplier, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, resolveMultipleRon, settleMultipleRon, countNineTerminals, canDeclareNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, detectAbortiveDraw, tileDangerScore, type MahjongTile } from '../src/riichimahjong.ts';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, seatWindFor, roundWindFor, countYakumanMultiplier, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, resolveMultipleRon, settleMultipleRon, countNineTerminals, canDeclareNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, detectAbortiveDraw, tileDangerScore, isRedFive, countRedFives, redFiveLabel, DEFAULT_RIICHI_RULES, riichiRuleLabels, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -723,4 +723,74 @@ test('역만과 더블 역만 총액이 맞다', () => {
   assert.equal(y(1, true), 48000);
   assert.equal(y(2, false), 64000);
   assert.equal(y(2, true), 96000);
+});
+
+test('적도라는 각 종류의 5 한 장씩이며 한 장당 1판이다', () => {
+  const deck = createMahjongTiles();
+  const reds = deck.filter(isRedFive);
+  assert.equal(reds.length, 3, '적도라는 만수·통수·삭수 5 한 장씩 세 장');
+  assert.deepEqual(reds.map((tile) => tile.suit).sort(), ['m', 'p', 's']);
+  assert.equal(reds.every((tile) => tile.value === 5), true);
+
+  assert.equal(countRedFives(reds), 3);
+  assert.equal(countRedFives(deck.filter((tile) => tile.value !== 5)), 0);
+  assert.equal(redFiveLabel(reds[0]).includes('적'), true);
+  assert.equal(redFiveLabel(deck.find((tile) => tile.value === 1)!).includes('적'), false);
+});
+
+test('쿠이탕을 끄면 울고 만든 탕야오는 인정하지 않는다', () => {
+  const concealed = hand(['m2','m3','m4','p5','p6','p7','s3','s3']);
+  const melds = [hand(['s6','s7','s8'])];
+
+  const ari = evaluateBasicRiichiYaku({ concealed, openMelds: melds, winType: 'ron', openTanyao: true });
+  assert.equal(ari.some((yaku) => yaku.name === '탕야오'), true);
+
+  const nashi = evaluateBasicRiichiYaku({ concealed, openMelds: melds, winType: 'ron', openTanyao: false });
+  assert.equal(nashi.some((yaku) => yaku.name === '탕야오'), false);
+
+  // 울지 않았으면 설정과 무관하게 인정
+  const closed = hand(['m2','m3','m4','p5','p6','p7','s6','s7','s8','m6','m7','m8','s3','s3']);
+  assert.equal(evaluateBasicRiichiYaku({ concealed: closed, winType: 'ron', openTanyao: false }).some((yaku) => yaku.name === '탕야오'), true);
+});
+
+test('인화는 자가가 첫 순번에 남의 패로 완성했을 때만 붙는다', () => {
+  const tiles = hand(['m1','m2','m3','m4','m5','m6','p2','p3','p4','s6','s7','s8','p5','p5']);
+  const winning = tiles.find((tile) => tile.suit === 's' && tile.value === 8)!;
+
+  const human = evaluateBasicRiichiYaku({ concealed: tiles, winType: 'ron', winningTile: winning, firstTurn: true, anyCallMade: false, seatWind: 2 });
+  assert.equal(human.some((yaku) => yaku.name === '인화'), true);
+
+  // 친은 인화가 아니라 천화 쪽 (쯔모여야 하므로 론이면 아무것도 아님)
+  const dealer = evaluateBasicRiichiYaku({ concealed: tiles, winType: 'ron', winningTile: winning, firstTurn: true, anyCallMade: false, seatWind: 1 });
+  assert.equal(dealer.some((yaku) => yaku.name === '인화'), false);
+
+  // 누가 울었으면 성립하지 않음
+  const called = evaluateBasicRiichiYaku({ concealed: tiles, winType: 'ron', winningTile: winning, firstTurn: true, anyCallMade: true, seatWind: 2 });
+  assert.equal(called.some((yaku) => yaku.name === '인화'), false);
+
+  // 첫 순번이 아니면 성립하지 않음
+  const later = evaluateBasicRiichiYaku({ concealed: tiles, winType: 'ron', winningTile: winning, firstTurn: false, seatWind: 2 });
+  assert.equal(later.some((yaku) => yaku.name === '인화'), false);
+});
+
+test('룰 옵션의 기본값과 이름표가 갖춰져 있다', () => {
+  assert.equal(DEFAULT_RIICHI_RULES.redFives, true);
+  assert.equal(DEFAULT_RIICHI_RULES.openTanyao, true);
+  assert.equal(Object.keys(DEFAULT_RIICHI_RULES).length, 6);
+  Object.keys(DEFAULT_RIICHI_RULES).forEach((key) => {
+    const label = riichiRuleLabels[key as keyof typeof DEFAULT_RIICHI_RULES];
+    assert.equal(typeof label.name, 'string');
+    assert.equal(label.name.length > 0, true);
+    assert.equal(label.detail.length > 0, true);
+  });
+});
+
+test('왕패 없이 나누면 산의 마지막 패까지 모두 쓸 수 있다', () => {
+  const withDeadWall = dealRiichi(Math.random, true, 14);
+  assert.equal(withDeadWall.deadWall.length, 14);
+  assert.equal(withDeadWall.wall.length, 136 - 52 - 14);
+
+  const noDeadWall = dealRiichi(Math.random, false, 0);
+  assert.equal(noDeadWall.deadWall.length, 0);
+  assert.equal(noDeadWall.wall.length, 108 - 52);
 });

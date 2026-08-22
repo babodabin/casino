@@ -89,3 +89,60 @@ test('버튼 문구가 상태를 구분해 준다', () => {
   assert.equal(winButtonLabel('sichuan', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '정결 미완료');
   assert.equal(winButtonLabel('riichi', true, { allowed: true, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '쯔모');
 });
+
+test('쿠이탕을 끄면 울고 만든 탕야오가 인정되지 않는다', () => {
+  const concealed = hand(['m2','m3','m4','p5','p6','p7','s2','s3','s4','s5','s5']);
+  const melds = [hand(['s6','s7','s8'])];
+  const ctx = { ...base, mode: 'riichi' as const, hand: concealed, melds, winType: 'ron' as const, winningTile: concealed[10] };
+
+  const ari = summariseWin({ ...ctx, openTanyao: true });
+  assert.equal(ari.lines.some((line) => line.name === '탕야오'), true);
+
+  const nashi = summariseWin({ ...ctx, openTanyao: false });
+  assert.equal(nashi.lines.some((line) => line.name === '탕야오'), false);
+});
+
+test('적도라를 끄면 점수에서 빠진다', () => {
+  const tiles = hand(['m1','m2','m3','m4','m5','m6','p2','p3','p4','s6','s7','s8','p5','p5']);
+  // 적도라 자리에 놓기 위해 id를 맞춥니다
+  const red = tiles.map((tile, index) => index === 12 ? { ...tile, id: 'p5-0' } : tile);
+  const winning = red.find((tile) => tile.suit === 's' && tile.value === 8)!;
+  const ctx = { ...base, mode: 'riichi' as const, hand: red, winType: 'ron' as const, winningTile: winning, riichi: true };
+
+  const on = summariseWin({ ...ctx, redFives: true });
+  const off = summariseWin({ ...ctx, redFives: false });
+  assert.equal(on.lines.some((line) => line.name === '적도라'), true);
+  assert.equal(off.lines.some((line) => line.name === '적도라'), false);
+  assert.equal(on.rawPoints > off.rawPoints, true, '적도라를 켜면 점수가 더 높아야 합니다');
+});
+
+test('홍콩 최소 번을 낮추면 화료할 수 있게 된다', () => {
+  const plain = hand(['m1','m2','m3','p4','p5','p6','s3','s4','s5','m6','m7','m8','s7','s7']);
+  const ctx = { ...base, mode: 'hongkong' as const, hand: plain, winType: 'ron' as const };
+
+  const strict = summariseWin({ ...ctx, minFaan: 5 });
+  assert.equal(strict.allowed, false);
+  assert.equal(strict.blockedReason.includes('5번'), true);
+
+  const loose = summariseWin({ ...ctx, minFaan: 1 });
+  assert.equal(loose.allowed, true, `1번 기준이면 화료 가능해야 합니다 (현재 ${loose.rawPoints}번)`);
+});
+
+test('완성되지 않은 패는 어떤 종목에서도 화료로 인정하지 않는다', () => {
+  // 몸통 4개와 머리 1개를 만들 수 없는 14장
+  const broken = hand(['m1','m2','p1','p6','p7','p8','p9','p9','s1','s2','s9','z3','z7','z5']);
+  const winning = broken[broken.length - 1];
+  for (const mode of ['riichi', 'chinese', 'hongkong'] as const) {
+    const summary = summariseWin({ ...base, mode, hand: broken, winType: 'tsumo', winningTile: winning });
+    assert.equal(summary.allowed, false, `${mode}에서 미완성 패가 화료로 인정됨`);
+    assert.equal(summary.blockedReason, '아직 완성된 패가 아닙니다');
+    assert.equal(summary.rawPoints, 0);
+  }
+});
+
+test('멘젠쯔모만으로 미완성 패가 통과하지 않는다', () => {
+  const broken = hand(['m1','m1','m1','m2','m2','m2','m3','m3','m3','m4','m4','m4','s5','s9']);
+  const summary = summariseWin({ ...base, mode: 'riichi', hand: broken, winType: 'tsumo', winningTile: broken[13] });
+  assert.equal(summary.allowed, false);
+  assert.equal(summary.grade, '');
+});

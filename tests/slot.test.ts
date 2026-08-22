@@ -38,3 +38,13 @@ test('파치슬롯 BIG과 REGULAR 보너스를 판정한다', () => {
   assert.equal(evaluatePachislot(['7️⃣', '7️⃣', '7️⃣'], 100).bonusSpins, 8);
   assert.equal(evaluatePachislot(['🔔', '🔔', '🔔'], 100).bonusSpins, 4);
 });
+
+test('조커는 서로 다른 그림 사이에서도 2개 보너스를 만든다', () => {
+  const result = evaluateSlot(['👑', '💎', '🃏'], 100);
+  assert.equal(result.multiplier, 1.5);
+  assert.equal(result.payout, 150);
+});
+
+test('조커 없이 모두 다르면 당첨이 없다', () => {
+  assert.equal(evaluateSlot(['👑', '💎', '🍒'], 100).payout, 0);
+});
