@@ -47,6 +47,7 @@ jobs:
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
 
+          # 홈 화면 아이콘만 교체하고, 레이아웃/safe-area 설정은 건드리지 않습니다.
           cp assets/icon.png dist/icon.png
           python - <<'PY'
           from pathlib import Path
@@ -54,47 +55,13 @@ jobs:
 
           path = Path('dist/index.html')
           html = path.read_text()
+          icon = '<link rel="apple-touch-icon" href="./icon.png?v=5" />'
+          pattern = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
 
-          # Keep edge-to-edge viewport support, but do not use black-translucent.
-          viewport_re = re.compile(r'<meta[^>]+name=["\']viewport["\'][^>]*>', re.IGNORECASE)
-          match = viewport_re.search(html)
-          if match:
-              tag = match.group(0)
-              content_match = re.search(r'content=["\']([^"\']*)["\']', tag, re.IGNORECASE)
-              content = content_match.group(1) if content_match else 'width=device-width, initial-scale=1'
-              if 'viewport-fit=cover' not in content:
-                  content = content.rstrip(' ,') + ', viewport-fit=cover'
-              replacement = f'<meta name="viewport" content="{content}" />'
-              html = html[:match.start()] + replacement + html[match.end():]
+          if re.search(pattern, html, flags=re.IGNORECASE):
+              html = re.sub(pattern, icon, html, count=1, flags=re.IGNORECASE)
           else:
-              html = html.replace('<head>', '<head>\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />', 1)
-
-          if 'apple-mobile-web-app-capable' not in html:
-              html = html.replace('</head>', '<meta name="apple-mobile-web-app-capable" content="yes" />\n</head>', 1)
-
-          # iOS 26 standalone PWA can create a bottom chin gap when this is combined
-          # with viewport-fit=cover, so remove it from every deployment.
-          html = re.sub(
-              r'<meta[^>]+name=["\']apple-mobile-web-app-status-bar-style["\'][^>]*>\s*',
-              '',
-              html,
-              flags=re.IGNORECASE,
-          )
-
-          # Remove the temporary fullscreen workaround if it ever appears.
-          html = re.sub(
-              r'<style[^>]+id=["\']world-casino-fullscreen-fix["\'][^>]*>.*?</style>\s*',
-              '',
-              html,
-              flags=re.IGNORECASE | re.DOTALL,
-          )
-
-          icon = '<link rel="apple-touch-icon" href="./icon.png?v=7" />'
-          icon_re = r'<link[^>]+rel=["\']apple-touch-icon["\'][^>]*>'
-          if re.search(icon_re, html, flags=re.IGNORECASE):
-              html = re.sub(icon_re, icon, html, count=1, flags=re.IGNORECASE)
-          else:
-              html = html.replace('</head>', f'{icon}\n</head>', 1)
+              html = html.replace('</head>', f'{icon}\n</head>')
 
           path.write_text(html)
           PY
