@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -23,6 +23,45 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Apply verified safe-area fix to source
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('App.tsx')
+          text = path.read_text()
+
+          # 검증된 해결책 그대로:
+          # 1) 루트 SafeAreaView 제거
+          # 2) 탭바의 insets.bottom은 그대로 한 번만 유지
+          text = text.replace('  SafeAreaView,\n', '')
+          text = text.replace(
+              '<SafeAreaView style={styles.splash}>',
+              '<View style={[styles.splash, { paddingTop: insets.top }]}>',
+          )
+          text = text.replace('</SafeAreaView>', '</View>')
+
+          required = [
+              '<View style={[styles.app, { paddingTop: insets.top }]}>' ,
+              'style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}',
+          ]
+          if 'SafeAreaView' in text:
+              raise SystemExit('SafeAreaView still remains; refusing to deploy.')
+          if not all(marker in text for marker in required):
+              raise SystemExit('Verified safe-area layout markers not found; refusing to deploy.')
+
+          path.write_text(text)
+          PY
+
+          if ! git diff --quiet -- App.tsx; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add App.tsx
+            git commit -m "Remove duplicate root safe-area padding"
+            git push origin HEAD:main
+          fi
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -47,7 +86,7 @@ jobs:
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
 
-          # 홈 화면 아이콘만 교체하고, 레이아웃/safe-area 설정은 건드리지 않습니다.
+          # 아이콘만 교체합니다. safe-area/레이아웃은 여기서 건드리지 않습니다.
           cp assets/icon.png dist/icon.png
           python - <<'PY'
           from pathlib import Path
