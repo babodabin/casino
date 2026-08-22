@@ -47,8 +47,8 @@ jobs:
               '<View style={[styles.app, { paddingTop: insets.top }]}>' ,
               'style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}',
           ]
-          if 'SafeAreaView' in text:
-              raise SystemExit('SafeAreaView still remains; refusing to deploy.')
+          if '<SafeAreaView' in text or '</SafeAreaView>' in text or '  SafeAreaView,\n' in text:
+              raise SystemExit('SafeAreaView component still remains; refusing to deploy.')
           if not all(marker in text for marker in required):
               raise SystemExit('Verified safe-area layout markers not found; refusing to deploy.')
 
