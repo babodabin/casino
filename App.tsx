@@ -56,10 +56,11 @@ import {
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
 import { monthNames, type HwatuCard } from './src/hwatu';
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
+import { dealDori, evaluateDori, resolveDori } from './src/dorijitgottaeng';
 import { backupFileName, buildBackup, checkBackup, type BackupData } from './src/backup';
 import { levelFromPlays } from './src/level';
 import { DAILY_MISSION_GOAL, DAILY_MISSION_REWARD, countPlayedOn, missionDayKey, shouldClaimMission } from './src/mission';
-import { decidePokerAction, estimateDrawEquity, estimateEquity, pokerActionLabel, seotdaEquity } from './src/pokerai';
+import { decidePokerAction, doriEquity, estimateDrawEquity, estimateEquity, pokerActionLabel, seotdaEquity } from './src/pokerai';
 import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
 import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
@@ -75,14 +76,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '섰다';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '섰다' | '도리짓고땡';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -114,7 +115,7 @@ const gameCategories: GameCategory[] = [
     { name: '고스톱', icon: '花', description: '화투패를 모아 점수를 겨루는 대표 게임', status: 'planned' },
     { name: '맞고', icon: '二', description: '두 명이 빠르게 즐기는 고스톱', status: 'planned' },
     { name: '섰다', icon: '光', description: '두 장의 화투 조합으로 승부', status: 'playable' },
-    { name: '도리짓고땡', icon: '十', description: '패를 나누어 두 조합을 완성', status: 'planned' },
+    { name: '도리짓고땡', icon: '十', description: '다섯 장 중 셋으로 짓고 남은 둘로 승부', status: 'playable' },
     { name: '민화투', icon: '月', description: '그림과 띠를 모으는 전통 화투', status: 'planned' },
     { name: '육백', icon: '六', description: '화투 점수를 누적하는 팀 게임', status: 'planned' },
   ]},
@@ -179,6 +180,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '홍콩 마작': 'hongKongMahjongSetup',
   '사천 마작': 'sichuanMahjongSetup',
   '섰다': 'seotdaSetup',
+  '도리짓고땡': 'doriSetup',
 };
 const screenForGame = (name: string): AppScreen => gameEntryScreens[name] ?? 'gamePreview';
 
@@ -670,12 +672,15 @@ function CasinoApp() {
     addRecord((count) => ({ id: `${Date.now()}-poker-${count}`, game, result, difficulty, bet:mine, net, playedAt:new Date().toISOString(), detail }));
   };
 
-  const settleSeotda = (mine: number, theirs: number, result: 'win' | 'loss' | 'push', detail: string) => {
+  // 화투 게임들은 정산 방식이 같아 한 함수로 씁니다.
+  const settleHwatu = (game: '섰다' | '도리짓고땡') => (mine: number, theirs: number, result: 'win' | 'loss' | 'push', detail: string) => {
     const payout = result === 'win' ? mine + theirs : result === 'push' ? mine : 0;
     const net = result === 'win' ? theirs : result === 'push' ? 0 : -mine;
     if (payout) setCoins((current) => current + payout);
-    addRecord((count) => ({ id: `${Date.now()}-seotda-${count}`, game: '섰다', result, difficulty, bet: mine, net, playedAt: new Date().toISOString(), detail }));
+    addRecord((count) => ({ id: `${Date.now()}-hwatu-${count}`, game, result, difficulty, bet: mine, net, playedAt: new Date().toISOString(), detail }));
   };
+  const settleSeotda = settleHwatu('섰다');
+  const settleDori = settleHwatu('도리짓고땡');
 
   const settleHighLow = (mine: number, theirs: number, share: number, detail: string) => {
     const payout = Math.round((mine + theirs) * share); const net = payout - mine;
@@ -751,6 +756,20 @@ function CasinoApp() {
             onPlayAgain={startBlackjack}
             onExit={() => setAppScreen('blackjackSetup')}
           />
+        )}
+        {appScreen === 'doriSetup' && (
+          <DoriSetupScreen
+            coins={coins}
+            difficulty={difficulty}
+            selectedBet={selectedBet}
+            onBack={() => setAppScreen('categoryCatalog')}
+            onDifficultyChange={saveDifficulty}
+            onBetChange={setSelectedBet}
+            onStart={() => setAppScreen('doriGame')}
+          />
+        )}
+        {appScreen === 'doriGame' && (
+          <DoriGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('doriSetup')} onPlaceBet={placeBet} onSettle={settleDori} />
         )}
         {appScreen === 'seotdaSetup' && (
           <SeotdaSetupScreen
@@ -2332,6 +2351,130 @@ function HwatuCardView({ card, hidden = false, emphasis }: { card: HwatuCard; hi
       <Text style={styles.hwatuName}>{monthNames[card.month]}</Text>
     </View>
   );
+}
+
+function DoriSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
+  const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="도리짓고땡 준비" onBack={props.onBack} />
+      <ScrollView {...useScrollMemory('DoriSetupScreen')} contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <View style={styles.sicboHero}>
+          <Text style={styles.sicboHeroDice}>三 + 二 = 짓기</Text>
+          <Text style={styles.detailLead}>다섯 장 중 셋으로 짓고 둘로 겨루기</Text>
+        </View>
+        <View style={styles.slotRules}>
+          <Text style={styles.slotRulesTitle}>규칙</Text>
+          <Text style={styles.slotRuleText}>1. 화투 20장(1~10월 각 두 장)에서 다섯 장을 받습니다.</Text>
+          <Text style={styles.slotRuleText}>2. 그중 <Text style={styles.mahjongStrong}>세 장의 월 합이 10·20·30</Text>이 되게 지어 내려놓습니다.</Text>
+          <Text style={styles.slotRuleText}>3. 남은 두 장으로 겨룹니다. 같은 달 두 장이면 <Text style={styles.mahjongStrong}>땡</Text>, 아니면 두 달을 더한 <Text style={styles.mahjongStrong}>끗</Text>입니다.</Text>
+          <Text style={styles.slotRuleText}>4. 땡이 끗보다 무조건 높고, 장(10)땡이 가장 높습니다. 9끗은 갑오, 0끗은 망통.</Text>
+          <Text style={styles.slotRuleText}>5. 세 장으로 10의 배수를 <Text style={styles.mahjongStrong}>못 만들면 그 판은 집니다</Text>. 대략 열 판에 세 판꼴로 나옵니다.</Text>
+          <Text style={styles.slotRuleText}>지을 방법이 여럿이면 남는 두 장이 가장 센 쪽으로 자동으로 지어 드립니다.</Text>
+        </View>
+        <Text style={styles.sectionTitle}>베팅 등급</Text>
+        <View style={styles.setupOptions}>
+          {difficultyOptions.map((item) => (
+            <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}>
+              <Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text>
+              <Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.sectionTitle}>시작 베팅</Text>
+        <View style={styles.betGrid}>
+          {option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}
+        </View>
+        <Pressable disabled={props.selectedBet > props.coins} style={[styles.primaryButton, styles.fullWidthButton, props.selectedBet > props.coins && styles.disabledCard]} onPress={props.onStart}>
+          <Text style={styles.primaryButtonText}>도리짓고땡 시작</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+  const [round,setRound]=useState<ReturnType<typeof dealDori>|null>(null);
+  const [phase,setPhase]=useState<'ready'|'bet'|'result'>('ready');
+  const [betting,setBetting]=useState<PokerBetting>({mine:0,theirs:0,raises:0});
+  const [outcome,setOutcome]=useState('');
+  const [opponentNote,setOpponentNote]=useState('');
+  const [showdown,setShowdown]=useState<ReturnType<typeof resolveDori>|null>(null);
+
+  const myResult=round?evaluateDori(round.player):null;
+
+  const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealDori());setBetting({mine:selectedBet,theirs:selectedBet,raises:0});setOutcome('');setOpponentNote('컴퓨터도 같은 금액을 냈습니다');setShowdown(null);setPhase('bet');};
+
+  const settle=(current:PokerBetting,active:ReturnType<typeof dealDori>)=>{
+    const resolved=resolveDori(active.player,active.opponent);
+    setShowdown(resolved);
+    setOutcome(resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'비겼습니다');
+    const label=(r:ReturnType<typeof evaluateDori>)=>r.kind==='hand'?r.hand.name:'못 지음';
+    onSettle(current.mine,current.theirs,resolved.result,`${label(resolved.playerHand)} vs ${label(resolved.opponentHand)}`);
+    setPhase('result');
+  };
+
+  /** 컴퓨터는 상대가 받을 수 있는 다섯 장 3,003가지를 전부 세어 판단합니다. */
+  const computerTurn=(current:PokerBetting)=>{
+    if(!round)return;
+    const equity=doriEquity(round.opponent);
+    const action=decidePokerAction({equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:2});
+    if(action.kind==='fold'){
+      setBetting(current);setOpponentNote('컴퓨터 죽음 — 팟을 가져갑니다');setOutcome('컴퓨터가 죽었습니다');setShowdown(null);
+      onSettle(current.mine,current.theirs,'win','컴퓨터 죽음 · 상대 패 비공개');setPhase('result');return;
+    }
+    if(action.kind==='raise'){
+      const next={mine:current.mine,theirs:current.mine+action.amount,raises:current.raises+1};
+      setBetting(next);setOpponentNote(`컴퓨터 ${pokerActionLabel(action)} — 받으려면 ${(next.theirs-next.mine).toLocaleString()} WC`);return;
+    }
+    const next={mine:current.mine,theirs:current.mine,raises:0};
+    setBetting(next);
+    setOpponentNote(`컴퓨터 ${action.kind==='call'?`받음 ${(current.mine-current.theirs).toLocaleString()} WC`:'체크'}`);
+    settle(next,round);
+  };
+
+  const toCall=Math.max(0,betting.theirs-betting.mine);
+  const fold=()=>{setOutcome('죽었습니다 · 상대 패는 공개하지 않습니다');setShowdown(null);onSettle(betting.mine,betting.theirs,'loss','중간에 죽음 · 상대 패 비공개');setPhase('result');};
+  const callOrCheck=()=>{if(toCall>0&&!onPlaceBet(toCall))return;const next={...betting,mine:betting.mine+toCall};setBetting(next);computerTurn(next);};
+  const raise=()=>{const need=toCall+selectedBet;if(!onPlaceBet(need))return;const next={mine:betting.mine+need,theirs:betting.theirs,raises:betting.raises+1};setBetting(next);computerTurn(next);};
+
+  /** 지은 세 장은 흐리게, 겨루는 두 장은 그대로 보여 줍니다. */
+  const handRow=(cards:HwatuCard[],result:ReturnType<typeof evaluateDori>|null,hidden:boolean,winner:boolean|undefined)=>{
+    const buildIds=result&&result.kind==='hand'?new Set(result.hand.build.map((card)=>card.id)):new Set<string>();
+    return <View style={styles.hwatuHand}>{cards.map((card)=>
+      <HwatuCardView key={card.id} card={card} hidden={hidden}
+        emphasis={hidden?undefined:buildIds.has(card.id)?'dim':winner===undefined?undefined:winner?'winner':'dim'}/>)}</View>;
+  };
+
+  const winnerSide=(side:'player'|'opponent')=>{
+    if(!showdown||showdown.result==='push')return undefined;
+    return (side==='player')===(showdown.result==='win');
+  };
+  const label=(r:ReturnType<typeof evaluateDori>)=>r.kind==='hand'?`${r.hand.name} · ${r.hand.detail}`:'못 지음 · 세 장으로 10의 배수를 만들 수 없습니다';
+
+  return <View style={styles.detailScreen}><ScreenHeader title="도리짓고땡" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
+    <View style={[styles.holdemTable,styles.fiveDrawTable]}>
+      <Text style={styles.holdemSeat}>컴퓨터</Text>
+      {round?handRow(round.opponent,showdown?evaluateDori(round.opponent):null,!showdown,winnerSide('opponent')):null}
+      {showdown?<Text style={styles.pokerInlineResult}>{label(showdown.opponentHand)}</Text>:null}
+      <Text style={styles.holdemPot}>POT {(betting.mine+betting.theirs).toLocaleString()} WC</Text>
+      <Text style={styles.pokerContribution}>내가 낸 돈 {betting.mine.toLocaleString()} · 컴퓨터 {betting.theirs.toLocaleString()} WC</Text>
+      <Text style={styles.holdemSeat}>나</Text>
+      {round?handRow(round.player,myResult,false,winnerSide('player')):null}
+      {myResult?<Text style={styles.seotdaMyHand}>{label(myResult)}</Text>:null}
+      {round&&myResult?.kind==='hand'?<Text style={styles.doriHint}>흐린 세 장이 지은 패입니다</Text>:null}
+      {opponentNote?<Text style={styles.pokerOpponentNote}>{opponentNote}</Text>:null}
+      <Text style={styles.holdemOutcome}>{outcome||'다섯 장을 받아 시작하세요'}</Text>
+    </View>
+    {phase!=='bet'
+      ?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 하기':'다섯 장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>
+      :<View style={styles.holdemActions}>
+        <Pressable style={styles.holdemFold} onPress={fold}><Text style={styles.holdemActionText}>죽기</Text></Pressable>
+        <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={callOrCheck}><Text style={styles.primaryButtonText}>{toCall>0?`받기 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
+        <Pressable disabled={toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={raise}><Text style={styles.primaryButtonText}>더 걸기 +{selectedBet.toLocaleString()}</Text></Pressable>
+      </View>}
+    <Text style={styles.disclaimer}>세 장으로 10의 배수를 못 만들면 집니다 · 상대 패는 끝까지 갔을 때만 공개됩니다</Text>
+  </ScrollView></View>;
 }
 
 function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; rules:SeotdaRules; onRulesChange:(v:SeotdaRules)=>void; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
@@ -3989,6 +4132,7 @@ const styles = StyleSheet.create({
   hwatuKind: { color: '#7A4A1E', fontSize: 13, fontWeight: '700' },
   hwatuName: { color: '#6B6355', fontSize: 10 },
   seotdaMyHand: { color: colors.goldLight, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 4 },
+  doriHint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 2 },
   importApply: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.gold },
   levelCard: { backgroundColor: colors.panel, borderRadius: 16, padding: 16, gap: 8, marginBottom: 14, borderWidth: 1, borderColor: colors.border },
   levelHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
