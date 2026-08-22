@@ -182,31 +182,6 @@ const gameEntryScreens: Record<string, AppScreen> = {
 };
 const screenForGame = (name: string): AppScreen => gameEntryScreens[name] ?? 'gamePreview';
 
-/**
- * 각 화면에서 뒤로 갔을 때 갈 화면.
- * 사파리의 '밀어서 뒤로 가기'가 사이트를 나가는 대신 이 표를 따라가게 씁니다.
- */
-const parentScreens: Partial<Record<AppScreen, AppScreen>> = {
-  categoryCatalog: 'tabs',
-  gamePreview: 'categoryCatalog',
-  blackjackSetup: 'categoryCatalog', blackjackGame: 'blackjackSetup',
-  rouletteSetup: 'categoryCatalog', rouletteGame: 'rouletteSetup',
-  baccaratSetup: 'categoryCatalog', baccaratGame: 'baccaratSetup',
-  crapsSetup: 'categoryCatalog', crapsGame: 'crapsSetup',
-  slotSetup: 'categoryCatalog', slotGame: 'slotSetup', pachislotGame: 'slotSetup',
-  sicboSetup: 'categoryCatalog', sicboGame: 'sicboSetup',
-  videoPokerSetup: 'categoryCatalog', videoPokerGame: 'videoPokerSetup',
-  holdemSetup: 'categoryCatalog', holdemGame: 'holdemSetup',
-  omahaSetup: 'categoryCatalog', omahaGame: 'omahaSetup',
-  sevenPokerSetup: 'categoryCatalog', sevenPokerGame: 'sevenPokerSetup',
-  fiveDrawSetup: 'categoryCatalog', fiveDrawGame: 'fiveDrawSetup',
-  highLowSetup: 'categoryCatalog', highLowGame: 'highLowSetup',
-  riichiSetup: 'categoryCatalog', riichiGame: 'riichiSetup',
-  chineseMahjongSetup: 'categoryCatalog', chineseMahjongGame: 'chineseMahjongSetup',
-  hongKongMahjongSetup: 'categoryCatalog', hongKongMahjongGame: 'hongKongMahjongSetup',
-  sichuanMahjongSetup: 'categoryCatalog', sichuanMahjongGame: 'sichuanMahjongSetup',
-  seotdaSetup: 'categoryCatalog', seotdaGame: 'seotdaSetup',
-};
 
 const gameCategoryOf = (game: string) => gameCategories.find((category) => category.games.some((item) => item.name === game))?.name ?? '기타';
 
@@ -460,41 +435,6 @@ function CasinoApp() {
     };
   }, []);
 
-  // 사파리의 '밀어서 뒤로 가기'가 사이트를 나가는 대신 앱 안에서 한 단계 뒤로 가게 합니다.
-  //
-  // 화면을 옮길 때마다 기록을 쌓으면 방문 기록이 계속 늘어나서, 사파리가 같은 페이지
-  // 안에서의 이동이 아니라 진짜 페이지 이동으로 취급합니다(흰 화면이 잠깐 보이고 느려짐).
-  // 그래서 기록은 항상 딱 한 칸만 세워 두고, 뒤로 갈 때 그 한 칸을 쓰고 다시 세웁니다.
-  const appScreenRef = useRef(appScreen);
-  appScreenRef.current = appScreen;
-  const backArmed = useRef(false);
-  const armBackRef = useRef<(() => void) | null>(null);
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    const arm = () => {
-      if (backArmed.current) return;
-      window.history.pushState({ worldCasino: true }, '');
-      backArmed.current = true;
-    };
-    const onPop = () => {
-      // 세워 둔 한 칸이 방금 쓰였습니다.
-      backArmed.current = false;
-      const parent = parentScreens[appScreenRef.current];
-      // 탭 화면이면 막지 않고 그대로 사이트를 나가게 둡니다.
-      if (!parent) return;
-      arm();
-      setAppScreen(parent);
-    };
-    armBackRef.current = arm;
-    window.addEventListener('popstate', onPop);
-    return () => { window.removeEventListener('popstate', onPop); armBackRef.current = null; };
-  }, []);
-
-  // 게임 쪽 화면에 있는 동안 한 칸만 유지합니다(이미 세워져 있으면 아무 일도 하지 않음).
-  useEffect(() => {
-    if (Platform.OS !== 'web') return;
-    if (parentScreens[appScreen]) armBackRef.current?.();
-  }, [appScreen]);
 
   // 백업 내보내기·가져오기. 가져오기는 검사를 통과한 뒤 확인을 받고 나서야 반영합니다.
   const [backupNote, setBackupNote] = useState('');
