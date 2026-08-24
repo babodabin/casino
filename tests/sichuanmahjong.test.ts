@@ -4,7 +4,7 @@ import {
   createSichuanTiles, dealSichuan, chooseVoidSuit, countBySuit, isSichuanVoidCleared, nextVoidDiscard,
   pickSwapTiles, swapThreeTiles, canSichuanWin, getSichuanWaits, countRoots, evaluateSichuanFan,
   sichuanScore, createBloodState, settleSichuanWin, settleSichuanMultipleRon, settleSichuanDraw, activeSichuanSeats,
-  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
+  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, refundSichuanKanTransfers, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
 } from '../src/sichuanmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -114,13 +114,13 @@ test('자모와 깡상화는 배수를 두 배씩 더한다', () => {
   const fans = evaluateSichuanFan({ hand: tiles, winType: 'tsumo', afterKan: true });
   assert.equal(fans.some((fan) => fan.name === '자모'), true);
   assert.equal(fans.some((fan) => fan.name === '깡상화'), true);
-  // 울지 않은 손이므로 금구도 붙습니다: 평화 1 × 금구 2 × 자모 2 × 깡상화 2 = 8배
-  assert.equal(fans.some((fan) => fan.name === '금구'), true);
+  // 울지 않은 손이므로 문전도 붙습니다: 평화 1 × 문전 2 × 자모 2 × 깡상화 2 = 8배
+  assert.equal(fans.some((fan) => fan.name === '문전'), true);
   assert.equal(sichuanScore({ fans, winType: 'tsumo' }).multiplier, 8);
 
-  // 울었으면 금구가 빠져 4배
+  // 울었으면 문전이 빠져 4배
   const opened = evaluateSichuanFan({ hand: hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','s2','s2']), melds: [hand(['m5','m6','m7'])], winType: 'tsumo', afterKan: true });
-  assert.equal(opened.some((fan) => fan.name === '금구'), false);
+  assert.equal(opened.some((fan) => fan.name === '문전'), false);
   assert.equal(sichuanScore({ fans: opened, winType: 'tsumo' }).multiplier, 4);
 });
 
@@ -331,6 +331,14 @@ test('이미 화료해 빠진 사람은 깡 정산에서 제외된다', () => {
   assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
 });
 
+test('깡 직후 방총하면 방금 받은 깡 점수를 모두 돌려준다', () => {
+  const before = createBloodState(0);
+  const afterKan = settleSichuanKan(before, { kanner: 0, kind: 'ankan', basePoints: 1 });
+  const refunded = refundSichuanKanTransfers(afterKan.state, afterKan.transfers);
+  assert.deepEqual(refunded.scores, before.scores);
+  assert.equal(refunded.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
 test('일포다향은 한 방총자가 여러 론 승자에게 각각 지불한다', () => {
   const one = sichuanScore({ fans: [{ name: '평화', chinese: '平胡', multiplier: 1, detail: '' }], basePoints: 1, winType: 'ron' });
   const two = sichuanScore({ fans: [{ name: '대대호', chinese: '对对胡', multiplier: 2, detail: '' }], basePoints: 1, winType: 'ron' });
@@ -356,13 +364,17 @@ test('퇴세는 유국 때 노텐인 사람이 받은 깡 점수를 돌려준다
   assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
 });
 
-test('금구: 한 번도 울지 않으면 배수가 두 배', () => {
+test('문전은 닫힌 손, 금구는 네 몸통을 공개한 단기 화료다', () => {
   const tiles = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7','s7']);
   const closed = evaluateSichuanFan({ hand: tiles, winType: 'ron' });
-  assert.equal(closed.some((fan) => fan.name === '금구'), true);
+  assert.equal(closed.some((fan) => fan.name === '문전'), true);
+  assert.equal(closed.some((fan) => fan.name === '금구'), false);
 
   const open = evaluateSichuanFan({ hand: hand(['m1','m2','m3','m4','m5','m6','s2','s3','s4','s7','s7']), melds: [hand(['m7','m8','m9'])], winType: 'ron' });
-  assert.equal(open.some((fan) => fan.name === '금구'), false);
+  assert.equal(open.some((fan) => fan.name === '문전'), false);
+
+  const goldHook = evaluateSichuanFan({ hand: hand(['s7','s7']), melds: [hand(['m1','m1','m1']),hand(['m2','m2','m2']),hand(['s3','s3','s3']),hand(['s4','s4','s4'])], winType: 'ron' });
+  assert.equal(goldHook.some((fan) => fan.name === '금구'), true);
 });
 
 test('차대각: 유국이면 노텐과 화저가 텐파이한 사람에게 물어준다', () => {

@@ -43,7 +43,7 @@ test('홍콩 마작: 한도 역과 번, 꽃패 규칙이 있다', () => {
 test('사천 마작: 고유 규칙이 모두 있다', () => {
   const source = read('sichuanmahjong.ts');
   const required = [
-    '정결', '환삼장', '혈전', '금구',
+    '정결', '환삼장', '혈전', '문전', '금구',
     '평화', '대대화', '청일색', '칠대자', '청대대', '용칠대자', '청칠대자', '장대', '청룡칠대자', '십팔나한',
     '자모', '깡상화', '창깡', '해저포',
     'settleSichuanKan', 'kanInstantPoints', 'settleSichuanFullDraw', 'autoPlaySichuanRemainder',

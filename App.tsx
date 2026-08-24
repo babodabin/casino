@@ -69,7 +69,7 @@ import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
 import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCardDraw } from './src/fivecarddraw';
 import { dealHighLow, resolveHighLow } from './src/highlow';
 import { summariseWin, isModeWinningShape, canModeWinShape, winButtonLabel, mahjongMinimumNote, type MahjongWinSummary } from './src/mahjongmodes';
-import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swapThreeTiles, settleSichuanFullDraw, settleSichuanKan, settleSichuanMultipleRon, createBloodState, settleSichuanWin, autoPlaySichuanRemainder, activeSichuanSeats, rankSichuanScores, evaluateSichuanFan, sichuanScore, countRoots, sichuanSuits, type SichuanSuit, type SichuanBloodState, type SichuanKanTransfer } from './src/sichuanmahjong';
+import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swapThreeTiles, settleSichuanFullDraw, settleSichuanKan, refundSichuanKanTransfers, settleSichuanMultipleRon, createBloodState, settleSichuanWin, autoPlaySichuanRemainder, activeSichuanSeats, rankSichuanScores, evaluateSichuanFan, sichuanScore, countRoots, sichuanSuits, type SichuanSuit, type SichuanBloodState, type SichuanKanTransfer } from './src/sichuanmahjong';
 import { createHongKongMatch, settleHongKongWin, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, evaluateHongKongFaan, hongKongScore, resolveFlowerDraws, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
 import { createChineseMatch, settleChineseWin, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
 import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
@@ -1968,6 +1968,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
   const [bloodState,setBloodState]=useState<SichuanBloodState>(createBloodState(0));
   const [bloodLog,setBloodLog]=useState<string[]>([]);
   const [sichuanKanTransfers,setSichuanKanTransfers]=useState<SichuanKanTransfer[]>([]);
+  const [sichuanLastKanTransfers,setSichuanLastKanTransfers]=useState<SichuanKanTransfer[]>([]);
   const [flowers,setFlowers]=useState<HongKongFlower[][]>([[],[],[],[]]);
   const [flowerWall,setFlowerWall]=useState<HongKongFlower[]>([]);
   const [rules,setRules]=useState<RiichiRuleOptions>(DEFAULT_RIICHI_RULES);
@@ -1995,6 +1996,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       if(phase==='ready')setBloodState(createBloodState(0));
       setBloodLog([]);
       setSichuanKanTransfers([]);
+      setSichuanLastKanTransfers([]);
     }else setChoosingVoid(false);
     if(mode==='hongkong'){
       // 꽃패 여덟 장 중 배패 때 나오는 몇 장만 먼저 주고, 나머지는 산에 남겨
@@ -2208,6 +2210,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       const settled=settleSichuanKan(bloodState,{kanner:0,kind:kind==='minkan'?'ankan':kind,basePoints:1});
       setBloodState(settled.state);
       setSichuanKanTransfers((current)=>[...current,...settled.transfers]);
+      setSichuanLastKanTransfers(settled.transfers);
       setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);
     }
     if(option.kind==='kakan'){
@@ -2251,10 +2254,11 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const ronWinners=computerRons.map((index)=>{const hand=[...opponents[index],mine.discarded];const winnerMelds=opponentMelds[index];const winnerFans=evaluateSichuanFan({hand,melds:winnerMelds,winType:'ron'});const winnerScore=sichuanScore({fans:winnerFans,roots:countRoots(hand,winnerMelds),basePoints:1,winType:'ron',activeOpponents:activeSichuanSeats(bloodState).length-1});return {seat:index+1,index,fans:winnerFans,score:winnerScore};});
         const fans=ronWinners[0].fans;
         const score=ronWinners[0].score;
-        const settled=ronWinners.length>1?settleSichuanMultipleRon(bloodState,{loser:0,winners:ronWinners.map(({seat,score})=>({seat,score}))}):settleSichuanWin(bloodState,{winner:seat,score,winType:'ron',loser:0});
+        const ronBaseState=afterKanDraw?refundSichuanKanTransfers(bloodState,sichuanLastKanTransfers):bloodState;
+        const settled=ronWinners.length>1?settleSichuanMultipleRon(ronBaseState,{loser:0,winners:ronWinners.map(({seat,score})=>({seat,score}))}):settleSichuanWin(ronBaseState,{winner:seat,score,winType:'ron',loser:0});
         const rest=autoPlaySichuanRemainder({state:settled,hands:[mine.hand,...opponents],melds:[openMelds,...opponentMelds],wall,rivers:nextRivers,voidSuits,basePoints:1,startSeat:seat+1});
         const ronLabel=ronWinners.map((winner)=>`컴퓨터 ${winner.index+1}`).join('·');
-        setBloodState(rest.state);setBloodLog([`${ronLabel} 론 · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
+        setBloodState(rest.state);setBloodLog([...(afterKanDraw?['깡 직후 방총 · 방금 받은 깡 점수 반환']:[]),`${ronLabel} 론 · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
         setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
         const delta=rest.state.scores[0]-bloodState.scores[0];
         finish(delta>0?'win':delta<0?'loss':'push',`${ronLabel} 론${ronWinners.length>1?' · 일포다향':''} · ${result.grade}\n혈전 ${rest.state.winners.length}명 화료 · 내 점수 ${delta>0?'+':''}${delta}`);

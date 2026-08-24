@@ -193,6 +193,7 @@ export function evaluateSichuanFan(args: {
 }): SichuanFan[] {
   const melds = args.melds ?? [];
   const concealed = melds.length === 0;
+  const goldHook = melds.length === 4 && args.hand.length === 2;
   const all = [...args.hand, ...melds.flat()];
   const fans: SichuanFan[] = [];
 
@@ -223,12 +224,13 @@ export function evaluateSichuanFan(args: {
   else if (allTriplets) fans.push({ name: '대대화', chinese: '碰碰胡', multiplier: 2, detail: '모든 몸통이 같은 패 세 장 또는 네 장' });
   else fans.push({ name: '평화', chinese: '平胡', multiplier: 1, detail: '기본 완성형' });
 
-  return finishFans(fans, { ...args, concealed });
+  return finishFans(fans, { ...args, concealed, goldHook });
 }
 
-function finishFans(fans: SichuanFan[], args: { winType: SichuanWinType; afterKan?: boolean; robbingKan?: boolean; lastTile?: boolean; concealed?: boolean }) {
+function finishFans(fans: SichuanFan[], args: { winType: SichuanWinType; afterKan?: boolean; robbingKan?: boolean; lastTile?: boolean; concealed?: boolean; goldHook?: boolean }) {
   const extra: SichuanFan[] = [];
-  if (args.concealed) extra.push({ name: '금구', chinese: '門清', multiplier: 2, detail: '한 번도 울지 않고 완성' });
+  if (args.concealed) extra.push({ name: '문전', chinese: '門清', multiplier: 2, detail: '한 번도 울지 않고 완성' });
+  if (args.goldHook) extra.push({ name: '금구', chinese: '金钩钓', multiplier: 2, detail: '네 몸통을 모두 공개하고 손의 한 장으로 단기 화료' });
   if (args.winType === 'tsumo') extra.push({ name: '자모', chinese: '自摸', multiplier: 2, detail: '직접 뽑아 완성' });
   if (args.afterKan) extra.push({ name: '깡상화', chinese: '杠上花', multiplier: 2, detail: '깡을 하고 가져온 패로 완성' });
   if (args.robbingKan) extra.push({ name: '창깡', chinese: '抢杠', multiplier: 2, detail: '상대가 가깡하려는 패를 가로채 완성' });
@@ -310,6 +312,21 @@ export function settleSichuanKan(state: SichuanBloodState, args: {
     });
   }
   return { state: next, gained, label: rule.label, transfers };
+}
+
+/** 깡 직후 버린 패로 방총하면 방금 받은 깡 점수를 원래 낸 사람에게 돌려줍니다. */
+export function refundSichuanKanTransfers(state: SichuanBloodState, transfers: SichuanKanTransfer[]): SichuanBloodState {
+  const next: SichuanBloodState = {
+    scores: [...state.scores] as SichuanBloodState['scores'],
+    finished: [...state.finished] as SichuanBloodState['finished'],
+    winners: [...state.winners],
+    over: state.over,
+  };
+  transfers.forEach((transfer) => {
+    next.scores[transfer.to] -= transfer.amount;
+    next.scores[transfer.from] += transfer.amount;
+  });
+  return next;
 }
 
 // ── 혈전도저 진행 ──────────────────────────────────────────────────

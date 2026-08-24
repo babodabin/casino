@@ -163,7 +163,8 @@ test('사천 마작 역의 배수가 표준과 같다', () => {
 
   const plain = hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','m5','m6','m7','s2','s2']);
   check('평화', 1, { hand: plain });
-  check('금구', 2, { hand: plain });
+  check('문전', 2, { hand: plain });
+  check('금구', 2, { hand: hand(['s2','s2']), melds: [hand(['m1','m1','m1']),hand(['m2','m2','m2']),hand(['s3','s3','s3']),hand(['s4','s4','s4'])] });
   check('자모', 2, { hand: plain, winType: 'tsumo' });
   check('깡상화', 2, { hand: plain, winType: 'tsumo', afterKan: true });
   check('창깡', 2, { hand: plain, robbingKan: true });
@@ -340,7 +341,7 @@ test('사천: 칠대자로도 표준형으로도 읽히는 손은 높은 쪽이 
   const both = hand(['m1','m1','m2','m2','m3','m3','m4','m4','m5','m5','m6','m6','m8','m8']);
   const fans = evaluateSichuanFan({ hand: both, winType: 'ron' });
   const score = sichuanScore({ fans, basePoints: 1, winType: 'ron' });
-  // 청칠대자 16 × 금구 2 = 32배. 표준형(청일색 4 × 금구 2 = 8배)보다 높아야 합니다
+  // 청칠대자 16 × 문전 2 = 32배. 표준형(청일색 4 × 문전 2 = 8배)보다 높아야 합니다
   assert.equal(fans.some((fan) => fan.name === '청칠대자'), true, `실제: ${fans.map((f) => f.name).join(' ')}`);
   assert.equal(score.multiplier >= 8, true);
 
@@ -360,7 +361,7 @@ test('사천 역 사다리가 점수를 잃지 않는다', () => {
   // 청대대가 청일색·대대화를 대신하므로 둘은 따로 나오지 않습니다
   assert.equal(names.includes('청일색'), false);
   assert.equal(names.includes('대대화'), false);
-  assert.equal(sichuanScore({ fans, basePoints: 1, winType: 'ron' }).multiplier, 16); // 청대대 8 × 금구 2
+  assert.equal(sichuanScore({ fans, basePoints: 1, winType: 'ron' }).multiplier, 16); // 청대대 8 × 문전 2
 });
 
 test('홍콩 역 사다리가 점수를 잃지 않는다', () => {
