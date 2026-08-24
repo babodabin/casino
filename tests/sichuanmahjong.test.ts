@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createSichuanTiles, dealSichuan, chooseVoidSuit, countBySuit, isSichuanVoidCleared, nextVoidDiscard,
   pickSwapTiles, swapThreeTiles, canSichuanWin, getSichuanWaits, countRoots, evaluateSichuanFan,
-  sichuanScore, createBloodState, settleSichuanWin, settleSichuanDraw, activeSichuanSeats,
+  sichuanScore, createBloodState, settleSichuanWin, settleSichuanMultipleRon, settleSichuanDraw, activeSichuanSeats,
   isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
 } from '../src/sichuanmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
@@ -328,6 +328,31 @@ test('이미 화료해 빠진 사람은 깡 정산에서 제외된다', () => {
   // 빠진 3번은 그대로, 남은 0·2번만 낸다
   assert.equal(result.state.scores[3], before[3]);
   assert.equal(result.gained, 4);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('일포다향은 한 방총자가 여러 론 승자에게 각각 지불한다', () => {
+  const one = sichuanScore({ fans: [{ name: '평화', chinese: '平胡', multiplier: 1, detail: '' }], basePoints: 1, winType: 'ron' });
+  const two = sichuanScore({ fans: [{ name: '대대호', chinese: '对对胡', multiplier: 2, detail: '' }], basePoints: 1, winType: 'ron' });
+  const result = settleSichuanMultipleRon(createBloodState(0), { loser: 0, winners: [{ seat: 1, score: one }, { seat: 3, score: two }] });
+  assert.deepEqual(result.winners, [1, 3]);
+  assert.deepEqual(result.finished, [false, true, false, true]);
+  assert.equal(result.scores[0], -(one.perPlayer + two.perPlayer));
+  assert.equal(result.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('퇴세는 유국 때 노텐인 사람이 받은 깡 점수를 돌려준다', () => {
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const notenHand = hand(['m1','m3','m5','m7','m9','s2','s4','s6','s8','m2','m4','m6','s1']);
+  const afterKan = settleSichuanKan(createBloodState(0), { kanner: 1, kind: 'ankan', basePoints: 1 });
+  const result = settleSichuanFullDraw(afterKan.state, {
+    hands: [tenpaiHand, notenHand, tenpaiHand, tenpaiHand],
+    melds: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'],
+    kanTransfers: afterKan.transfers,
+    basePoints: 1,
+  });
+  assert.ok(result.log.some((line) => line.includes('퇴세')));
   assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
 });
 

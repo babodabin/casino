@@ -263,6 +263,7 @@ export function sichuanScore(args: {
 // ── 과수(刮風下雨): 깡 즉시 정산 ────────────────────────────────────
 
 export type SichuanKanKind = 'ankan' | 'minkan' | 'kakan';
+export type SichuanKanTransfer = { from: number; to: number; amount: number };
 
 /**
  * 사천 마작은 깡을 하는 순간 점수를 받습니다.
@@ -282,7 +283,7 @@ export function settleSichuanKan(state: SichuanBloodState, args: {
   kind: SichuanKanKind;
   discarder?: number;
   basePoints?: number;
-}): { state: SichuanBloodState; gained: number; label: string } {
+}): { state: SichuanBloodState; gained: number; label: string; transfers: SichuanKanTransfer[] } {
   const rule = kanInstantPoints(args.kind, args.basePoints ?? 1);
   const next: SichuanBloodState = {
     scores: [...state.scores] as SichuanBloodState['scores'],
@@ -291,21 +292,24 @@ export function settleSichuanKan(state: SichuanBloodState, args: {
     over: state.over,
   };
   let gained = 0;
+  const transfers: SichuanKanTransfer[] = [];
   if (rule.fromDiscarder) {
     if (args.discarder === undefined) throw new Error('대명깡에는 패를 버린 사람이 필요합니다.');
     if (!next.finished[args.discarder]) {
       next.scores[args.discarder] -= rule.perPlayer;
       next.scores[args.kanner] += rule.perPlayer;
       gained = rule.perPlayer;
+      transfers.push({ from: args.discarder, to: args.kanner, amount: rule.perPlayer });
     }
   } else {
     activeSichuanSeats(state).filter((seat) => seat !== args.kanner).forEach((seat) => {
       next.scores[seat] -= rule.perPlayer;
       next.scores[args.kanner] += rule.perPlayer;
       gained += rule.perPlayer;
+      transfers.push({ from: seat, to: args.kanner, amount: rule.perPlayer });
     });
   }
-  return { state: next, gained, label: rule.label };
+  return { state: next, gained, label: rule.label, transfers };
 }
 
 // ── 혈전도저 진행 ──────────────────────────────────────────────────
@@ -359,6 +363,24 @@ export function settleSichuanWin(state: SichuanBloodState, args: {
   return next;
 }
 
+/** 한 장의 버림패로 여러 명이 동시에 론하는 일포다향 정산입니다. */
+export function settleSichuanMultipleRon(state: SichuanBloodState, args: {
+  loser: number;
+  winners: { seat: number; score: SichuanScore }[];
+}): SichuanBloodState {
+  if (state.finished[args.loser]) throw new Error('이미 화료해 빠진 사람은 방총할 수 없습니다.');
+  const seats = args.winners.map((winner) => winner.seat);
+  if (new Set(seats).size !== seats.length || args.winners.some((winner) => winner.seat === args.loser || state.finished[winner.seat])) {
+    throw new Error('론 승자는 서로 다른 진행 중 참가자여야 합니다.');
+  }
+  return args.winners.reduce((next, winner) => settleSichuanWin(next, {
+    winner: winner.seat,
+    score: winner.score,
+    winType: 'ron',
+    loser: args.loser,
+  }), state);
+}
+
 /**
  * 차대각(査大叫) · 차화저(査花豬).
  *
@@ -370,6 +392,7 @@ export function settleSichuanFullDraw(state: SichuanBloodState, args: {
   hands: MahjongTile[][];
   melds: MahjongTile[][][];
   voidSuits: SichuanSuit[];
+  kanTransfers?: SichuanKanTransfer[];
   basePoints?: number;
 }): { state: SichuanBloodState; tenpai: boolean[]; cleared: boolean[]; log: string[] } {
   const base = args.basePoints ?? 1;
@@ -403,6 +426,14 @@ export function settleSichuanFullDraw(state: SichuanBloodState, args: {
       next.scores[receiver] += best;
       log.push(`${seatLabelOf(payer)} → ${seatLabelOf(receiver)} ${best}점 (${isPig ? '화저' : '노텐'})`);
     });
+  });
+
+  // 퇴세(退稅): 유국 때 텐파이하지 못한 사람이 받은 깡 점수는 원래 낸 사람에게 돌려줍니다.
+  (args.kanTransfers ?? []).forEach((transfer) => {
+    if (!remaining.includes(transfer.to) || tenpai[transfer.to]) return;
+    next.scores[transfer.to] -= transfer.amount;
+    next.scores[transfer.from] += transfer.amount;
+    log.push(`${seatLabelOf(transfer.to)} → ${seatLabelOf(transfer.from)} ${transfer.amount}점 (퇴세)`);
   });
 
   return { state: next, tenpai, cleared, log };
