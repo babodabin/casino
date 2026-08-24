@@ -169,10 +169,10 @@ export function settleRiichiWin(state:RiichiMatchState,args:{winner:number;score
 
 export function rankRiichiScores(scores:RiichiMatchState['scores']){return scores.map((score,seat)=>({seat,score})).sort((a,b)=>b.score-a.score||a.seat-b.seat).map((entry,index)=>({...entry,rank:index+1}));}
 
-export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true): RiichiDiscardOption[] {
-  if (hand.length !== 14) return [];
+export function getRiichiDiscardOptions(hand: MahjongTile[], includeHonors = true, openMeldCount = 0): RiichiDiscardOption[] {
+  if (hand.length !== 14-openMeldCount*3) return [];
   return hand.flatMap((tile) => {
-    const waits = getMahjongWaits(hand.filter((candidate) => candidate.id !== tile.id), 0, includeHonors);
+    const waits = getMahjongWaits(hand.filter((candidate) => candidate.id !== tile.id), openMeldCount, includeHonors);
     return waits.length ? [{ tile, waits }] : [];
   });
 }
@@ -536,12 +536,12 @@ export function chooseComputerCall(hand:MahjongTile[],discarded:MahjongTile,canC
   return choice.score>=threshold?choice.call:null;
 }
 
-export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;riichiRivers?:MahjongTile[][];visibleTiles?:MahjongTile[];includeHonors?:boolean;riichiDeclared?:boolean;points?:number;openMeldCount?:number;openMelds?:MahjongTile[][];requireYaku?:boolean}={}) {
+export function playOneComputerTurn(hand: MahjongTile[], wall: MahjongTile[], random: () => number = Math.random, options:{level?:MahjongAiLevel;opponentRiver?:MahjongTile[];opponentRiichi?:boolean;riichiRivers?:MahjongTile[][];visibleTiles?:MahjongTile[];includeHonors?:boolean;riichiDeclared?:boolean;points?:number;openMeldCount?:number;openMelds?:MahjongTile[][];requireYaku?:boolean;discardChooser?:(hand:MahjongTile[])=>MahjongTile}={}) {
   const draw = drawTile(hand, wall);
   if (!draw.drawn) return { hand, wall, discarded: null, win: false };
   const complete=isWinningMahjongHand(draw.hand,options.openMeldCount??0);const hasYaku=!options.requireYaku||evaluateBasicRiichiYaku({concealed:draw.hand,openMelds:options.openMelds,riichi:options.riichiDeclared,winType:'tsumo',winningTile:draw.drawn}).length>0;
   if (complete&&hasYaku) return { hand: draw.hand, wall: draw.wall, discarded: null, win: true,winningTile:draw.drawn };
-  const discarded=options.riichiDeclared?draw.drawn:chooseComputerDiscard(draw.hand,{...options,random});
+  const discarded=options.riichiDeclared?draw.drawn:options.discardChooser?.(draw.hand)??chooseComputerDiscard(draw.hand,{...options,random});
   const nextHand=sortMahjongHand(draw.hand.filter((tile) => tile.id !== discarded.id));const riichi=!options.riichiDeclared&&!(options.openMeldCount??0)&&shouldComputerDeclareRiichi(nextHand,options.level,options.points,options.includeHonors,{wallRemaining:draw.wall.length,visibleTiles:options.visibleTiles,opponentRiichi:options.opponentRiichi});
   return { hand:nextHand, wall: draw.wall, discarded, win: false, riichi };
 }

@@ -132,6 +132,14 @@ test('14장에서 어떤 패를 버리면 리치인지 찾는다', () => {
   assert.equal(choices.some((choice) => choice.tile.suit === 'z' && choice.tile.value === 2), true);
 });
 
+test('공개 몸통이 있어 손패가 줄어도 버림 뒤 대기패를 찾는다', () => {
+  const tiles=hand(['m1','m2','m3','p1','p2','p3','s1','s2','s3','z5','z1']);
+  const choices=getRiichiDiscardOptions(tiles,true,1);
+  const choice=choices.find((item)=>`${item.tile.suit}${item.tile.value}`==='z1');
+  assert.ok(choice);
+  assert.ok(choice.waits.some((tile)=>`${tile.suit}${tile.value}`==='z5'));
+});
+
 test('리치와 멘젠쯔모 및 탕야오를 판정한다', () => {
   const result = evaluateBasicRiichiYaku({ concealed:hand(['m2','m3','m4','m3','m4','m5','p2','p3','p4','s6','s7','s8','p5','p5']), riichi:true, winType:'tsumo' });
   assert.deepEqual(result.map((yaku) => yaku.name), ['리치','멘젠쯔모','탕야오']);
