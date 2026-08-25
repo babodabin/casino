@@ -54,7 +54,7 @@ import {
   type BaccaratWinner,
 } from './src/baccarat';
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
-import { monthNames, type HwatuCard } from './src/hwatu';
+import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
 import { dealDori, evaluateDori, resolveDori } from './src/dorijitgottaeng';
 import { backupFileName, buildBackup, checkBackup, type BackupData } from './src/backup';
@@ -1913,7 +1913,7 @@ function PokerGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mo
 
 function RiichiSetupScreen(props:{coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}) {
   const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('RiichiSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text></View><RiichiBeginnerGuide/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>설명을 읽었어요 · 동1국 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('RiichiSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text></View><RiichiBeginnerGuide/><MahjongGlossary/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>설명을 읽었어요 · 동1국 시작</Text></Pressable></ScrollView></View>;
 }
 
 function RiichiBeginnerGuide(){
@@ -1927,6 +1927,29 @@ function RiichiBeginnerGuide(){
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>6</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>치·퐁·깡·리치는 무엇인가요?</Text><Text style={styles.mahjongLessonText}>치·퐁은 상대의 버림패를 가져와 몸통을 만드는 것, 깡은 같은 패 4장을 공개하는 것입니다. 치는 바로 왼쪽 상대의 패만 가져올 수 있지만 퐁·깡은 누구의 패든 가능합니다. 리치는 패를 공개하지 않은 텐파이 상태에서 1,000점을 맡기고 선언합니다. 선언 후에는 새로 뽑은 패만 그대로 버립니다.</Text></View></View>
     <View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>현재 이 앱에서 먼저 연습하는 것</Text><Text style={styles.mahjongLessonText}>패 뽑기 → 필요 없는 패 버리기 → 몸통 4개와 머리 1개 만들기 → 쯔모 판정. 처음에는 점수보다 패 모양을 익히면 됩니다.</Text></View>
   </View>:null}</View>;
+}
+
+const mahjongGlossary=[
+  ['몸통','패 3장으로 만든 한 묶음. 연속 숫자 3장(순쯔) 또는 같은 패 3장(커쯔)입니다.'],
+  ['머리','똑같은 패 2장. 기본 완성은 몸통 4개와 머리 1개입니다.'],
+  ['역(役)','승리할 자격과 점수를 주는 조건. 리치·탕야오·역패 등이 역입니다.'],
+  ['판(飜)','리치마작에서 역의 가치를 세는 단위. 판이 높을수록 점수가 크게 오릅니다.'],
+  ['부(符)','리치마작에서 패 모양의 어려움을 세는 단위. 판과 부로 점수를 정합니다.'],
+  ['쯔모','내가 직접 뽑은 패로 완성해 승리하는 것.'],
+  ['론','다른 사람이 버린 패로 완성해 승리하는 것.'],
+  ['텐파이','필요한 패가 딱 1장만 남은 완성 직전 상태.'],
+  ['리치','울지 않은 텐파이에서 1,000점을 맡기고 선언하는 일본식 규칙.'],
+  ['치','바로 왼쪽 사람이 버린 패로 연속 숫자 몸통을 만드는 것.'],
+  ['퐁','누군가 버린 패를 가져와 같은 패 3장 몸통을 만드는 것.'],
+  ['깡','같은 패 4장을 한 묶음으로 만들고 보충패를 뽑는 것.'],
+  ['동·남·서·북','바람패. 숫자처럼 이어지지 않으며 같은 패 3장으로 몸통을 만듭니다.'],
+  ['정결(定缺)','사천마작에서 한 종류를 정해 모두 버리는 규칙. 남아 있으면 화료할 수 없습니다.'],
+  ['화료','패를 완성해 승리를 선언하는 것. 쯔모와 론이 화료 방법입니다.'],
+] as const;
+
+function MahjongGlossary(){
+  const [open,setOpen]=useState(true);
+  return <View style={styles.mahjongGlossary}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>MAHJONG WORDS</Text><Text style={styles.mahjongGuideTitle}>처음 보는 마작 용어</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGlossaryGrid}>{mahjongGlossary.map(([term,detail])=><View key={term} style={styles.mahjongGlossaryRow}><Text style={styles.mahjongGlossaryTerm}>{term}</Text><Text style={styles.mahjongGlossaryDetail}>{detail}</Text></View>)}</View>:null}</View>;
 }
 
 function MahjongTileView({tile,selected=false,onPress,showRed=false}:{tile:MahjongTile;selected?:boolean;onPress?:()=>void;showRed?:boolean}) {
@@ -1944,7 +1967,7 @@ const mahjongProfiles:Record<MahjongMode,{title:string;round:string;lead:string;
 
 function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}){
   const profile=mahjongProfiles[props.mode];const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><MahjongGlossary/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
 }
 
 function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
@@ -2353,12 +2376,14 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
 }
 
 /** 화투 한 장. 월 숫자와 종류를 같이 보여 줍니다. */
+const hwatuMonthArt:Record<number,string>={1:'🌲🕊',2:'🌸🐦',3:'🌸🌸',4:'🌿',5:'🌺',6:'🌹🦋',7:'🍁🐗',8:'🌕🦆',9:'🌼🍶',10:'🍁🦌',11:'🌳',12:'🌧☂'};
 function HwatuCardView({ card, hidden = false, emphasis }: { card: HwatuCard; hidden?: boolean; emphasis?: 'winner' | 'dim' }) {
   if (hidden) return <View style={[styles.hwatuCard, styles.hwatuHidden]}><Text style={styles.hwatuHiddenMark}>花</Text></View>;
   const label = card.kind === '광' ? '光' : card.kind === '열끗' ? '十' : card.kind === '띠' ? (card.ribbon ?? '띠') : card.double ? '쌍피' : '피';
   return (
     <View style={[styles.hwatuCard, card.kind === '광' && styles.hwatuBright, emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
       <Text style={styles.hwatuMonth}>{card.month}</Text>
+      <Text style={styles.hwatuArt}>{hwatuMonthArt[card.month]}</Text>
       <Text style={styles.hwatuKind}>{label}</Text>
       <Text style={styles.hwatuName}>{monthNames[card.month]}</Text>
     </View>
@@ -2491,6 +2516,8 @@ function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:nu
 
 function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; rules:SeotdaRules; onRulesChange:(v:SeotdaRules)=>void; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
   const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
+  const deck=createHwatuDeck();
+  const monthCards=Array.from({length:10},(_,index)=>deck.find((card)=>card.month===index+1)!);
   return (
     <View style={styles.detailScreen}>
       <ScreenHeader title="섰다 준비" onBack={props.onBack} />
@@ -2498,6 +2525,15 @@ function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet
         <View style={styles.sicboHero}>
           <Text style={styles.sicboHeroDice}>光 十 띠</Text>
           <Text style={styles.detailLead}>화투 두 장으로 겨루는 승부</Text>
+        </View>
+        <View style={styles.hwatuMonthGuide}>
+          <Text style={styles.slotRulesTitle}>1월부터 10월 그림 순서</Text>
+          <Text style={styles.slotRuleText}>섰다는 그림 이름보다 카드 왼쪽 위의 월 숫자로 계산합니다. 먼저 이 순서만 익히면 됩니다.</Text>
+          <View style={styles.hwatuMonthGrid}>{monthCards.map((card)=><View key={card.month} style={styles.hwatuMonthGuideItem}><HwatuCardView card={card}/><Text style={styles.hwatuMonthGuideLabel}>{card.month}월 · {monthNames[card.month]}</Text></View>)}</View>
+        </View>
+        <View style={styles.seotdaStrengthGuide}>
+          <Text style={styles.slotRulesTitle}>약한 패 → 강한 패</Text>
+          <Text style={styles.seotdaStrengthText}>망통(0끗) → 1~8끗 → 갑오(9끗) → 세륙 → 장사 → 장삥 → 구삥 → 독사 → 알리 → 1땡~장땡 → 일팔광땡 → 일삼광땡 → 삼팔광땡</Text>
         </View>
         <View style={styles.slotRules}>
           <Text style={styles.slotRulesTitle}>족보 (높은 순)</Text>
@@ -3797,6 +3833,11 @@ const styles = StyleSheet.create({
   mahjongGuide: { padding: 18, borderRadius: 20, backgroundColor: '#16352C', borderWidth: 1, borderColor: '#6C8D70' },
   mahjongHeroTiles: { color: '#FFF4D4', fontSize: 35, textAlign: 'center', marginBottom: 12 },
   mahjongBeginner: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#101E1A', borderWidth: 1, borderColor: '#678573' },
+  mahjongGlossary: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#111B24', borderWidth: 1, borderColor: '#657A91' },
+  mahjongGlossaryGrid: { paddingHorizontal: 13, paddingVertical: 8 },
+  mahjongGlossaryRow: { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#273746' },
+  mahjongGlossaryTerm: { color: '#FFE080', fontSize: 13, fontWeight: '900', marginBottom: 3 },
+  mahjongGlossaryDetail: { color: '#D6E0E8', fontSize: 11, lineHeight: 17 },
   mahjongGuideHeader: { minHeight: 70, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1B3A30' },
   mahjongGuideEyebrow: { color: '#C5A957', fontSize: 8, fontWeight: '900', letterSpacing: 2 },
   mahjongGuideTitle: { color: '#FFF4CF', fontSize: 15, fontWeight: '900', marginTop: 3 },
@@ -4141,8 +4182,15 @@ const styles = StyleSheet.create({
   hwatuHidden: { backgroundColor: '#1A2233', borderColor: colors.border },
   hwatuHiddenMark: { color: colors.muted, fontSize: 22 },
   hwatuMonth: { color: '#20242C', fontSize: 26, fontWeight: '800', lineHeight: 30 },
+  hwatuArt: { fontSize: 16, lineHeight: 18 },
   hwatuKind: { color: '#7A4A1E', fontSize: 13, fontWeight: '700' },
   hwatuName: { color: '#6B6355', fontSize: 10 },
+  hwatuMonthGuide: { marginTop: 18, padding: 15, borderRadius: 17, backgroundColor: '#211A11', borderWidth: 1, borderColor: '#80652E' },
+  hwatuMonthGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13, marginTop: 12 },
+  hwatuMonthGuideItem: { width: '31%', alignItems: 'center', gap: 4 },
+  hwatuMonthGuideLabel: { color: '#E8D8B1', fontSize: 9, fontWeight: '800', textAlign: 'center' },
+  seotdaStrengthGuide: { marginTop: 14, padding: 15, borderRadius: 17, backgroundColor: '#271419', borderWidth: 1, borderColor: '#8A4A57' },
+  seotdaStrengthText: { color: '#FFE5A0', fontSize: 11, lineHeight: 19, fontWeight: '800' },
   seotdaMyHand: { color: colors.goldLight, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 4 },
   doriHint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 2 },
   importApply: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.gold },
