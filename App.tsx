@@ -1964,7 +1964,19 @@ const mahjongGlossary=[
 
 function MahjongGlossary(){
   const [open,setOpen]=useState(true);
-  return <><MahjongTileBasics/><View style={styles.mahjongGlossary}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>MAHJONG WORDS</Text><Text style={styles.mahjongGuideTitle}>처음 보는 마작 용어</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGlossaryGrid}>{mahjongGlossary.map(([term,detail])=><View key={term} style={styles.mahjongGlossaryRow}><Text style={styles.mahjongGlossaryTerm}>{term}</Text><Text style={styles.mahjongGlossaryDetail}>{detail}</Text></View>)}</View>:null}</View></>;
+  return <><MahjongTileBasics/><View style={styles.mahjongGlossary}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>MAHJONG WORDS</Text><Text style={styles.mahjongGuideTitle}>처음 보는 마작 용어</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGlossaryGrid}>{mahjongGlossary.map(([term,detail])=><View key={term} style={styles.mahjongGlossaryRow}><Text style={styles.mahjongGlossaryTerm}>{term}</Text><Text style={styles.mahjongGlossaryDetail}>{detail}</Text></View>)}</View>:null}</View><MahjongModeComparison/></>;
+}
+
+const mahjongModeComparison=[
+  {icon:'立',name:'리치마작',region:'일본',tiles:'136장 중 왕패 14장 별도',win:'역 1개 이상',calls:'치·퐁·깡',score:'판과 부로 계산',special:'리치·도라·후리텐·도중유국'},
+  {icon:'中',name:'중국식 마작',region:'국표 · MCR',tiles:'136장',win:'역 합계 8점 이상',calls:'치·퐁·깡',score:'81개 역 점수를 더함',special:'꽃패는 보너스지만 8점 조건에서 제외'},
+  {icon:'港',name:'홍콩마작',region:'홍콩',tiles:'136장 + 꽃패 8장',win:'기본 설정 3번 이상',calls:'치·퐁·깡',score:'번마다 두 배',special:'꽃패·친 연장·론은 방총자가 전액 지불'},
+  {icon:'川',name:'사천마작',region:'중국 사천',tiles:'자패 없는 108장',win:'정결 완료 + 완성',calls:'퐁·깡만 가능',score:'번을 배수로 계산',special:'환삼장·정결·혈전도저·과수'},
+] as const;
+
+function MahjongModeComparison(){
+  const [open,setOpen]=useState(true);
+  return <View style={styles.mahjongModeComparison}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>4 RULE SETS</Text><Text style={styles.mahjongGuideTitle}>네 가지 마작 차이</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongModeBody}><View style={styles.mahjongModeCommon}><Text style={styles.mahjongModeCommonTitle}>공통 목표</Text><Text style={styles.mahjongModeText}>한 장을 뽑고 한 장을 버리며 기본적으로 몸통 4개와 머리 1개를 만듭니다. 달라지는 것은 사용하는 패, 이길 수 있는 최소 조건과 점수 계산입니다.</Text></View>{mahjongModeComparison.map((item)=><View key={item.name} style={styles.mahjongModeCard}><View style={styles.mahjongModeHeading}><Text style={styles.mahjongModeIcon}>{item.icon}</Text><View><Text style={styles.mahjongModeName}>{item.name}</Text><Text style={styles.mahjongModeRegion}>{item.region}</Text></View></View><View style={styles.mahjongModeFacts}><Text style={styles.mahjongModeFact}><Text style={styles.mahjongModeLabel}>사용 패　</Text>{item.tiles}</Text><Text style={styles.mahjongModeFact}><Text style={styles.mahjongModeLabel}>승리 조건　</Text>{item.win}</Text><Text style={styles.mahjongModeFact}><Text style={styles.mahjongModeLabel}>부르기　</Text>{item.calls}</Text><Text style={styles.mahjongModeFact}><Text style={styles.mahjongModeLabel}>점수　</Text>{item.score}</Text><Text style={styles.mahjongModeFact}><Text style={styles.mahjongModeLabel}>특징　</Text>{item.special}</Text></View></View>)}</View>:null}</View>;
 }
 
 function MahjongTileBasics(){
@@ -3914,6 +3926,19 @@ const styles = StyleSheet.create({
   riichiYakuHan: { color: '#9FD2B8', fontSize: 9, fontWeight: '900' },
   riichiYakuTiles: { color: '#FFF8E8', fontSize: 17, lineHeight: 26, marginVertical: 7 },
   riichiYakuDetail: { color: '#D9E1EC', fontSize: 10, lineHeight: 16 },
+  mahjongModeComparison: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#171D25', borderWidth: 1, borderColor: '#68788B' },
+  mahjongModeBody: { padding: 11, gap: 9 },
+  mahjongModeCommon: { padding: 11, borderRadius: 11, backgroundColor: '#193128', borderWidth: 1, borderColor: '#416D59' },
+  mahjongModeCommonTitle: { color: '#9FE0BE', fontSize: 12, fontWeight: '900', marginBottom: 4 },
+  mahjongModeText: { color: '#DCE7E1', fontSize: 10, lineHeight: 16 },
+  mahjongModeCard: { padding: 11, borderRadius: 12, backgroundColor: '#222B38', borderWidth: 1, borderColor: '#3E5067' },
+  mahjongModeHeading: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 8 },
+  mahjongModeIcon: { width: 34, height: 34, borderRadius: 8, backgroundColor: '#AA2833', color: '#FFF3C7', textAlign: 'center', lineHeight: 34, fontSize: 18, fontWeight: '900' },
+  mahjongModeName: { color: '#FFE080', fontSize: 13, fontWeight: '900' },
+  mahjongModeRegion: { color: '#AAB8CA', fontSize: 9, marginTop: 2 },
+  mahjongModeFacts: { gap: 4 },
+  mahjongModeFact: { color: '#DCE4EE', fontSize: 9, lineHeight: 14 },
+  mahjongModeLabel: { color: '#8FD8B2', fontWeight: '900' },
   mahjongGuideHeader: { minHeight: 70, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1B3A30' },
   mahjongGuideEyebrow: { color: '#C5A957', fontSize: 8, fontWeight: '900', letterSpacing: 2 },
   mahjongGuideTitle: { color: '#FFF4CF', fontSize: 15, fontWeight: '900', marginTop: 3 },
