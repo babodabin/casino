@@ -1949,7 +1949,17 @@ const mahjongGlossary=[
 
 function MahjongGlossary(){
   const [open,setOpen]=useState(true);
-  return <View style={styles.mahjongGlossary}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>MAHJONG WORDS</Text><Text style={styles.mahjongGuideTitle}>처음 보는 마작 용어</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGlossaryGrid}>{mahjongGlossary.map(([term,detail])=><View key={term} style={styles.mahjongGlossaryRow}><Text style={styles.mahjongGlossaryTerm}>{term}</Text><Text style={styles.mahjongGlossaryDetail}>{detail}</Text></View>)}</View>:null}</View>;
+  return <><MahjongTileBasics/><View style={styles.mahjongGlossary}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>MAHJONG WORDS</Text><Text style={styles.mahjongGuideTitle}>처음 보는 마작 용어</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGlossaryGrid}>{mahjongGlossary.map(([term,detail])=><View key={term} style={styles.mahjongGlossaryRow}><Text style={styles.mahjongGlossaryTerm}>{term}</Text><Text style={styles.mahjongGlossaryDetail}>{detail}</Text></View>)}</View>:null}</View></>;
+}
+
+function MahjongTileBasics(){
+  const [open,setOpen]=useState(true);
+  const groups=[
+    {name:'만수 · 숫자 1~9',tiles:'🀇 🀈 🀉 🀊 🀋 🀌 🀍 🀎 🀏',detail:'한자 모양의 숫자패. 같은 종류 안에서 2·3·4처럼 이어집니다.'},
+    {name:'통수 · 숫자 1~9',tiles:'🀙 🀚 🀛 🀜 🀝 🀞 🀟 🀠 🀡',detail:'동그라미 모양의 숫자패. 같은 통수끼리만 이어집니다.'},
+    {name:'삭수 · 숫자 1~9',tiles:'🀐 🀑 🀒 🀓 🀔 🀕 🀖 🀗 🀘',detail:'대나무 모양의 숫자패. 1삭은 대나무 대신 새 그림입니다.'},
+  ];
+  return <View style={styles.mahjongTileBasics}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>TILE GUIDE</Text><Text style={styles.mahjongGuideTitle}>패 그림부터 익히기</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongTileBasicsBody}>{groups.map((group)=><View key={group.name} style={styles.mahjongTileGroup}><Text style={styles.mahjongTileGroupName}>{group.name}</Text><Text style={styles.mahjongTileLine}>{group.tiles}</Text><Text style={styles.mahjongTileGroupDetail}>{group.detail}</Text></View>)}<View style={styles.mahjongTileGroup}><Text style={styles.mahjongTileGroupName}>자패 · 숫자가 없는 패</Text><Text style={styles.mahjongTileLine}>🀀 🀁 🀂 🀃　🀆 🀅 🀄</Text><Text style={styles.mahjongTileGroupDetail}>동·남·서·북과 백·발·중. 순서대로 이어지지 않고, 똑같은 패 3장으로만 몸통을 만듭니다. 사천마작에서는 자패를 사용하지 않습니다.</Text></View><View style={styles.mahjongShapeExample}><Text style={styles.mahjongShapeTitle}>완성 모양 예시</Text><Text style={styles.mahjongShapeTiles}>🀇🀈🀉　🀜🀜🀜　🀔🀕🀖　🀀🀀🀀　🀄🀄</Text><Text style={styles.mahjongTileGroupDetail}>연속 몸통 2개 + 같은 패 몸통 2개 + 같은 패 2장인 머리 1개입니다.</Text></View></View>:null}</View>;
 }
 
 function MahjongTileView({tile,selected=false,onPress,showRed=false}:{tile:MahjongTile;selected?:boolean;onPress?:()=>void;showRed?:boolean}) {
@@ -3850,6 +3860,15 @@ const styles = StyleSheet.create({
   mahjongGlossaryRow: { paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: '#273746' },
   mahjongGlossaryTerm: { color: '#FFE080', fontSize: 13, fontWeight: '900', marginBottom: 3 },
   mahjongGlossaryDetail: { color: '#D6E0E8', fontSize: 11, lineHeight: 17 },
+  mahjongTileBasics: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#13211D', borderWidth: 1, borderColor: '#6D8B79' },
+  mahjongTileBasicsBody: { padding: 12, gap: 10 },
+  mahjongTileGroup: { padding: 10, borderRadius: 11, backgroundColor: '#1B3029', borderWidth: 1, borderColor: '#38584B' },
+  mahjongTileGroupName: { color: '#FFE080', fontSize: 12, fontWeight: '900', marginBottom: 6 },
+  mahjongTileLine: { color: '#FFF7DF', fontSize: 21, lineHeight: 29, letterSpacing: 1, marginBottom: 5 },
+  mahjongTileGroupDetail: { color: '#D5E4DC', fontSize: 10, lineHeight: 16 },
+  mahjongShapeExample: { padding: 11, borderRadius: 12, backgroundColor: '#2B2012', borderWidth: 1, borderColor: '#8A6D35' },
+  mahjongShapeTitle: { color: '#FFD96B', fontSize: 12, fontWeight: '900', marginBottom: 7 },
+  mahjongShapeTiles: { color: '#FFF7DF', fontSize: 19, lineHeight: 28, marginBottom: 5 },
   mahjongGuideHeader: { minHeight: 70, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1B3A30' },
   mahjongGuideEyebrow: { color: '#C5A957', fontSize: 8, fontWeight: '900', letterSpacing: 2 },
   mahjongGuideTitle: { color: '#FFF4CF', fontSize: 15, fontWeight: '900', marginTop: 3 },
