@@ -2397,15 +2397,32 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     {choosingVoid&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>버릴 종류를 하나 고르세요 (정결)</Text><Text style={styles.mahjongWaitText}>고른 종류를 전부 버려야 화료할 수 있습니다. 적게 가진 쪽이 유리합니다.</Text><View style={styles.mahjongVoidRow}>{sichuanSuits.map((suit)=>{const held=player.filter((tile)=>tile.suit===suit).length;return <Pressable key={suit} onPress={()=>{setVoidSuits((current)=>[suit,current[1],current[2],current[3]]);setChoosingVoid(false);setMessage(`정결 ${suitNames[suit]} · ${suitNames[suit]}를 전부 버리세요`);}} style={[styles.mahjongVoidButton,voidSuits[0]===suit&&styles.mahjongVoidButtonActive]}><Text style={styles.mahjongVoidButtonText}>{suitNames[suit]}</Text><Text style={styles.mahjongVoidCount}>{held}장</Text></Pressable>;})}</View></View>}{bloodLog.length>0&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 진행</Text>{bloodLog.map((line,index)=><Text key={index} style={styles.mahjongWaitText}>{line}</Text>)}</View>}{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}<View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} showRed={mode==='riichi'&&rules.redFives} onPress={canDiscard?()=>discard(tile):undefined}/>;})}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&mode==='riichi'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='sichuan'&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 결과 · {bloodState.winners.length}명 화료</Text>{rankSichuanScores(bloodState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}</Text>)}</View>}{phase==='result'&&mode==='hongkong'&&hkMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankHongKongScores(hkMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='chinese'&&cnMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankChineseScores(cnMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'반장전 결과':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}{canAbortNineTerminals&&<Pressable onPress={declareNineTerminals} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>구종구패</Text></Pressable>}{kanOptions.map((option,index)=><Pressable key={`kan-${index}`} onPress={()=>declareKan(option)} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>{option.kind==='ankan'?'암깡':'가깡'} {option.tiles[0].glyph}</Text></Pressable>)}<Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{winButtonLabel(mode,structuralWin,tsumoSummary)}</Text></Pressable></View>}<Text style={styles.disclaimer}>{riichiDeclared?'리치 후에는 새로 뽑은 패만 그대로 버릴 수 있습니다':mahjongMinimumNote[mode]} · {profile.note}</Text></ScrollView></View>;
 }
 
-/** 화투 한 장. 월 숫자와 종류를 같이 보여 줍니다. */
-const hwatuMonthArt:Record<number,string>={1:'🌲🕊',2:'🌸🐦',3:'🌸🌸',4:'🌿',5:'🌺',6:'🌹🦋',7:'🍁🐗',8:'🌕🦆',9:'🌼🍶',10:'🍁🦌',11:'🌳',12:'🌧☂'};
+/** 작은 카드 안에서도 월별 그림이 구분되도록 만든 화투 전용 삽화입니다. */
+const hwatuPicture:Record<number,{plant:string;figure:string;color:string;dark:string}>={
+  1:{plant:'솔',figure:'학',color:'#D93642',dark:'#183D2A'},
+  2:{plant:'매화',figure:'새',color:'#E84B78',dark:'#3C271D'},
+  3:{plant:'벚꽃',figure:'막',color:'#EF6688',dark:'#5E1E2A'},
+  4:{plant:'등꽃',figure:'새',color:'#7D5BA6',dark:'#263A2B'},
+  5:{plant:'창포',figure:'다리',color:'#8558A5',dark:'#27513A'},
+  6:{plant:'모란',figure:'나비',color:'#D94A63',dark:'#34512D'},
+  7:{plant:'싸리',figure:'멧돼지',color:'#C94C58',dark:'#384527'},
+  8:{plant:'억새',figure:'달',color:'#E5C75A',dark:'#1C2737'},
+  9:{plant:'국화',figure:'술잔',color:'#D9A82F',dark:'#3C542A'},
+  10:{plant:'단풍',figure:'사슴',color:'#D84832',dark:'#2D3F28'},
+  11:{plant:'오동',figure:'봉황',color:'#9B5DAD',dark:'#26333D'},
+  12:{plant:'버들',figure:'비',color:'#4C75A7',dark:'#263747'},
+};
+function HwatuMonthPicture({month}:{month:number}){
+  const picture=hwatuPicture[month];
+  return <View style={[styles.hwatuPicture,{backgroundColor:picture.dark}]}><View style={[styles.hwatuBranch,{backgroundColor:picture.color}]}/><View style={[styles.hwatuBranch,styles.hwatuBranchSecond,{backgroundColor:picture.color}]}/>{[0,1,2,3].map((index)=><View key={index} style={[styles.hwatuBlossom,{backgroundColor:picture.color,left:5+(index%2)*17,top:5+Math.floor(index/2)*15}]}/>)}{month===8&&<View style={styles.hwatuMoon}/>}<Text style={styles.hwatuPlant}>{picture.plant}</Text><View style={styles.hwatuFigureBadge}><Text style={styles.hwatuFigure}>{picture.figure}</Text></View></View>;
+}
 function HwatuCardView({ card, hidden = false, emphasis }: { card: HwatuCard; hidden?: boolean; emphasis?: 'winner' | 'dim' }) {
   if (hidden) return <View style={[styles.hwatuCard, styles.hwatuHidden]}><Text style={styles.hwatuHiddenMark}>花</Text></View>;
   const label = card.kind === '광' ? '光' : card.kind === '열끗' ? '十' : card.kind === '띠' ? (card.ribbon ?? '띠') : card.double ? '쌍피' : '피';
   return (
     <View style={[styles.hwatuCard, card.kind === '광' && styles.hwatuBright, emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
       <Text style={styles.hwatuMonth}>{card.month}</Text>
-      <Text style={styles.hwatuArt}>{hwatuMonthArt[card.month]}</Text>
+      <HwatuMonthPicture month={card.month}/>
       <Text style={styles.hwatuKind}>{label}</Text>
       <Text style={styles.hwatuName}>{monthNames[card.month]}</Text>
     </View>
@@ -4212,14 +4229,21 @@ const styles = StyleSheet.create({
   importConfirmRow: { flexDirection: 'row', gap: 10, marginTop: 4 },
   importCancel: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.panel2 },
   hwatuHand: { flexDirection: 'row', gap: 10, justifyContent: 'center', marginVertical: 6 },
-  hwatuCard: { width: 62, height: 92, borderRadius: 10, backgroundColor: '#F4EFE2', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#C9BFA6', gap: 1 },
+  hwatuCard: { width: 62, height: 92, borderRadius: 7, backgroundColor: '#F4EFE2', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 2, borderColor: '#C9BFA6', paddingBottom: 4, overflow: 'hidden' },
   hwatuBright: { backgroundColor: '#FBF1CE', borderColor: colors.gold },
   hwatuHidden: { backgroundColor: '#1A2233', borderColor: colors.border },
   hwatuHiddenMark: { color: colors.muted, fontSize: 22 },
-  hwatuMonth: { color: '#20242C', fontSize: 26, fontWeight: '800', lineHeight: 30 },
-  hwatuArt: { fontSize: 16, lineHeight: 18 },
-  hwatuKind: { color: '#7A4A1E', fontSize: 13, fontWeight: '700' },
-  hwatuName: { color: '#6B6355', fontSize: 10 },
+  hwatuMonth: { position: 'absolute', left: 4, top: 2, zIndex: 3, color: '#171A1F', fontSize: 16, fontWeight: '900', lineHeight: 19, backgroundColor: 'rgba(255,255,255,0.78)', borderRadius: 4, paddingHorizontal: 2 },
+  hwatuPicture: { position: 'absolute', left: 4, right: 4, top: 4, height: 58, borderRadius: 4, overflow: 'hidden', borderWidth: 1, borderColor: '#3B3428' },
+  hwatuBranch: { position: 'absolute', width: 50, height: 4, left: 5, top: 30, borderRadius: 3, transform: [{rotate:'-28deg'}] },
+  hwatuBranchSecond: { width: 35, left: 20, top: 22, transform: [{rotate:'34deg'}] },
+  hwatuBlossom: { position: 'absolute', width: 9, height: 9, borderRadius: 5, borderWidth: 2, borderColor: '#F7E8D5' },
+  hwatuMoon: { position: 'absolute', width: 25, height: 25, borderRadius: 13, right: 3, top: 3, backgroundColor: '#FFF0A1', borderWidth: 2, borderColor: '#D8B84A' },
+  hwatuPlant: { position: 'absolute', left: 4, bottom: 2, color: '#FFF4D6', fontSize: 7, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 2 },
+  hwatuFigureBadge: { position: 'absolute', right: 2, bottom: 2, minWidth: 18, paddingHorizontal: 2, paddingVertical: 2, borderRadius: 6, backgroundColor: 'rgba(10,10,10,0.78)', alignItems: 'center' },
+  hwatuFigure: { color: '#FFF1B8', fontSize: 7, fontWeight: '900' },
+  hwatuKind: { color: '#7A4A1E', fontSize: 10, lineHeight: 12, fontWeight: '900' },
+  hwatuName: { color: '#5E574B', fontSize: 8, lineHeight: 10, fontWeight: '700' },
   hwatuMonthGuide: { marginTop: 18, padding: 15, borderRadius: 17, backgroundColor: '#211A11', borderWidth: 1, borderColor: '#80652E' },
   hwatuMonthGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: 13, marginTop: 12 },
   hwatuMonthGuideItem: { width: '31%', alignItems: 'center', gap: 4 },
