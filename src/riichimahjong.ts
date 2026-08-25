@@ -39,6 +39,31 @@ export function sortMahjongHand(hand: MahjongTile[]) {
   return [...hand].sort((a, b) => suitOrder[a.suit] - suitOrder[b.suit] || a.value - b.value || a.id.localeCompare(b.id));
 }
 
+export type BeginnerYakuHint={name:string;reason:string};
+
+/**
+ * 초보자에게 현재 손에서 비교적 가까운 리치 역을 설명합니다.
+ * 승리 판정이 아니라 방향을 잡는 힌트이므로, 확실한 근거가 있는 후보만 반환합니다.
+ */
+export function suggestBeginnerRiichiYaku(hand:MahjongTile[],openMeldCount=0,seatWind=1,roundWind=1):BeginnerYakuHint[]{
+  const hints:BeginnerYakuHint[]=[];
+  const closed=openMeldCount===0;
+  const counts=new Map<string,number>();
+  hand.forEach((tile)=>{const key=`${tile.suit}${tile.value}`;counts.set(key,(counts.get(key)??0)+1);});
+  const terminalOrHonor=hand.filter((tile)=>tile.suit==='z'||tile.value===1||tile.value===9).length;
+  const pairs=[...counts.values()].filter((count)=>count>=2).length;
+  if(closed)hints.push({name:'리치·멘젠쯔모',reason:'아직 패를 공개하지 않았습니다. 텐파이가 되면 리치, 직접 뽑아 완성하면 멘젠쯔모를 노릴 수 있어요.'});
+  if(terminalOrHonor<=2)hints.push({name:'탕야오',reason:`1·9·자패가 ${terminalOrHonor}장뿐입니다. 이것들을 정리하면 숫자 2~8만 남길 수 있어요.`});
+  const honorNames=['동','남','서','북','백','발','중'];
+  const valuable=[5,6,7,seatWind,roundWind];
+  const valuablePair=[...new Set(valuable)].find((value)=>(counts.get(`z${value}`)??0)>=2);
+  if(valuablePair)hints.push({name:'역패',reason:`${honorNames[valuablePair-1]}이 ${counts.get(`z${valuablePair}`)}장 있습니다. 같은 패 3장을 만들면 역이 됩니다.`});
+  if(closed&&pairs>=3)hints.push({name:'치또이츠',reason:`현재 짝이 ${pairs}개입니다. 서로 다른 짝 7개를 만들면 치또이츠가 됩니다.`});
+  const suitTotals=(['m','p','s'] as MahjongSuit[]).map((suit)=>({suit,count:hand.filter((tile)=>tile.suit===suit).length})).sort((a,b)=>b.count-a.count);
+  if(suitTotals[0].count>=9)hints.push({name:'혼일색·청일색',reason:`한 종류의 숫자패가 ${suitTotals[0].count}장입니다. 다른 숫자 종류를 줄이면 한 가지 무늬 중심의 큰 역을 노릴 수 있어요.`});
+  return hints.slice(0,4);
+}
+
 /**
  * 배패. 왕패(죽은 산)는 리치마작에만 있습니다. 중국식·홍콩·사천은 왕패를 두지 않으므로
  * deadWallSize 0으로 부르면 산의 마지막 패까지 모두 뽑을 수 있습니다.
