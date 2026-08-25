@@ -1918,7 +1918,7 @@ function RiichiSetupScreen(props:{coins:number;difficulty:string;selectedBet:num
 
 function RiichiBeginnerGuide(){
   const [open,setOpen]=useState(true);
-  return <View style={styles.mahjongBeginner}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>FIRST MAHJONG</Text><Text style={styles.mahjongGuideTitle}>처음 하는 사람을 위한 설명</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGuideBody}>
+  return <><View style={styles.mahjongBeginner}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>FIRST MAHJONG</Text><Text style={styles.mahjongGuideTitle}>처음 하는 사람을 위한 설명</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.mahjongGuideBody}>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>1</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>무엇을 만들면 되나요?</Text><Text style={styles.mahjongLessonText}>내 패 14장을 <Text style={styles.mahjongStrong}>몸통 4개 + 머리 1개</Text>로 나누면 기본 완성입니다. 머리는 똑같은 패 2장입니다. 예외로 서로 다른 일곱 쌍인 칠대자와 1·9·자패 13종을 모으는 국사무쌍도 있습니다.</Text><Text style={styles.mahjongExample}>🀇🀈🀉　🀙🀚🀛　🀐🀐🀐　🀀🀀🀀　🀄🀄</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>2</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>몸통은 두 종류예요</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>연속 3장</Text>: 같은 무늬의 3·4·5처럼 이어지는 숫자입니다. <Text style={styles.mahjongStrong}>같은 3장</Text>: 똑같은 패 세 장입니다. 동·남·서·북과 백·발·중은 숫자가 아니므로 연속으로 만들 수 없습니다.</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>3</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>패의 종류</Text><Text style={styles.mahjongLessonText}>🀇~🀏 만수, 🀙~🀡 통수, 🀐~🀘 삭수는 각각 1부터 9입니다. 🀀🀁🀂🀃은 동·남·서·북, 🀆🀅🀄은 백·발·중입니다. 모든 패는 네 장씩 있습니다.</Text></View></View>
@@ -1926,7 +1926,22 @@ function RiichiBeginnerGuide(){
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>5</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>쯔모와 론</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>쯔모</Text>는 내가 뽑은 패로 완성하는 승리, <Text style={styles.mahjongStrong}>론</Text>은 다른 사람이 버린 패로 완성하는 승리입니다. 상대의 버림패로 완성되면 론 버튼이 나타납니다.</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>6</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>치·퐁·깡·리치는 무엇인가요?</Text><Text style={styles.mahjongLessonText}>치·퐁은 상대의 버림패를 가져와 몸통을 만드는 것, 깡은 같은 패 4장을 공개하는 것입니다. 치는 바로 왼쪽 상대의 패만 가져올 수 있지만 퐁·깡은 누구의 패든 가능합니다. 리치는 패를 공개하지 않은 텐파이 상태에서 1,000점을 맡기고 선언합니다. 선언 후에는 새로 뽑은 패만 그대로 버립니다.</Text></View></View>
     <View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>현재 이 앱에서 먼저 연습하는 것</Text><Text style={styles.mahjongLessonText}>패 뽑기 → 필요 없는 패 버리기 → 몸통 4개와 머리 1개 만들기 → 쯔모 판정. 처음에는 점수보다 패 모양을 익히면 됩니다.</Text></View>
-  </View>:null}</View>;
+  </View>:null}</View><RiichiYakuGuide/></>;
+}
+
+const beginnerRiichiYaku=[
+  {name:'리치',han:'1판 · 울면 불가',tiles:'🀇🀈🀉　🀚🀛🀜　🀔🀕🀖　🀞🀞🀞　🀄🀄',detail:'치·퐁·깡으로 공개하지 않은 텐파이에서 1,000점을 내고 선언합니다. 패 모양 자체보다 선언이 역이 됩니다.'},
+  {name:'멘젠쯔모',han:'1판 · 울면 불가',tiles:'🀇🀈🀉　🀚🀛🀜　🀔🀕🀖　🀀🀀🀀　🀄🀄',detail:'한 번도 치·퐁하지 않은 상태에서 마지막 패를 내가 직접 뽑아 완성합니다.'},
+  {name:'탕야오',han:'1판 · 1·9·자패 금지',tiles:'🀈🀉🀊　🀛🀜🀝　🀓🀔🀕　🀞🀞🀞　🀌🀌',detail:'모든 패를 숫자 2~8만으로 만듭니다. 앱의 기본 설정에서는 울어도 성립합니다.'},
+  {name:'역패',han:'1판 · 울어도 가능',tiles:'🀇🀈🀉　🀙🀚🀛　🀐🀑🀒　🀄🀄🀄　🀀🀀',detail:'백·발·중, 내 자리의 바람, 현재 판의 바람 중 하나를 같은 패 3장으로 만듭니다.'},
+  {name:'핑후',han:'1판 · 울면 불가',tiles:'🀇🀈🀉　🀚🀛🀜　🀔🀕🀖　🀝🀞🀟　🀌🀌',detail:'네 몸통이 모두 연속패이고 점수 없는 머리이며, 양쪽으로 기다리는 형태로 완성합니다.'},
+  {name:'이페코',han:'1판 · 울면 불가',tiles:'🀇🀈🀉　🀇🀈🀉　🀔🀕🀖　🀝🀞🀟　🀄🀄',detail:'같은 종류의 똑같은 연속 몸통을 두 개 만듭니다.'},
+  {name:'치또이츠',han:'2판 · 울면 불가',tiles:'🀇🀇　🀊🀊　🀙🀙　🀝🀝　🀐🀐　🀖🀖　🀄🀄',detail:'서로 다른 똑같은 패 두 장짜리 짝을 일곱 개 만듭니다. 몸통 4개와 머리 1개의 예외입니다.'},
+] as const;
+
+function RiichiYakuGuide(){
+  const [open,setOpen]=useState(true);
+  return <View style={styles.riichiYakuGuide}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.mahjongGuideHeader}><View><Text style={styles.mahjongGuideEyebrow}>EASY YAKU</Text><Text style={styles.mahjongGuideTitle}>처음 노려볼 쉬운 역</Text></View><Text style={styles.mahjongGuideToggle}>{open?'접기 −':'보기 +'}</Text></Pressable>{open?<View style={styles.riichiYakuBody}><View style={styles.riichiNoYakuWarning}><Text style={styles.riichiNoYakuTitle}>완성 모양만으로는 이길 수 없어요</Text><Text style={styles.mahjongTileGroupDetail}>리치마작은 몸통 4개와 머리 1개를 만들고, 아래와 같은 역도 최소 하나 있어야 쯔모·론할 수 있습니다.</Text></View>{beginnerRiichiYaku.map((yaku)=><View key={yaku.name} style={styles.riichiYakuCard}><View style={styles.riichiYakuHeading}><Text style={styles.riichiYakuName}>{yaku.name}</Text><Text style={styles.riichiYakuHan}>{yaku.han}</Text></View><Text style={styles.riichiYakuTiles}>{yaku.tiles}</Text><Text style={styles.riichiYakuDetail}>{yaku.detail}</Text></View>)}</View>:null}</View>;
 }
 
 const mahjongGlossary=[
@@ -3886,6 +3901,16 @@ const styles = StyleSheet.create({
   mahjongShapeExample: { padding: 11, borderRadius: 12, backgroundColor: '#2B2012', borderWidth: 1, borderColor: '#8A6D35' },
   mahjongShapeTitle: { color: '#FFD96B', fontSize: 12, fontWeight: '900', marginBottom: 7 },
   mahjongShapeTiles: { color: '#FFF7DF', fontSize: 19, lineHeight: 28, marginBottom: 5 },
+  riichiYakuGuide: { marginTop: 14, borderRadius: 18, overflow: 'hidden', backgroundColor: '#171E2A', borderWidth: 1, borderColor: '#596A87' },
+  riichiYakuBody: { padding: 11, gap: 9 },
+  riichiNoYakuWarning: { padding: 11, borderRadius: 11, backgroundColor: '#351C1F', borderWidth: 1, borderColor: '#914C53' },
+  riichiNoYakuTitle: { color: '#FFB7A8', fontSize: 12, fontWeight: '900', marginBottom: 4 },
+  riichiYakuCard: { padding: 11, borderRadius: 12, backgroundColor: '#222C3B', borderWidth: 1, borderColor: '#43536C' },
+  riichiYakuHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  riichiYakuName: { color: '#FFE080', fontSize: 14, fontWeight: '900' },
+  riichiYakuHan: { color: '#9FD2B8', fontSize: 9, fontWeight: '900' },
+  riichiYakuTiles: { color: '#FFF8E8', fontSize: 17, lineHeight: 26, marginVertical: 7 },
+  riichiYakuDetail: { color: '#D9E1EC', fontSize: 10, lineHeight: 16 },
   mahjongGuideHeader: { minHeight: 70, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1B3A30' },
   mahjongGuideEyebrow: { color: '#C5A957', fontSize: 8, fontWeight: '900', letterSpacing: 2 },
   mahjongGuideTitle: { color: '#FFF4CF', fontSize: 15, fontWeight: '900', marginTop: 3 },
