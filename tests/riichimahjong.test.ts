@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, seatWindFor, roundWindFor, countYakumanMultiplier, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, resolveMultipleRon, settleMultipleRon, countNineTerminals, canDeclareNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, detectAbortiveDraw, tileDangerScore, isRedFive, countRedFives, redFiveLabel, suggestBeginnerRiichiYaku, DEFAULT_RIICHI_RULES, riichiRuleLabels, type MahjongTile } from '../src/riichimahjong.ts';
+import { advanceRiichiMatch, applyMahjongCall, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, createMahjongTiles, dealRiichi, doraFromIndicator, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, getStandardMahjongDecompositions, isMahjongFuriten, isSevenPairsHand, isThirteenOrphansHand, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, shouldComputerDeclareRiichi, seatWindFor, roundWindFor, countYakumanMultiplier, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, resolveMultipleRon, settleMultipleRon, countNineTerminals, canDeclareNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, detectAbortiveDraw, tileDangerScore, isRedFive, countRedFives, redFiveLabel, suggestBeginnerRiichiYaku, suggestRiichiDiscards, DEFAULT_RIICHI_RULES, riichiRuleLabels, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 
@@ -16,6 +16,23 @@ test('초보 힌트는 현재 손의 실제 특징만 알려준다',()=>{
   const pairs=hand(['m1','m1','m2','m2','p3','p3','s4','s5','s6','z1','z2','z3','z4']);
   assert.equal(suggestBeginnerRiichiYaku(pairs).some((hint)=>hint.name==='치또이츠'),true);
   assert.equal(suggestBeginnerRiichiYaku(tanyao,1).some((hint)=>hint.name==='리치·멘젠쯔모'),false);
+});
+
+test('초보 버림 안내는 텐파이가 되는 선택과 대기패를 먼저 보여준다',()=>{
+  const tiles=hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','z1','z1','m5','m6','z7']);
+  const guides=suggestRiichiDiscards(tiles,{limit:3});
+  assert.equal(guides[0].tile.suit,'z');
+  assert.equal(guides[0].tile.value,7);
+  assert.equal(guides[0].tenpai,true);
+  assert.deepEqual(guides[0].waits.map((tile)=>`${tile.suit}${tile.value}`),['m4','m7']);
+});
+
+test('초보 버림 안내는 이미 보인 패를 유효패 장수에서 뺀다',()=>{
+  const tiles=hand(['m1','m2','m3','p4','p5','p6','s7','s8','s9','z1','z1','m5','m6','z7']);
+  const base=suggestRiichiDiscards(tiles,{limit:1})[0];
+  const shown=[...tiles,...hand(['m4','m4','m4','m4'])];
+  const blocked=suggestRiichiDiscards(tiles,{visibleTiles:shown,limit:1})[0];
+  assert.equal(blocked.liveTiles,base.liveTiles-4);
 });
 
 test('사천식은 자패를 제외한 108장을 사용한다', () => {

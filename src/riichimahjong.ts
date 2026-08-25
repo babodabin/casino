@@ -40,6 +40,7 @@ export function sortMahjongHand(hand: MahjongTile[]) {
 }
 
 export type BeginnerYakuHint={name:string;reason:string};
+export type RiichiDiscardGuide={tile:MahjongTile;tenpai:boolean;waits:MahjongTile[];improvements:MahjongTile[];liveTiles:number;reason:string};
 
 /**
  * 초보자에게 현재 손에서 비교적 가까운 리치 역을 설명합니다.
@@ -496,6 +497,35 @@ export function tileDangerScore(tile: MahjongTile, context: MahjongDangerContext
 function normalizedPotential(hand: MahjongTile[], includeHonors: boolean, openMeldCount: number) {
   const raw = computerHandPotential(hand, includeHonors, openMeldCount);
   return raw >= 10000 ? { score: 1000 + (raw - 10000), tenpai: true } : { score: raw, tenpai: false };
+}
+
+/**
+ * 초보자용 버림패 후보. 완전한 샹텐 계산 대신 현재 모양보다 실제로 좋아지는
+ * 다음 패(유효패)를 전부 대입하며, 텐파이가 되는 선택은 항상 가장 먼저 둡니다.
+ * 같은 종류의 패가 여러 장이면 한 번만 보여 줍니다.
+ */
+export function suggestRiichiDiscards(hand:MahjongTile[],options:{openMeldCount?:number;includeHonors?:boolean;visibleTiles?:MahjongTile[];limit?:number}={}):RiichiDiscardGuide[]{
+  const openMeldCount=options.openMeldCount??0;
+  const includeHonors=options.includeHonors??true;
+  const visible=options.visibleTiles??hand;
+  const candidates=createMahjongTiles(includeHonors).filter((tile)=>tile.id.endsWith('-0'));
+  const unique=new Map<string,{tile:MahjongTile;index:number}>();
+  hand.forEach((tile,index)=>{const key=`${tile.suit}${tile.value}`;if(!unique.has(key))unique.set(key,{tile,index});});
+  const guides=[...unique.values()].map(({tile,index})=>{
+    const remaining=hand.filter((_,candidate)=>candidate!==index);
+    const waits=getMahjongWaits(remaining,openMeldCount,includeHonors);
+    const base=normalizedPotential(remaining,includeHonors,openMeldCount);
+    const improvements=waits.length?waits:candidates.filter((draw)=>normalizedPotential([...remaining,draw],includeHonors,openMeldCount).score>base.score);
+    const liveTiles=improvements.reduce((total,draw)=>total+Math.max(0,4-visible.filter((shown)=>sameTile(shown,draw)).length),0);
+    const reason=waits.length
+      ? `${waits.map((wait)=>wait.glyph).join(' ')}을 기다리는 텐파이 · 남은 대기패 최대 ${liveTiles}장`
+      : improvements.length
+        ? `${improvements.slice(0,8).map((draw)=>draw.glyph).join(' ')}${improvements.length>8?' 외':''}을 뽑으면 모양이 좋아짐 · 최대 ${liveTiles}장`
+        : '현재 계산에서 바로 좋아지는 패가 적은 선택';
+    return {tile,tenpai:waits.length>0,waits,improvements,liveTiles,reason,potential:base.score};
+  });
+  guides.sort((a,b)=>Number(b.tenpai)-Number(a.tenpai)||b.potential-a.potential||b.liveTiles-a.liveTiles||a.tile.suit.localeCompare(b.tile.suit)||a.tile.value-b.tile.value);
+  return guides.slice(0,options.limit??3).map(({potential:_,...guide})=>guide);
 }
 
 export function chooseComputerDiscard(hand:MahjongTile[],options:{
