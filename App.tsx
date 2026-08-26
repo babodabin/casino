@@ -70,10 +70,10 @@ import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCard
 import { dealHighLow, resolveHighLow } from './src/highlow';
 import { summariseWin, isModeWinningShape, canModeWinShape, winButtonLabel, mahjongMinimumNote, type MahjongWinSummary } from './src/mahjongmodes';
 import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swapThreeTiles, settleSichuanFullDraw, settleSichuanKan, refundSichuanKanTransfers, settleSichuanMultipleRon, createBloodState, settleSichuanWin, autoPlaySichuanRemainder, activeSichuanSeats, rankSichuanScores, evaluateSichuanFan, sichuanScore, countRoots, sichuanSuits, type SichuanSuit, type SichuanBloodState, type SichuanKanTransfer } from './src/sichuanmahjong';
-import { createHongKongMatch, settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
+import { createHongKongMatch, settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, dealInitialHongKongFlowers, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
 import { createChineseMatch, settleChineseWin, settleChineseMultipleRon, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
 import { chooseCallByPriority, drawModeSupplement, getModeCallOptions } from './src/mahjongflow';
-import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
+import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, settleMultipleRon, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
@@ -2073,10 +2073,9 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       // 꽃패 여덟 장 중 배패 때 나오는 몇 장만 먼저 주고, 나머지는 산에 남겨
       // 게임 중에 뽑으면 그때 보충패를 가져옵니다(補花).
       const pool=shuffleFlowers(createFlowerTiles(),Math.random);
-      const dealt:HongKongFlower[][]=[[],[],[],[]];
-      pool.slice(0,4).forEach((flower,index)=>dealt[index%4].push(flower));
-      setFlowers(dealt);
-      setFlowerWall(pool.slice(4));
+      const dealt=dealInitialHongKongFlowers(pool,Math.random);
+      setFlowers(dealt.flowers);
+      setFlowerWall(dealt.flowerWall);
     }else{ setFlowers([[],[],[],[]]); setFlowerWall([]); }const indicator=deadWallDoraIndicators(round.deadWall,0)[0],dora=indicator?doraFromIndicator(indicator):null;setMessage(`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`);setPhase('playing');};
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
   // 도중유국: 친이 그대로 유지되고 본장만 하나 올라갑니다.
@@ -2358,7 +2357,10 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const winners=computerRons.map((index)=>{const winnerSeat=index+1;const hand=[...opponents[index],mine.discarded];const winnerMelds=opponentMelds[index];return {seat:winnerSeat,score:chineseScore({yaku:evaluateChineseYaku({hand,melds:winnerMelds,winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(winnerSeat,cnMatch.roundIndex%4),roundWind:roundWindFor(cnMatch.roundIndex)}),winType:'ron'})};});
         setCnMatch((current)=>winners.length>1?settleChineseMultipleRon(current,{loser:0,winners}):settleChineseWin(current,{winner:seat,score:winners[0].score,winType:'ron',loser:0}));
       }
-      else if(result.riichiScore)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:seat,loser:0,score:result.riichiScore!,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});
+      else if(result.riichiScore)setMatchState((current)=>{
+        const winners=computerRons.flatMap((index)=>{const winnerSeat=index+1;const hand=[...opponents[index],mine.discarded];const summary=summariseWin({mode:'riichi',hand,melds:opponentMelds[index],winType:'ron',winningTile:mine.discarded,seat:winnerSeat,dealerSeat:current.roundIndex%4,roundIndex:current.roundIndex,riichi:opponentRiichi[index],doraIndicators,uraIndicators:opponentRiichi[index]?deadWallUraIndicators(deadWall,revealedKans):[],redFives:rules.redFives,openTanyao:rules.openTanyao});return summary.riichiScore?[{seat:winnerSeat,score:summary.riichiScore}]:[];});
+        const next=winners.length>1?settleMultipleRon(current,{winners,discarderSeat:0}):settleRiichiWin(current,{winner:seat,loser:0,score:result.riichiScore!,winType:'ron'});setRiichiPoints(next.scores[0]);return next;
+      });
       else setMatchState((current)=>advanceRiichiMatch(current,{winner:seat}));
       const ronNames=computerRons.map((index)=>`컴퓨터 ${index+1}`).join('·');
       finish('loss',`${ronNames} 론${computerRons.length>1?' · 일포다향':''} · 내가 버린 ${mine.discarded.glyph}으로 완성 · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);

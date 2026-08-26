@@ -144,6 +144,28 @@ export function resolveFlowerDraws(args: {
 }
 
 /**
+ * 144장을 섞어 배패했다고 보았을 때 처음 13장씩에 섞인 꽃패를 자리별로 나눕니다.
+ * 꽃패가 나오면 같은 자리가 다시 한 장을 받으므로, 각자의 숫자패·자패는 13장으로
+ * 유지되고 뽑힌 꽃패만 옆에 공개됩니다.
+ */
+export function dealInitialHongKongFlowers(flowerWall:HongKongFlower[],random:()=>number=Math.random){
+  let remaining=[...flowerWall];
+  const flowers:HongKongFlower[][]=[[],[],[],[]];
+  let standardRemaining=136;
+  for(let draw=0;draw<52;draw++){
+    const seat=draw%4;
+    while(remaining.length&&random()<remaining.length/(standardRemaining+remaining.length)){
+      const picked=drawFlower(remaining);
+      if(!picked.drawn)break;
+      flowers[seat].push(picked.drawn);
+      remaining=picked.flowerWall;
+    }
+    standardRemaining--;
+  }
+  return {flowers,flowerWall:remaining};
+}
+
+/**
  * 한 차례의 홍콩식 뽑기를 끝까지 처리합니다.
  * 꽃패는 손패 장수에 포함하지 않고 옆으로 모은 뒤, 숫자패/자패 한 장이
  * 나올 때까지 보충합니다. 꽃패를 별도 산으로 관리하는 현재 앱 구조에서도

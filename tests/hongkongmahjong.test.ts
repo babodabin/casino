@@ -5,7 +5,7 @@ import {
   evaluateHongKongFaan, totalFaan, canHongKongDeclareWin, hongKongScore, createHongKongMatch,
   settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, rankHongKongScores, hongKongRoundLabel,
   getHongKongCallOptions, applyHongKongCall, HONG_KONG_MIN_FAAN, HONG_KONG_LIMIT,
-  resolveFlowerDraws, drawHongKongTurn, HONG_KONG_MIN_OPTIONS,
+  resolveFlowerDraws, drawHongKongTurn, dealInitialHongKongFlowers, HONG_KONG_MIN_OPTIONS,
 } from '../src/hongkongmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -44,6 +44,18 @@ test('꽃패가 연속으로 나와도 최종 손패는 한 장만 늘어난다'
   assert.equal(result.hand.length,14);
   assert.equal(result.wall.length,2);
   assert.equal(result.drawn?.glyph,'s1');
+});
+
+test('초기 꽃패는 고정 한 장씩이 아니라 실제 섞인 위치에 따라 배분한다',()=>{
+  const none=dealInitialHongKongFlowers(createFlowerTiles(),()=>1);
+  assert.deepEqual(none.flowers.map((list)=>list.length),[0,0,0,0]);
+  assert.equal(none.flowerWall.length,8);
+
+  const sequence=[0,1,...Array(60).fill(1)];
+  const one=dealInitialHongKongFlowers(createFlowerTiles(),()=>sequence.shift()??1);
+  assert.deepEqual(one.flowers.map((list)=>list.length),[1,0,0,0]);
+  assert.equal(one.flowerWall.length,7);
+  assert.equal(one.flowers.flat().length+one.flowerWall.length,8);
 });
 
 test('자기 자리 번호와 같은 꽃패는 한 번씩 준다', () => {

@@ -9,7 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/baccarat.test.ts tests/backup.test.ts tests/blackjack.test.ts tests/chinesemahjong.test.ts tests/coverage.test.ts tests/craps.test.ts tests/dorijitgottaeng.test.ts tests/fivecarddraw.test.ts tests/highlow.test.ts tests/hongkongmahjong.test.ts tests/hwatu.test.ts tests/implications.test.ts tests/level.test.ts tests/mahjongflow.test.ts tests/mahjongmodes.test.ts tests/mcr-coverage.test.ts tests/mission.test.ts tests/pokerai.test.ts tests/riichimahjong.test.ts tests/roulette.test.ts tests/seotda.test.ts tests/sevenpoker.test.ts tests/sicbo.test.ts tests/sichuanmahjong.test.ts tests/slot.test.ts tests/texasholdem.test.ts tests/values.test.ts tests/videopoker.test.ts"
+    "test": "node --experimental-strip-types --test tests/baccarat.test.ts tests/backup.test.ts tests/blackjack.test.ts tests/chinesemahjong.test.ts tests/coverage.test.ts tests/craps.test.ts tests/dorijitgottaeng.test.ts tests/fivecarddraw.test.ts tests/highlow.test.ts tests/hongkongmahjong.test.ts tests/hwatu.test.ts tests/implications.test.ts tests/level.test.ts tests/mahjongflow.test.ts tests/mahjongmodes.test.ts tests/mahjongrounds.test.ts tests/mcr-coverage.test.ts tests/mission.test.ts tests/pokerai.test.ts tests/riichimahjong.test.ts tests/roulette.test.ts tests/seotda.test.ts tests/sevenpoker.test.ts tests/sicbo.test.ts tests/sichuanmahjong.test.ts tests/slot.test.ts tests/texasholdem.test.ts tests/values.test.ts tests/videopoker.test.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~57.0.9",
