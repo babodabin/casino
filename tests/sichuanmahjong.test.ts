@@ -413,3 +413,52 @@ test('네 명이 모두 텐파이면 차대각에서 점수가 오가지 않는�
   assert.deepEqual(result.state.scores, [0, 0, 0, 0]);
   assert.equal(result.log.length, 0);
 });
+
+test('자동 혈전에서 산이 마르면 간단 벌점이 아니라 차대각 상세 정산을 한다', () => {
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const notenHand = hand(['m1','m3','m5','m7','m9','s2','s4','s6','s8','m2','m4','m6','s1']);
+  const pigHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','p2','p3','p4','p7']);
+  const result = autoPlaySichuanRemainder({
+    state: createBloodState(0),
+    hands: [tenpaiHand, notenHand, pigHand, tenpaiHand],
+    melds: [[], [], [], []], wall: [], rivers: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'], basePoints: 1,
+  });
+  assert.equal(result.exhausted, true);
+  assert.equal(result.drawSettlement?.tenpai[0], true);
+  assert.equal(result.drawSettlement?.cleared[2], false);
+  assert.ok(result.log.some((line) => line.includes('차대각')));
+  assert.ok(result.log.some((line) => line.includes('화저')));
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('자동 혈전 유국도 이전 깡 기록을 받아 노텐 깡의 퇴세를 실행한다', () => {
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const notenHand = hand(['m1','m3','m5','m7','m9','s2','s4','s6','s8','m2','m4','m6','s1']);
+  const afterKan = settleSichuanKan(createBloodState(0), { kanner: 1, kind: 'ankan', basePoints: 1 });
+  const result = autoPlaySichuanRemainder({
+    state: afterKan.state,
+    hands: [tenpaiHand, notenHand, tenpaiHand, tenpaiHand],
+    melds: [[], [], [], []], wall: [], rivers: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'], kanTransfers: afterKan.transfers, basePoints: 1,
+  });
+  assert.equal(result.kanTransfers.length, afterKan.transfers.length);
+  assert.ok(result.log.some((line) => line.includes('퇴세')));
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('이미 화료한 사람은 자동 유국의 차대각과 퇴세 대상에서도 빠진다', () => {
+  const tenpaiHand = hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7']);
+  const notenHand = hand(['m1','m3','m5','m7','m9','s2','s4','s6','s8','m2','m4','m6','s1']);
+  const winScore = sichuanScore({ fans: [{ name: '평화', chinese: '平胡', multiplier: 1, detail: '' }], basePoints: 1, winType: 'ron' });
+  const state = settleSichuanWin(createBloodState(0), { winner: 3, score: winScore, winType: 'ron', loser: 0 });
+  const beforeWinner = state.scores[3];
+  const result = autoPlaySichuanRemainder({
+    state, hands: [notenHand, tenpaiHand, notenHand, notenHand],
+    melds: [[], [], [], []], wall: [], rivers: [[], [], [], []],
+    voidSuits: ['p', 'p', 'p', 'p'], basePoints: 1,
+  });
+  assert.equal(result.state.scores[3], beforeWinner);
+  assert.equal(result.state.winners.filter((seat) => seat === 3).length, 1);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});

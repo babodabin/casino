@@ -2183,8 +2183,9 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const score=sichuanScore({fans,roots:countRoots(concealed,melds),basePoints:1,winType,activeOpponents:activeSichuanSeats(bloodState).length-1});
         const stateBeforeWin=winType==='ron'&&kanRefundTransfers.length?refundSichuanKanTransfers(bloodState,kanRefundTransfers):bloodState;
         const settled=settleSichuanWin(stateBeforeWin,{winner:seat,score,winType,loser:loser===undefined?undefined:loser+1});
-        const rest=autoPlaySichuanRemainder({state:settled,hands:[nextPlayer,...hands],melds:[openMelds,...meldSets],wall:remaining,rivers:streams,voidSuits,basePoints:1,startSeat:seat+1});
-        setBloodState(rest.state);setBloodLog([...(kanRefundTransfers.length?[`호상전포 · 직전 깡 점수 ${kanRefundTransfers.length}건 환급`]:[]),`컴퓨터 ${seat} ${winType==='ron'?'론':'쯔모'} · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
+        const carriedKanTransfers=kanRefundTransfers.length?sichuanKanTransfers.slice(0,-kanRefundTransfers.length):sichuanKanTransfers;
+        const rest=autoPlaySichuanRemainder({state:settled,hands:[nextPlayer,...hands],melds:[openMelds,...meldSets],wall:remaining,rivers:streams,voidSuits,kanTransfers:carriedKanTransfers,basePoints:1,startSeat:seat+1});
+        setBloodState(rest.state);setSichuanKanTransfers(rest.kanTransfers);setBloodLog([...(kanRefundTransfers.length?[`호상전포 · 직전 깡 점수 ${kanRefundTransfers.length}건 환급`]:[]),`컴퓨터 ${seat} ${winType==='ron'?'론':'쯔모'} · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
         setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
         const delta=rest.state.scores[0]-bloodState.scores[0];
         finish(delta>0?'win':delta<0?'loss':'push',`컴퓨터 ${seat} ${winType==='ron'?'론':'쯔모'} · ${result.grade}\n혈전 ${rest.state.winners.length}명 화료 · 내 점수 ${delta>0?'+':''}${delta}`);
@@ -2211,8 +2212,9 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const ronWinners=details.map(({seat,concealed,melds})=>({seat,score:sichuanScore({fans:evaluateSichuanFan({hand:concealed,melds,winType:'ron'}),roots:countRoots(concealed,melds),basePoints:1,winType:'ron',activeOpponents:activeSichuanSeats(bloodState).length-1})}));
         const stateBeforeRon=kanRefundTransfers.length?refundSichuanKanTransfers(bloodState,kanRefundTransfers):bloodState;
         const settled=settleSichuanMultipleRon(stateBeforeRon,{loser:discarder+1,winners:ronWinners});
-        const rest=autoPlaySichuanRemainder({state:settled,hands:[nextPlayer,...hands],melds:[openMelds,...meldSets],wall:remaining,rivers:streams,voidSuits,basePoints:1,startSeat:first.seat+1});
-        setBloodState(rest.state);setBloodLog([...(kanRefundTransfers.length?[`호상전포 · 직전 깡 점수 ${kanRefundTransfers.length}건 환급`]:[]),`${names} 론 · 일포다향`,...rest.log]);setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
+        const carriedKanTransfers=kanRefundTransfers.length?sichuanKanTransfers.slice(0,-kanRefundTransfers.length):sichuanKanTransfers;
+        const rest=autoPlaySichuanRemainder({state:settled,hands:[nextPlayer,...hands],melds:[openMelds,...meldSets],wall:remaining,rivers:streams,voidSuits,kanTransfers:carriedKanTransfers,basePoints:1,startSeat:first.seat+1});
+        setBloodState(rest.state);setSichuanKanTransfers(rest.kanTransfers);setBloodLog([...(kanRefundTransfers.length?[`호상전포 · 직전 깡 점수 ${kanRefundTransfers.length}건 환급`]:[]),`${names} 론 · 일포다향`,...rest.log]);setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
       }else if(mode==='hongkong'){
         const scored=details.map(({seat,concealed,melds})=>({seat,score:hongKongScore({faan:evaluateHongKongFaan({hand:concealed,melds,winType:'ron',winningTile,seatWind:seatWindFor(seat,hkMatch.roundIndex%4),roundWind:roundWindFor(hkMatch.roundIndex),flowers:flowerSets[seat],seat}),basePoints:1,winType:'ron'})}));
         setHkMatch((current)=>settleHongKongMultipleRon(current,{loser:discarder+1,winners:scored}));
@@ -2389,9 +2391,10 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         const score=ronWinners[0].score;
         const ronBaseState=afterKanDraw?refundSichuanKanTransfers(bloodState,sichuanLastKanTransfers):bloodState;
         const settled=ronWinners.length>1?settleSichuanMultipleRon(ronBaseState,{loser:0,winners:ronWinners.map(({seat,score})=>({seat,score}))}):settleSichuanWin(ronBaseState,{winner:seat,score,winType:'ron',loser:0});
-        const rest=autoPlaySichuanRemainder({state:settled,hands:[mine.hand,...opponents],melds:[openMelds,...opponentMelds],wall,rivers:nextRivers,voidSuits,basePoints:1,startSeat:seat+1});
+        const carriedKanTransfers=afterKanDraw?sichuanKanTransfers.slice(0,-sichuanLastKanTransfers.length):sichuanKanTransfers;
+        const rest=autoPlaySichuanRemainder({state:settled,hands:[mine.hand,...opponents],melds:[openMelds,...opponentMelds],wall,rivers:nextRivers,voidSuits,kanTransfers:carriedKanTransfers,basePoints:1,startSeat:seat+1});
         const ronLabel=ronWinners.map((winner)=>`컴퓨터 ${winner.index+1}`).join('·');
-        setBloodState(rest.state);setBloodLog([...(afterKanDraw?['깡 직후 방총 · 방금 받은 깡 점수 반환']:[]),`${ronLabel} 론 · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
+        setBloodState(rest.state);setSichuanKanTransfers(rest.kanTransfers);setBloodLog([...(afterKanDraw?['깡 직후 방총 · 방금 받은 깡 점수 반환']:[]),`${ronLabel} 론 · ${fans.map((fan)=>fan.name).join('·')} ${score.multiplier}배`,...rest.log]);
         setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
         const delta=rest.state.scores[0]-bloodState.scores[0];
         finish(delta>0?'win':delta<0?'loss':'push',`${ronLabel} 론${ronWinners.length>1?' · 일포다향':''} · ${result.grade}\n혈전 ${rest.state.winners.length}명 화료 · 내 점수 ${delta>0?'+':''}${delta}`);
@@ -2468,13 +2471,15 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       const kanRefundTransfers=winType==='ron'?(pendingCall?.kanRefundTransfers??[]):[];
       const stateBeforeWin=kanRefundTransfers.length?refundSichuanKanTransfers(bloodState,kanRefundTransfers):bloodState;
       const settled=others.length&&pendingCall?settleSichuanMultipleRon(stateBeforeWin,{loser:pendingCall.discarder,winners:[{seat:0,score},...others]}):settleSichuanWin(stateBeforeWin,{winner:0,score,winType,loser:pendingCall?.discarder});
+      const carriedKanTransfers=kanRefundTransfers.length?sichuanKanTransfers.slice(0,-kanRefundTransfers.length):sichuanKanTransfers;
       const rest=autoPlaySichuanRemainder({
         state:settled,
         hands:[player,...opponents],
         melds:[openMelds,...opponentMelds],
-        wall,rivers,voidSuits,basePoints:1,startSeat:1,
+        wall,rivers,voidSuits,kanTransfers:carriedKanTransfers,basePoints:1,startSeat:1,
       });
       setBloodState(rest.state);
+      setSichuanKanTransfers(rest.kanTransfers);
       setBloodLog([...(kanRefundTransfers.length?[`호상전포 · 컴퓨터 ${pendingCall?.discarder}의 직전 깡 점수 환급`]:[]),...rest.log]);
       setOpponents(rest.hands.slice(1));
       setWall(rest.wall);

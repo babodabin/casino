@@ -573,6 +573,10 @@ export type SichuanAutoResult = {
   /** 진행 중 일어난 일을 사람이 읽을 수 있게 남깁니다. */
   log: string[];
   exhausted: boolean;
+  /** 자동 진행 중 발생해 유국 때 퇴세 판정에 쓰는 깡 점수 이동입니다. */
+  kanTransfers: SichuanKanTransfer[];
+  /** 산이 말랐을 때 차대각·화저·퇴세의 상세 판정입니다. */
+  drawSettlement?: ReturnType<typeof settleSichuanFullDraw>;
 };
 
 const seatLabel = (seat: number) => seat === 0 ? '나' : `컴퓨터 ${seat}`;
@@ -588,6 +592,8 @@ export function autoPlaySichuanRemainder(args: {
   wall: MahjongTile[];
   rivers: MahjongTile[][];
   voidSuits: SichuanSuit[];
+  /** 자동 진행 전에 이미 일어난 깡도 유국의 퇴세 판정에 포함합니다. */
+  kanTransfers?: SichuanKanTransfer[];
   basePoints?: number;
   startSeat?: number;
   random?: () => number;
@@ -600,6 +606,33 @@ export function autoPlaySichuanRemainder(args: {
   const rivers = args.rivers.map((river) => [...river]);
   let wall = [...args.wall];
   const log: string[] = [];
+  const kanTransfers = [...(args.kanTransfers ?? [])];
+
+  /** 한 장의 버림패에 가능한 모든 론을 모아 일포다향까지 한 번에 정산합니다. */
+  const settleRonReactions = (discarder: number, discarded: MahjongTile, refundTransfers: SichuanKanTransfer[] = []) => {
+    const ronWinners: { seat: number; score: SichuanScore; fans: SichuanFan[] }[] = [];
+    for (let step = 1; step < 4; step++) {
+      const other = (discarder + step) % 4;
+      if (state.finished[other]) continue;
+      if (!canSichuanWin([...hands[other], discarded], melds[other], args.voidSuits[other])) continue;
+      const fans = evaluateSichuanFan({ hand: [...hands[other], discarded], melds: melds[other], winType: 'ron' });
+      const score = sichuanScore({ fans, roots: countRoots([...hands[other], discarded], melds[other]), basePoints: base, winType: 'ron' });
+      ronWinners.push({ seat: other, score, fans });
+    }
+    if (!ronWinners.length) return false;
+    if (refundTransfers.length) {
+      state = refundSichuanKanTransfers(state, refundTransfers);
+      kanTransfers.splice(Math.max(0, kanTransfers.length - refundTransfers.length), refundTransfers.length);
+      log.push(`호상전포 · ${seatLabel(discarder)}의 직전 깡 점수 환급`);
+    }
+    state = ronWinners.length === 1
+      ? settleSichuanWin(state, { winner: ronWinners[0].seat, score: ronWinners[0].score, winType: 'ron', loser: discarder })
+      : settleSichuanMultipleRon(state, { loser: discarder, winners: ronWinners.map(({ seat, score }) => ({ seat, score })) });
+    const winnerLabels = ronWinners.map(({ seat }) => seatLabel(seat)).join('·');
+    const fanLabels = ronWinners.map(({ seat, fans, score }) => `${seatLabel(seat)} ${fans.map((fan) => fan.name).join('·')} ${score.multiplier}배`).join(' / ');
+    log.push(`${winnerLabels} 론${ronWinners.length > 1 ? ' · 일포다향' : ''} · ${seatLabel(discarder)}의 ${discarded.glyph} · ${fanLabels}`);
+    return true;
+  };
 
   let turn = args.startSeat ?? 0;
   let guard = 0;
@@ -627,18 +660,7 @@ export function autoPlaySichuanRemainder(args: {
     hands[seat] = sortMahjongHand(hands[seat].filter((tile) => tile.id !== discarded.id));
     rivers[seat].push(discarded);
 
-    let claimed = false;
-    for (let step = 1; step < 4 && !claimed; step++) {
-      const other = (seat + step) % 4;
-      if (state.finished[other]) continue;
-      if (!canSichuanWin([...hands[other], discarded], melds[other], args.voidSuits[other])) continue;
-      const fans = evaluateSichuanFan({ hand: [...hands[other], discarded], melds: melds[other], winType: 'ron' });
-      const score = sichuanScore({ fans, roots: countRoots([...hands[other], discarded], melds[other]), basePoints: base, winType: 'ron' });
-      state = settleSichuanWin(state, { winner: other, score, winType: 'ron', loser: seat });
-      log.push(`${seatLabel(other)} 론 · ${seatLabel(seat)}의 ${discarded.glyph} · ${fans.map((fan) => fan.name).join('·')} ${score.multiplier}배`);
-      claimed = true;
-    }
-    if (claimed) continue;
+    if (settleRonReactions(seat, discarded)) continue;
 
     for (let step = 1; step < 4; step++) {
       const other = (seat + step) % 4;
@@ -650,7 +672,13 @@ export function autoPlaySichuanRemainder(args: {
       hands[other] = applied.hand;
       melds[other].push(applied.meld);
       rivers[seat].pop();
+      let immediateKanTransfers: SichuanKanTransfer[] = [];
       if (pick.kind === 'minkan') {
+        const settledKan = settleSichuanKan(state, { kanner: other, kind: 'minkan', discarder: seat, basePoints: base });
+        state = settledKan.state;
+        kanTransfers.push(...settledKan.transfers);
+        immediateKanTransfers = settledKan.transfers;
+        log.push(`${seatLabel(other)} 대명깡 · ${seatLabel(seat)}이 ${settledKan.gained}점 지불`);
         const replacement = drawSichuanReplacement(hands[other], wall);
         hands[other] = replacement.hand;
         wall = replacement.wall;
@@ -659,17 +687,23 @@ export function autoPlaySichuanRemainder(args: {
       const thrown = chooseSichuanDiscard(hands[other], args.voidSuits[other], random);
       hands[other] = sortMahjongHand(hands[other].filter((tile) => tile.id !== thrown.id));
       rivers[other].push(thrown);
+      // 퐁·깡 뒤에 버린 패도 평범한 버림패와 똑같이 론(복수 론 포함)을 받습니다.
+      settleRonReactions(other, thrown, immediateKanTransfers);
       turn = other + 1;
       break;
     }
   }
 
   const exhausted = !state.over;
+  let drawSettlement: ReturnType<typeof settleSichuanFullDraw> | undefined;
   if (exhausted) {
-    const cleared = [0, 1, 2, 3].map((seat) => isSichuanVoidCleared(hands[seat], melds[seat], args.voidSuits[seat]));
-    state = settleSichuanDraw(state, cleared, base);
-    log.push('산이 말라 유국 · 정결을 못 끝낸 사람이 물어줍니다');
+    drawSettlement = settleSichuanFullDraw(state, {
+      hands, melds, voidSuits: args.voidSuits, kanTransfers, basePoints: base,
+    });
+    state = drawSettlement.state;
+    log.push('산이 말라 유국 · 차대각·화저·퇴세 정산');
+    log.push(...drawSettlement.log);
   }
 
-  return { state, hands, melds, wall, rivers, log, exhausted };
+  return { state, hands, melds, wall, rivers, log, exhausted, kanTransfers, drawSettlement };
 }
