@@ -2662,7 +2662,8 @@ function HwatuCardView({ card, hidden = false, emphasis }: { card: HwatuCard; hi
   if(card.bonus)return <View style={[styles.hwatuCard,styles.hwatuBright,emphasis==='winner'&&styles.cardWinner]}><Text style={styles.hwatuMonth}>BONUS</Text><View style={[styles.hwatuPicture,{backgroundColor:'#7A1E3A'}]}><Text style={styles.hwatuHiddenMark}>＋</Text></View><Text style={styles.hwatuKind}>{card.bonus}피</Text><Text style={styles.hwatuName}>보너스</Text></View>;
   const label = card.kind === '광' ? '光' : card.kind === '열끗' ? '十' : card.kind === '띠' ? (card.ribbon ?? '띠') : card.double ? '쌍피' : '피';
   const source=hwatuCardImages[card.id];
-  const webImageStyle=source&&Platform.OS==='web'?({backgroundImage:`url("${Image.resolveAssetSource(source).uri}")`,backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat'} as any):null;
+  const webImageUri=source&&typeof source==='object'&&'uri' in source?String(source.uri):'';
+  const webImageStyle=webImageUri&&Platform.OS==='web'?({backgroundImage:`url("${webImageUri}")`,backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat'} as any):null;
   return (
     <View style={[styles.hwatuCard, card.kind === '광' && styles.hwatuBright, emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
       {source?(Platform.OS==='web'?<View style={[styles.hwatuCardImage,webImageStyle]}/>:<Image source={source} resizeMode="contain" style={styles.hwatuCardImage}/>):<HwatuMonthPicture month={card.month}/>}
