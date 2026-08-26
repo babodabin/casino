@@ -143,6 +143,39 @@ export function resolveFlowerDraws(args: {
   return { hand, wall, flowerWall, collected, drawnFlowers };
 }
 
+/**
+ * 한 차례의 홍콩식 뽑기를 끝까지 처리합니다.
+ * 꽃패는 손패 장수에 포함하지 않고 옆으로 모은 뒤, 숫자패/자패 한 장이
+ * 나올 때까지 보충합니다. 꽃패를 별도 산으로 관리하는 현재 앱 구조에서도
+ * 최종 손패는 정확히 한 장만 늘어납니다.
+ */
+export function drawHongKongTurn(args: {
+  hand: MahjongTile[];
+  wall: MahjongTile[];
+  flowerWall: HongKongFlower[];
+  collected: HongKongFlower[];
+  flowerChance?: number;
+  random?: () => number;
+}) {
+  const random=args.random??Math.random;
+  const chance=args.flowerChance??0;
+  let flowerWall=[...args.flowerWall];
+  const collected=[...args.collected];
+  const drawnFlowers:HongKongFlower[]=[];
+
+  while(flowerWall.length&&random()<chance){
+    const picked=drawFlower(flowerWall);
+    if(!picked.drawn)break;
+    flowerWall=picked.flowerWall;
+    collected.push(picked.drawn);
+    drawnFlowers.push(picked.drawn);
+  }
+
+  if(!args.wall.length)return {hand:[...args.hand],wall:[],flowerWall,collected,drawn:null,drawnFlowers};
+  const [drawn,...wall]=args.wall;
+  return {hand:sortMahjongHand([...args.hand,drawn]),wall,flowerWall,collected,drawn,drawnFlowers};
+}
+
 // ── 완성 판정 ──────────────────────────────────────────────────────
 
 export function isHongKongWinningHand(hand: MahjongTile[], meldCount = 0) {

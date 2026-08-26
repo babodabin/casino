@@ -5,7 +5,7 @@ import {
   evaluateHongKongFaan, totalFaan, canHongKongDeclareWin, hongKongScore, createHongKongMatch,
   settleHongKongWin, settleHongKongDraw, rankHongKongScores, hongKongRoundLabel,
   getHongKongCallOptions, applyHongKongCall, HONG_KONG_MIN_FAAN, HONG_KONG_LIMIT,
-  resolveFlowerDraws, HONG_KONG_MIN_OPTIONS,
+  resolveFlowerDraws, drawHongKongTurn, HONG_KONG_MIN_OPTIONS,
 } from '../src/hongkongmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -17,6 +17,23 @@ test('꽃패 여덟 장을 만든다', () => {
   assert.equal(flowers.length, 8);
   assert.equal(flowers.filter((flower) => flower.kind === 'flower').length, 4);
   assert.equal(flowers.filter((flower) => flower.kind === 'season').length, 4);
+});
+
+test('꽃패가 연속으로 나와도 최종 손패는 한 장만 늘어난다', () => {
+  const flowers=createFlowerTiles();
+  const result=drawHongKongTurn({
+    hand:hand(['m1','m2','m3','m4','m5','m6','m7','m8','m9','p1','p2','p3','p4']),
+    wall:hand(['s1','s2','s3']),
+    flowerWall:flowers,
+    collected:[],
+    flowerChance:0.5,
+    random:(()=>{const values=[0.1,0.2,0.9];return ()=>values.shift()??0.9;})(),
+  });
+  assert.equal(result.drawnFlowers.length,2);
+  assert.equal(result.collected.length,2);
+  assert.equal(result.hand.length,14);
+  assert.equal(result.wall.length,2);
+  assert.equal(result.drawn?.glyph,'s1');
 });
 
 test('자기 자리 번호와 같은 꽃패는 한 번씩 준다', () => {
