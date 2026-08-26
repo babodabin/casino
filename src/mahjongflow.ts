@@ -1,4 +1,4 @@
-import { drawSichuanReplacement, type SichuanSuit } from './sichuanmahjong.ts';
+import { drawSichuanReplacement, settleSichuanKan, type SichuanBloodState, type SichuanSuit } from './sichuanmahjong.ts';
 import { drawReplacementTile, getMahjongCallOptions, type MahjongCallOption, type MahjongTile } from './riichimahjong.ts';
 
 export type SharedMahjongMode='riichi'|'chinese'|'hongkong'|'sichuan';
@@ -24,4 +24,13 @@ export function chooseCallByPriority<T extends {seat:number;call:MahjongCallOpti
 export function drawModeSupplement(mode:SharedMahjongMode,hand:MahjongTile[],wall:MahjongTile[],deadWall:MahjongTile[],revealedKans:number){
   if(mode==='riichi')return drawReplacementTile(hand,wall,deadWall,revealedKans);
   return {...drawSichuanReplacement(hand,wall),deadWall};
+}
+
+/** 아직 화면 정산에 반영되지 않은 다음 쓰촨 깡 이벤트 하나를 처리합니다. */
+export function reconcileSichuanKanEvent(state:SichuanBloodState,owners:number[],settledCount:number,discarder=0){
+  if(settledCount>=owners.length)return null;
+  const owner=owners[settledCount];
+  if(owner===0)return {state,owner,settledCount:settledCount+1,gained:0,label:'플레이어 깡',transfers:[]};
+  const settled=settleSichuanKan(state,{kanner:owner,kind:'minkan',discarder,basePoints:1});
+  return {...settled,owner,settledCount:settledCount+1};
 }

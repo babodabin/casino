@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseCallByPriority, drawModeSupplement, getModeCallOptions } from '../src/mahjongflow.ts';
+import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, reconcileSichuanKanEvent } from '../src/mahjongflow.ts';
+import { createBloodState } from '../src/sichuanmahjong.ts';
 import { chooseComputerCall, type MahjongCallOption, type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand=(codes:string[]):MahjongTile[]=>codes.map((code,index)=>({id:`${code}-${index}`,suit:code[0] as MahjongTile['suit'],value:Number(code.slice(1)),glyph:code}));
@@ -60,4 +61,16 @@ test('리치 깡은 왕패에서, 다른 마작의 깡은 산 뒤에서 보충�
     assert.equal(result.drawn?.id,wall[wall.length-1].id,mode);
     assert.equal(result.wall.length,wall.length-1,mode);
   }
+});
+
+test('화면에서 놓친 컴퓨터 대명깡을 정확히 한 번만 정산한다',()=>{
+  const state=createBloodState(0);
+  const first=reconcileSichuanKanEvent(state,[0,2],0,0)!;
+  assert.equal(first.owner,0);
+  assert.deepEqual(first.state.scores,[0,0,0,0]);
+  const second=reconcileSichuanKanEvent(first.state,[0,2],first.settledCount,0)!;
+  assert.equal(second.owner,2);
+  assert.equal(second.gained,2);
+  assert.deepEqual(second.state.scores,[-2,0,2,0]);
+  assert.equal(reconcileSichuanKanEvent(second.state,[0,2],second.settledCount,0),null);
 });
