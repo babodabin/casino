@@ -64,6 +64,9 @@ jobs:
           # 속성 이름을 가리지 않고 절대 경로를 전부 상대 경로로 바꿉니다
           sed -i 's|="/_expo/|="./_expo/|g' dist/index.html
           sed -i 's|="/assets/|="./assets/|g' dist/index.html
+          # Expo의 JS 번들 안에 기록된 정적 이미지 경로도 프로젝트 페이지 기준으로 바꿉니다.
+          # 이 처리가 없으면 /casino/assets가 아닌 도메인 루트 /assets를 찾아 카드가 빈칸으로 보입니다.
+          find dist/_expo -type f -name '*.js' -exec sed -i 's|uri:"/assets/|uri:"./assets/|g' {} +
           touch dist/.nojekyll
 
       - name: Configure GitHub Pages
