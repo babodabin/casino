@@ -2,13 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   dealChinese, isChineseWinningHand, getChineseWaits, evaluateChineseYaku, totalChinesePoints,
-  canChineseDeclareWin, chineseScore, createChineseMatch, settleChineseWin, settleChineseDraw,
+  canChineseDeclareWin, chineseScore, createChineseMatch, settleChineseWin, settleChineseMultipleRon, settleChineseDraw,
   rankChineseScores, chineseRoundLabel, CHINESE_MIN_POINTS, CHINESE_BASE_POINTS,
 } from '../src/chinesemahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 const names = (result: { name: string }[]) => result.map((entry) => entry.name);
+
+test('일포다향은 두 승자를 모두 정산하고 국은 한 번만 넘긴다',()=>{
+  const score=chineseScore({yaku:[{name:'시험',chinese:'試',points:8,detail:''}],winType:'ron'});
+  const result=settleChineseMultipleRon(createChineseMatch(),{loser:0,winners:[{seat:1,score},{seat:3,score}]});
+  assert.equal(result.roundIndex,1);
+  assert.equal(result.scores.reduce((sum,value)=>sum+value,0),0);
+  assert.ok(result.scores[1]>0&&result.scores[3]>0&&result.scores[0]<0);
+});
 
 test('136장으로 열세 장씩 나눈다', () => {
   const round = dealChinese(() => 0.29);

@@ -415,6 +415,27 @@ export function settleHongKongWin(state: HongKongMatchState, args: {
   return next;
 }
 
+/** 한 버림패에 여러 명이 동시에 론하는 일포다향 정산. 국 진행은 한 번만 합니다. */
+export function settleHongKongMultipleRon(state: HongKongMatchState,args:{
+  loser:number;
+  winners:{seat:number;score:HongKongScore}[];
+}):HongKongMatchState{
+  if(!args.winners.length)throw new Error('론 승자가 필요합니다.');
+  const seats=args.winners.map(({seat})=>seat);
+  if(new Set(seats).size!==seats.length||seats.includes(args.loser))throw new Error('복수 론 자리 정보가 올바르지 않습니다.');
+  const next:HongKongMatchState={...state,scores:[...state.scores] as HongKongMatchState['scores']};
+  args.winners.forEach(({seat,score})=>{
+    const amount=score.perPlayer*3;
+    next.scores[args.loser]-=amount;
+    next.scores[seat]+=amount;
+  });
+  const dealer=state.roundIndex%4;
+  if(seats.includes(dealer))next.dealerRepeat++;
+  else{next.dealerRepeat=0;next.roundIndex++;}
+  next.finished=next.roundIndex>=16;
+  return next;
+}
+
 export function settleHongKongDraw(state: HongKongMatchState): HongKongMatchState {
   // 유국이면 점수 이동 없이 친이 그대로 이어갑니다.
   const next: HongKongMatchState = { ...state, scores: [...state.scores] as HongKongMatchState['scores'] };

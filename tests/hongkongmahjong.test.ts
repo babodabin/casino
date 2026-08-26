@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createFlowerTiles, flowerFaan, dealHongKong, drawFlower, isHongKongWinningHand, getHongKongWaits,
   evaluateHongKongFaan, totalFaan, canHongKongDeclareWin, hongKongScore, createHongKongMatch,
-  settleHongKongWin, settleHongKongDraw, rankHongKongScores, hongKongRoundLabel,
+  settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, rankHongKongScores, hongKongRoundLabel,
   getHongKongCallOptions, applyHongKongCall, HONG_KONG_MIN_FAAN, HONG_KONG_LIMIT,
   resolveFlowerDraws, drawHongKongTurn, HONG_KONG_MIN_OPTIONS,
 } from '../src/hongkongmahjong.ts';
@@ -11,6 +11,16 @@ import { type MahjongTile } from '../src/riichimahjong.ts';
 
 const hand = (codes: string[]): MahjongTile[] => codes.map((code, index) => ({ id: `${code}-${index}`, suit: code[0] as MahjongTile['suit'], value: Number(code.slice(1)), glyph: code }));
 const names = (result: { name: string }[]) => result.map((entry) => entry.name);
+
+test('홍콩 일포다향은 방총자가 두 승자에게 각각 지불한다',()=>{
+  const score=hongKongScore({faan:[{name:'시험',chinese:'試',faan:3,detail:''}],winType:'ron'});
+  const result=settleHongKongMultipleRon(createHongKongMatch(),{loser:0,winners:[{seat:1,score},{seat:2,score}]});
+  assert.equal(result.scores.reduce((sum,value)=>sum+value,0),2000);
+  assert.equal(result.scores[0],500-score.perPlayer*6);
+  assert.equal(result.scores[1],500+score.perPlayer*3);
+  assert.equal(result.scores[2],500+score.perPlayer*3);
+  assert.equal(result.roundIndex,1);
+});
 
 test('꽃패 여덟 장을 만든다', () => {
   const flowers = createFlowerTiles();

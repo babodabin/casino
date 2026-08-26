@@ -70,8 +70,8 @@ import { dealFiveCardDraw, exchangeDrawCards, opponentKeepCards, resolveFiveCard
 import { dealHighLow, resolveHighLow } from './src/highlow';
 import { summariseWin, isModeWinningShape, canModeWinShape, winButtonLabel, mahjongMinimumNote, type MahjongWinSummary } from './src/mahjongmodes';
 import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swapThreeTiles, settleSichuanFullDraw, settleSichuanKan, refundSichuanKanTransfers, settleSichuanMultipleRon, createBloodState, settleSichuanWin, autoPlaySichuanRemainder, activeSichuanSeats, rankSichuanScores, evaluateSichuanFan, sichuanScore, countRoots, sichuanSuits, type SichuanSuit, type SichuanBloodState, type SichuanKanTransfer } from './src/sichuanmahjong';
-import { createHongKongMatch, settleHongKongWin, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
-import { createChineseMatch, settleChineseWin, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
+import { createHongKongMatch, settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
+import { createChineseMatch, settleChineseWin, settleChineseMultipleRon, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
 import { chooseCallByPriority, drawModeSupplement, getModeCallOptions } from './src/mahjongflow';
 import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
@@ -2291,16 +2291,6 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
 
   const declareKan=(option:MahjongKanOption)=>{
     if(phase!=='playing'||pendingCall)return;
-    // 사천은 깡을 하는 순간 점수를 받습니다(과수).
-    if(mode==='sichuan'){
-      const kind=option.kind==='ankan'?'ankan':option.kind==='kakan'?'kakan':'minkan';
-      // 여기서는 내가 뽑은 패로 하는 암깡·가깡뿐이라 방총자가 없습니다.
-      const settled=settleSichuanKan(bloodState,{kanner:0,kind:kind==='minkan'?'ankan':kind,basePoints:1});
-      setBloodState(settled.state);
-      setSichuanKanTransfers((current)=>[...current,...settled.transfers]);
-      setSichuanLastKanTransfers(settled.transfers);
-      setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);
-    }
     if(option.kind==='kakan'){
       const added=option.tiles[option.tiles.length-1];
       // 창깡: 가깡하려는 패로 상대가 완성할 수 있으면 그 자리에서 론이 성립합니다.
@@ -2320,13 +2310,19 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         return;
       }
     }
+    // 가깡이 창깡으로 취소되지 않은 뒤에만 쓰촨 과수 점수를 지급합니다.
+    if(mode==='sichuan'){
+      const settled=settleSichuanKan(bloodState,{kanner:0,kind:option.kind,basePoints:1});
+      setBloodState(settled.state);
+      setSichuanKanTransfers((current)=>[...current,...settled.transfers]);
+      setSichuanLastKanTransfers(settled.transfers);
+      setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);
+    }
     const applied=option.kind==='ankan'?applyAnkan(player,option):applyKakan(player,openMelds,option);
     if(option.kind==='ankan')setConcealedKans((current)=>[...current,option.tiles]);
     else setOpenMelds((applied as ReturnType<typeof applyKakan>).openMelds);
     // 왕패는 리치마작에만 있습니다. 나머지 종목은 산의 마지막 패를 영상패로 가져옵니다.
-    const supplement=mode==='riichi'
-      ?drawReplacementTile(applied.hand,wall,deadWall,revealedKans)
-      :{...drawSichuanReplacement(applied.hand,wall),deadWall};
+    const supplement=drawModeSupplement(mode,applied.hand,wall,deadWall,revealedKans);
     setPlayer(supplement.hand);setWall(supplement.wall);setDeadWall(supplement.deadWall);
     setDrawnId(supplement.drawn?.id??'');setAfterKanDraw(true);setIppatsuEligible(false);setRevealedKans((value)=>value+1);setKanOwners((current)=>[...current,0]);setAnyCallMade(true);
     const indicator=deadWallDoraIndicators(supplement.deadWall,revealedKans+1).slice(-1)[0];
@@ -2352,11 +2348,18 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         finish(delta>0?'win':delta<0?'loss':'push',`${ronLabel} 론${ronWinners.length>1?' · 일포다향':''} · ${result.grade}\n혈전 ${rest.state.winners.length}명 화료 · 내 점수 ${delta>0?'+':''}${delta}`);
         return;
       }
-      if(mode==='hongkong')setHkMatch((current)=>settleHongKongWin(current,{winner:seat,score:hongKongScore({faan:evaluateHongKongFaan({hand:winningHand,melds,winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(seat,hkMatch.roundIndex%4),roundWind:roundWindFor(hkMatch.roundIndex),flowers:flowers[seat],seat}),basePoints:1,winType:'ron'}),winType:'ron',loser:0}));
-      else if(mode==='chinese')setCnMatch((current)=>settleChineseWin(current,{winner:seat,score:chineseScore({yaku:evaluateChineseYaku({hand:winningHand,melds,winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(seat,cnMatch.roundIndex%4),roundWind:roundWindFor(cnMatch.roundIndex)}),winType:'ron'}),winType:'ron',loser:0}));
+      if(mode==='hongkong'){
+        const winners=computerRons.map((index)=>{const winnerSeat=index+1;const hand=[...opponents[index],mine.discarded];const winnerMelds=opponentMelds[index];return {seat:winnerSeat,score:hongKongScore({faan:evaluateHongKongFaan({hand,melds:winnerMelds,winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(winnerSeat,hkMatch.roundIndex%4),roundWind:roundWindFor(hkMatch.roundIndex),flowers:flowers[winnerSeat],seat:winnerSeat}),basePoints:1,winType:'ron'})};});
+        setHkMatch((current)=>winners.length>1?settleHongKongMultipleRon(current,{loser:0,winners}):settleHongKongWin(current,{winner:seat,score:winners[0].score,winType:'ron',loser:0}));
+      }
+      else if(mode==='chinese'){
+        const winners=computerRons.map((index)=>{const winnerSeat=index+1;const hand=[...opponents[index],mine.discarded];const winnerMelds=opponentMelds[index];return {seat:winnerSeat,score:chineseScore({yaku:evaluateChineseYaku({hand,melds:winnerMelds,winType:'ron',winningTile:mine.discarded,seatWind:seatWindFor(winnerSeat,cnMatch.roundIndex%4),roundWind:roundWindFor(cnMatch.roundIndex)}),winType:'ron'})};});
+        setCnMatch((current)=>winners.length>1?settleChineseMultipleRon(current,{loser:0,winners}):settleChineseWin(current,{winner:seat,score:winners[0].score,winType:'ron',loser:0}));
+      }
       else if(result.riichiScore)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:seat,loser:0,score:result.riichiScore!,winType:'ron'});setRiichiPoints(next.scores[0]);return next;});
       else setMatchState((current)=>advanceRiichiMatch(current,{winner:seat}));
-      finish('loss',`컴퓨터 ${computerRon+1} 론 · 내가 버린 ${mine.discarded.glyph}으로 완성 · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);
+      const ronNames=computerRons.map((index)=>`컴퓨터 ${index+1}`).join('·');
+      finish('loss',`${ronNames} 론${computerRons.length>1?' · 일포다향':''} · 내가 버린 ${mine.discarded.glyph}으로 완성 · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);
       return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors,allowedCalls:getModeCallOptions(mode,hand,mine.discarded,index===0,voidSuits[index+1])}));const callReaction=chooseCallByPriority(calls.flatMap((call,index)=>call?[{seat:index+1,candidate:index,call}]:[]),0);const caller=callReaction?.candidate??-1;if(caller>=0){const call=callReaction!.call;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);setAnyCallMade(true);setMyDiscardClaimed(true);if(call.kind==='kan')setKanOwners((current)=>[...current,caller+1]);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=mode==='riichi'?drawReplacementTile(callHand,remaining,deadWall,revealedKans):{...drawSichuanReplacement(callHand,remaining),deadWall};callHand=supplement.hand;remaining=supplement.wall;setDeadWall(supplement.deadWall);setRevealedKans((value)=>value+1);}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(riichiDeclared||declaration?[nextRivers[0]]:[]),...opponentRiichi.flatMap((declared,seat)=>declared&&seat!==caller?[nextRivers[seat+1]]:[])],visibleTiles:[...callHand,...nextRivers.flat(),...computerMeldSets.flat(2)]});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
   const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
   const claim=(option:MahjongCallOption)=>{if(!pendingCall)return;setAnyCallMade(true);if(option.kind==='kan')setKanOwners((current)=>[...current,0]);setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){if(mode==='sichuan'){const settled=settleSichuanKan(bloodState,{kanner:0,kind:'minkan',discarder:pendingCall.discarder,basePoints:1});setBloodState(settled.state);setSichuanKanTransfers((current)=>[...current,...settled.transfers]);setSichuanLastKanTransfers(settled.transfers);setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);}const draw=drawModeSupplement(mode,called.hand,wall,deadWall,revealedKans);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDeadWall(draw.deadWall);setRevealedKans((value)=>value+1);setDrawnId(draw.drawn.id);setAfterKanDraw(true);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};

@@ -679,6 +679,27 @@ export function settleChineseWin(state: ChineseMatchState, args: {
   return next;
 }
 
+/** 한 장의 방총패에 여러 명이 화료할 때 각 승자를 모두 정산하고 국은 한 번만 넘깁니다. */
+export function settleChineseMultipleRon(state:ChineseMatchState,args:{
+  loser:number;
+  winners:{seat:number;score:ChineseScore}[];
+}):ChineseMatchState{
+  if(!args.winners.length)throw new Error('론 승자가 필요합니다.');
+  const seats=args.winners.map(({seat})=>seat);
+  if(new Set(seats).size!==seats.length||seats.includes(args.loser))throw new Error('복수 론 자리 정보가 올바르지 않습니다.');
+  const next:ChineseMatchState={...state,scores:[...state.scores] as ChineseMatchState['scores']};
+  args.winners.forEach(({seat,score})=>{
+    [0,1,2,3].filter((other)=>other!==seat).forEach((other)=>{
+      const amount=other===args.loser?score.payments[0]:score.basePoints;
+      next.scores[other]-=amount;
+      next.scores[seat]+=amount;
+    });
+  });
+  next.roundIndex++;
+  next.finished=next.roundIndex>=16;
+  return next;
+}
+
 export function settleChineseDraw(state: ChineseMatchState): ChineseMatchState {
   const next: ChineseMatchState = { ...state, scores: [...state.scores] as ChineseMatchState['scores'] };
   next.roundIndex++;
