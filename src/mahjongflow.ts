@@ -3,6 +3,21 @@ import { drawReplacementTile, getMahjongCallOptions, type MahjongCallOption, typ
 
 export type SharedMahjongMode='riichi'|'chinese'|'hongkong'|'sichuan';
 
+/** 화면과 컴퓨터가 같은 리치 선언 조건을 사용하도록 한 곳에서 판정합니다. */
+export function canDeclareRiichiNow(args:{points:number;closed:boolean;wallRemaining:number;alreadyDeclared?:boolean}){
+  return !args.alreadyDeclared&&args.closed&&args.points>=1000&&args.wallRemaining>=4;
+}
+
+/** 첫 버림 전까지 아무 부름도 없었을 때 선언한 리치는 더블리치입니다. */
+export function isDoubleRiichiDeclaration(ownDiscards:number,anyCallMade:boolean){
+  return ownDiscards===0&&!anyCallMade;
+}
+
+/** 국 번호가 올라갈 때 동·남·서·북 자리의 친도 함께 회전합니다. */
+export function mahjongDealerSeat(roundIndex:number){
+  return ((Math.trunc(roundIndex)%4)+4)%4;
+}
+
 /** 공통 시작 버튼이 각 종목의 실제 경기 종료 상태를 읽도록 통일합니다. */
 export function isMahjongSessionFinished(mode:SharedMahjongMode,states:{riichi:boolean;chinese:boolean;hongkong:boolean;sichuan:boolean}){
   return states[mode];

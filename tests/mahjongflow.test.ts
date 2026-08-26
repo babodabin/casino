@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, isMahjongSessionFinished, reconcileSichuanKanEvent } from '../src/mahjongflow.ts';
+import { canDeclareRiichiNow, chooseCallByPriority, drawModeSupplement, getModeCallOptions, isDoubleRiichiDeclaration, isMahjongSessionFinished, mahjongDealerSeat, reconcileSichuanKanEvent } from '../src/mahjongflow.ts';
 import { createBloodState } from '../src/sichuanmahjong.ts';
 import { chooseComputerCall, type MahjongCallOption, type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -81,4 +81,22 @@ test('새 경기 버튼은 네 마작 각각의 실제 종료 상태를 확인�
   assert.equal(isMahjongSessionFinished('hongkong',states),true);
   assert.equal(isMahjongSessionFinished('chinese',{...states,chinese:true}),true);
   assert.equal(isMahjongSessionFinished('sichuan',{...states,sichuan:true}),true);
+});
+
+test('리치는 1,000점 이상·멘젠·산 4장 이상일 때만 선언한다',()=>{
+  assert.equal(canDeclareRiichiNow({points:1000,closed:true,wallRemaining:4}),true);
+  assert.equal(canDeclareRiichiNow({points:999,closed:true,wallRemaining:20}),false);
+  assert.equal(canDeclareRiichiNow({points:25000,closed:false,wallRemaining:20}),false);
+  assert.equal(canDeclareRiichiNow({points:25000,closed:true,wallRemaining:3}),false);
+  assert.equal(canDeclareRiichiNow({points:25000,closed:true,wallRemaining:20,alreadyDeclared:true}),false);
+});
+
+test('첫 버림 전이고 아무도 울지 않았을 때만 더블리치다',()=>{
+  assert.equal(isDoubleRiichiDeclaration(0,false),true);
+  assert.equal(isDoubleRiichiDeclaration(1,false),false);
+  assert.equal(isDoubleRiichiDeclaration(0,true),false);
+});
+
+test('국이 바뀌면 친이 동가부터 네 자리로 정확히 회전한다',()=>{
+  assert.deepEqual([0,1,2,3,4,5,6,7].map(mahjongDealerSeat),[0,1,2,3,0,1,2,3]);
 });
