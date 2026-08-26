@@ -593,9 +593,9 @@ export function shouldComputerDeclareRiichi(
   return true;
 }
 
-export function chooseComputerCall(hand:MahjongTile[],discarded:MahjongTile,canChi:boolean,options:{level?:MahjongAiLevel;openMeldCount?:number;includeHonors?:boolean}={}):MahjongCallOption|null{
+export function chooseComputerCall(hand:MahjongTile[],discarded:MahjongTile,canChi:boolean,options:{level?:MahjongAiLevel;openMeldCount?:number;includeHonors?:boolean;allowedCalls?:MahjongCallOption[]}={}):MahjongCallOption|null{
   const level=options.level??'normal';if(level==='beginner')return null;
-  const calls=getMahjongCallOptions(hand,discarded,canChi);if(!calls.length)return null;
+  const calls=options.allowedCalls??getMahjongCallOptions(hand,discarded,canChi);if(!calls.length)return null;
   const before=computerHandPotential(hand,options.includeHonors??true,options.openMeldCount??0);
   const ranked=calls.map((call)=>{const called=applyMahjongCall(hand,discarded,call);let best=-Infinity;
     called.hand.forEach((tile,index)=>{const after=called.hand.filter((_,candidate)=>candidate!==index);best=Math.max(best,computerHandPotential(after,options.includeHonors??true,(options.openMeldCount??0)+1));});
