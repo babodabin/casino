@@ -46,3 +46,29 @@ test('쓰촨은 깡 뒤 일포다향까지 이어져도 점수 총합을 보존�
   assert.deepEqual(state.winners,[1,2]);
   assert.equal(state.scores.reduce((sum,value)=>sum+value,0),0);
 });
+
+test('플레이어와 컴퓨터의 중국식 동시 론을 함께 정산한다',()=>{
+  const score=chineseScore({yaku:[{name:'시험',chinese:'試',points:8,detail:''}],winType:'ron'});
+  const result=settleChineseMultipleRon(createChineseMatch(),{loser:1,winners:[{seat:0,score},{seat:3,score}]});
+  assert.ok(result.scores[0]>0&&result.scores[3]>0&&result.scores[1]<0);
+  assert.equal(result.scores.reduce((sum,value)=>sum+value,0),0);
+});
+
+test('플레이어와 컴퓨터의 홍콩식 동시 론을 함께 정산한다',()=>{
+  const score=hongKongScore({faan:[{name:'시험',chinese:'試',faan:3,detail:''}],winType:'ron'});
+  const result=settleHongKongMultipleRon(createHongKongMatch(),{loser:1,winners:[{seat:0,score},{seat:2,score}]});
+  assert.ok(result.scores[0]>500&&result.scores[2]>500&&result.scores[1]<500);
+  assert.equal(result.scores.reduce((sum,value)=>sum+value,0),2000);
+});
+
+test('플레이어와 컴퓨터의 리치·쓰촨 동시 론도 총점을 보존한다',()=>{
+  const riichi:RiichiMatchState={roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false};
+  const riichiScore=calculateRiichiScore({han:2,fu:40,dealer:false,winType:'ron'});
+  const riichiResult=settleMultipleRon(riichi,{discarderSeat:1,winners:[{seat:0,score:riichiScore},{seat:2,score:riichiScore}]});
+  assert.equal(riichiResult.scores.reduce((sum,value)=>sum+value,0),100000);
+
+  const sichuanScoreResult=sichuanScore({fans:[],roots:0,basePoints:1,winType:'ron',activeOpponents:3});
+  const sichuanResult=settleSichuanMultipleRon(createBloodState(0),{loser:1,winners:[{seat:0,score:sichuanScoreResult},{seat:2,score:sichuanScoreResult}]});
+  assert.deepEqual(sichuanResult.winners,[0,2]);
+  assert.equal(sichuanResult.scores.reduce((sum,value)=>sum+value,0),0);
+});

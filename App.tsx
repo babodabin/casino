@@ -2019,7 +2019,7 @@ function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins
 
 function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const profile=mahjongProfiles[mode];
-  type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean;onPassRon?:()=>void};
+  type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean;otherRonSeats?:number[];onPassRon?:()=>void};
   type MahjongRoundResult={winner:number|null;winners?:number[];method:'론'|'쯔모'|'유국'|'유국만관';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
   const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready'); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [deadWall,setDeadWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
   const [openMelds,setOpenMelds]=useState<MahjongTile[][]>([]); const [pendingCall,setPendingCall]=useState<PendingCall|null>(null);
@@ -2181,6 +2181,34 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       finish('loss',`컴퓨터 ${seat} ${winType==='ron'?'론':'쯔모'} · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);
     };
 
+    const finishComputerRons=(winners:number[],winningTile:MahjongTile,discarder:number)=>{
+      if(winners.length===1){finishComputerWin(winners[0],[...hands[winners[0]],winningTile],winningTile,'ron',discarder);return;}
+      persist();
+      const details=winners.map((winner)=>{
+        const seat=winner+1;const concealed=[...hands[winner],winningTile];const melds=meldSets[winner];
+        const summary=summariseWin({mode,hand:concealed,melds,winType:'ron',winningTile,seat,dealerSeat:matchState.roundIndex%4,roundIndex:matchState.roundIndex,riichi:riichiStates[winner],voidSuit:voidSuits[seat],flowers:flowerSets[seat],doraIndicators,uraIndicators:riichiStates[winner]?deadWallUraIndicators(deadWall,revealedKans):[],activeOpponents:activeSichuanSeats(bloodState).length-1,redFives:rules.redFives,openTanyao:rules.openTanyao,minFaan});
+        return {winner,seat,concealed,melds,summary};
+      });
+      const first=details[0];const names=details.map(({seat})=>`컴퓨터 ${seat}`).join(' · ');
+      setRoundResult({winner:first.seat,winners:details.map(({seat})=>seat),method:'론',concealed:sortMahjongHand(first.concealed),melds:first.melds.map((meld)=>[...meld]),yaku:first.summary.lines.map((line)=>`${line.name} ${line.value}`),grade:`${names} 일포다향 · ${first.summary.grade}`,scoreText:first.summary.scoreText});
+      if(mode==='sichuan'){
+        const ronWinners=details.map(({seat,concealed,melds})=>({seat,score:sichuanScore({fans:evaluateSichuanFan({hand:concealed,melds,winType:'ron'}),roots:countRoots(concealed,melds),basePoints:1,winType:'ron',activeOpponents:activeSichuanSeats(bloodState).length-1})}));
+        const settled=settleSichuanMultipleRon(bloodState,{loser:discarder+1,winners:ronWinners});
+        const rest=autoPlaySichuanRemainder({state:settled,hands:[nextPlayer,...hands],melds:[openMelds,...meldSets],wall:remaining,rivers:streams,voidSuits,basePoints:1,startSeat:first.seat+1});
+        setBloodState(rest.state);setBloodLog([`${names} 론 · 일포다향`,...rest.log]);setOpponents(rest.hands.slice(1));setWall(rest.wall);setRivers(rest.rivers);
+      }else if(mode==='hongkong'){
+        const scored=details.map(({seat,concealed,melds})=>({seat,score:hongKongScore({faan:evaluateHongKongFaan({hand:concealed,melds,winType:'ron',winningTile,seatWind:seatWindFor(seat,hkMatch.roundIndex%4),roundWind:roundWindFor(hkMatch.roundIndex),flowers:flowerSets[seat],seat}),basePoints:1,winType:'ron'})}));
+        setHkMatch((current)=>settleHongKongMultipleRon(current,{loser:discarder+1,winners:scored}));
+      }else if(mode==='chinese'){
+        const scored=details.map(({seat,concealed,melds})=>({seat,score:chineseScore({yaku:evaluateChineseYaku({hand:concealed,melds,winType:'ron',winningTile,seatWind:seatWindFor(seat,cnMatch.roundIndex%4),roundWind:roundWindFor(cnMatch.roundIndex)}),winType:'ron'})}));
+        setCnMatch((current)=>settleChineseMultipleRon(current,{loser:discarder+1,winners:scored}));
+      }else{
+        const scored=details.flatMap(({seat,summary})=>summary.riichiScore?[{seat,score:summary.riichiScore}]:[]);
+        if(scored.length)setMatchState((current)=>{const next=settleMultipleRon(current,{winners:scored,discarderSeat:discarder+1});setRiichiPoints(next.scores[0]);return next;});
+      }
+      finish('loss',`${names} 동시 론 · 내가 아닌 컴퓨터 ${discarder+1}의 ${winningTile.glyph} 방총`);
+    };
+
     const processTurn=(index:number):void=>{
       if(index>=3){persist();setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);return;}
       if(mode==='hongkong'&&remainingFlowerWall.length){
@@ -2207,7 +2235,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       const hasRonYaku=mode!=='riichi'||evaluateBasicRiichiYaku({concealed:[...nextPlayer,discarded],openMelds,riichi:lockedRiichi,ippatsu:ippatsuEligible,winType:'ron',winningTile:discarded,seatWind:seatWindFor(0,matchState.roundIndex%4),roundWind:roundWindFor(matchState.roundIndex)}).length>0;
       const playerRon=structurallyRon&&hasRonYaku&&!blockedFuriten&&!permanentFuriten;
       const reactionOrder=Array.from({length:3},(_,offset)=>(discarder+2+offset)%4).filter((seat)=>seat>0).map((seat)=>seat-1);
-      const ronWinner=reactionOrder.find((candidate)=>{
+      const ronWinners=reactionOrder.filter((candidate)=>{
         if(candidate===discarder)return false;
         const structural=canRonMahjong(hands[candidate],discarded,counts[candidate]);
         if(!structural)return false;
@@ -2216,15 +2244,15 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
         return hasYaku&&!furiten;
       });
       if(playerRon||playerOptions.length){
-        if(!playerRon&&ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+        if(!playerRon&&ronWinners.length){finishComputerRons(ronWinners,discarded,discarder);return;}
         persist();
-        setPendingCall({tile:discarded,discarder:discarder+1,nextComputer,options:ronWinner===undefined?playerOptions:[],canRon:playerRon,onPassRon:ronWinner===undefined?undefined:()=>finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder)});
+        setPendingCall({tile:discarded,discarder:discarder+1,nextComputer,options:ronWinners.length?[]:playerOptions,canRon:playerRon,otherRonSeats:ronWinners.map((winner)=>winner+1),onPassRon:ronWinners.length?()=>finishComputerRons(ronWinners,discarded,discarder):undefined});
         setMessage(`컴퓨터 ${discarder+1}(${['쉬움','보통','전문가'][discarder]})이 ${discarded.glyph} 버림 · ${playerRon?'론할 수 있어요':'가져올까요?'}${declaredNow?' · 컴퓨터 리치 선언':''}`);
         return;
       }
       if(structurallyRon&&(blockedFuriten||permanentFuriten))setMessage(`${discarded.glyph}은 완성패지만 후리텐이라 론할 수 없습니다 · 쯔모는 가능`);
 
-      if(ronWinner!==undefined){finishComputerWin(ronWinner,[...hands[ronWinner],discarded],discarded,'ron',discarder);return;}
+      if(ronWinners.length){finishComputerRons(ronWinners,discarded,discarder);return;}
 
       const callReactions=reactionOrder.flatMap((candidate)=>{
         if(candidate===discarder||riichiStates[candidate])return [];
@@ -2386,25 +2414,38 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';
     const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];
     const concealed=pendingCall?[...player,pendingCall.tile]:player;
+    const otherRonSeats=winType==='ron'?(pendingCall?.otherRonSeats??[]):[];
     const result=summariseWin({mode,hand:concealed,melds:openMelds,concealedKans,winType,winningTile,seat:0,dealerSeat:matchState.roundIndex%4,roundIndex:matchState.roundIndex,riichi:riichiDeclared,ippatsu:ippatsuEligible,afterKan:afterKanDraw&&winType==='tsumo',voidSuit:voidSuits[0],doraIndicators,uraIndicators,lastTile:wall.length===0,redFives:rules.redFives,openTanyao:rules.openTanyao,minFaan});
     if(!result.allowed){setMessage(result.blockedReason);return;}
 
     // 종목마다 국 진행과 점수 이동 방식이 다릅니다.
     if(mode==='riichi'){
       const score=result.riichiScore;
-      if(score)setMatchState((current)=>{const next=settleRiichiWin(current,{winner:0,score,winType,loser:pendingCall?.discarder});setRiichiPoints(next.scores[0]);return next;});
+      if(score)setMatchState((current)=>{
+        const others=otherRonSeats.flatMap((seat)=>{const index=seat-1;const hand=[...opponents[index],winningTile];const summary=summariseWin({mode:'riichi',hand,melds:opponentMelds[index],winType:'ron',winningTile,seat,dealerSeat:current.roundIndex%4,roundIndex:current.roundIndex,riichi:opponentRiichi[index],doraIndicators,uraIndicators:opponentRiichi[index]?deadWallUraIndicators(deadWall,revealedKans):[],redFives:rules.redFives,openTanyao:rules.openTanyao});return summary.riichiScore?[{seat,score:summary.riichiScore}]:[];});
+        const next=others.length&&pendingCall?settleMultipleRon(current,{winners:[{seat:0,score},...others],discarderSeat:pendingCall.discarder}):settleRiichiWin(current,{winner:0,score,winType,loser:pendingCall?.discarder});setRiichiPoints(next.scores[0]);return next;
+      });
       else setMatchState((current)=>advanceRiichiMatch(current,{winner:0}));
     }else if(mode==='hongkong'){
       const faan=evaluateHongKongFaan({hand:concealed,melds:openMelds,concealedKans,winType,winningTile,seatWind:seatWindFor(0,hkMatch.roundIndex%4),roundWind:roundWindFor(hkMatch.roundIndex),flowers:flowers[0],seat:0});
-      setHkMatch((current)=>settleHongKongWin(current,{winner:0,score:hongKongScore({faan,basePoints:1,winType}),winType,loser:pendingCall?.discarder}));
+      const playerScore=hongKongScore({faan,basePoints:1,winType});
+      setHkMatch((current)=>{
+        const others=otherRonSeats.map((seat)=>{const index=seat-1;const hand=[...opponents[index],winningTile];return {seat,score:hongKongScore({faan:evaluateHongKongFaan({hand,melds:opponentMelds[index],winType:'ron',winningTile,seatWind:seatWindFor(seat,current.roundIndex%4),roundWind:roundWindFor(current.roundIndex),flowers:flowers[seat],seat}),basePoints:1,winType:'ron'})};});
+        return others.length&&pendingCall?settleHongKongMultipleRon(current,{loser:pendingCall.discarder,winners:[{seat:0,score:playerScore},...others]}):settleHongKongWin(current,{winner:0,score:playerScore,winType,loser:pendingCall?.discarder});
+      });
     }else if(mode==='chinese'){
       const yaku=evaluateChineseYaku({hand:concealed,melds:openMelds,concealedKans,winType,winningTile,seatWind:seatWindFor(0,cnMatch.roundIndex%4),roundWind:roundWindFor(cnMatch.roundIndex)});
-      setCnMatch((current)=>settleChineseWin(current,{winner:0,score:chineseScore({yaku,winType}),winType,loser:pendingCall?.discarder}));
+      const playerScore=chineseScore({yaku,winType});
+      setCnMatch((current)=>{
+        const others=otherRonSeats.map((seat)=>{const index=seat-1;const hand=[...opponents[index],winningTile];return {seat,score:chineseScore({yaku:evaluateChineseYaku({hand,melds:opponentMelds[index],winType:'ron',winningTile,seatWind:seatWindFor(seat,current.roundIndex%4),roundWind:roundWindFor(current.roundIndex)}),winType:'ron'})};});
+        return others.length&&pendingCall?settleChineseMultipleRon(current,{loser:pendingCall.discarder,winners:[{seat:0,score:playerScore},...others]}):settleChineseWin(current,{winner:0,score:playerScore,winType,loser:pendingCall?.discarder});
+      });
     }else if(mode==='sichuan'){
       // 혈전도저: 내가 화료해도 국이 끝나지 않습니다. 남은 사람끼리 이어서 둡니다.
       const fans=evaluateSichuanFan({hand:concealed,melds:openMelds,winType,afterKan:afterKanDraw&&winType==='tsumo'});
       const score=sichuanScore({fans,roots:countRoots(concealed,openMelds),basePoints:1,winType,activeOpponents:activeSichuanSeats(bloodState).length-1});
-      const settled=settleSichuanWin(bloodState,{winner:0,score,winType,loser:pendingCall?.discarder});
+      const others=otherRonSeats.map((seat)=>{const index=seat-1;const hand=[...opponents[index],winningTile];const melds=opponentMelds[index];return {seat,score:sichuanScore({fans:evaluateSichuanFan({hand,melds,winType:'ron'}),roots:countRoots(hand,melds),basePoints:1,winType:'ron',activeOpponents:activeSichuanSeats(bloodState).length-1})};});
+      const settled=others.length&&pendingCall?settleSichuanMultipleRon(bloodState,{loser:pendingCall.discarder,winners:[{seat:0,score},...others]}):settleSichuanWin(bloodState,{winner:0,score,winType,loser:pendingCall?.discarder});
       const rest=autoPlaySichuanRemainder({
         state:settled,
         hands:[player,...opponents],
@@ -2420,15 +2461,17 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
 
     setRoundResult({
       winner:0,
+      winners:otherRonSeats.length?[0,...otherRonSeats]:undefined,
       method:winType==='ron'?'론':'쯔모',
       concealed:sortMahjongHand(concealed),
       melds:[...openMelds.map((meld)=>[...meld]),...concealedKans.map((meld)=>[...meld])],
       yaku:result.lines.map((line)=>`${line.name} ${line.value}`),
-      grade:result.grade,
+      grade:otherRonSeats.length?`나 · ${otherRonSeats.map((seat)=>`컴퓨터 ${seat}`).join(' · ')} 일포다향 · ${result.grade}`:result.grade,
       scoreText:result.scoreText,
     });
     const detail=result.lines.map((line)=>`${line.name} ${line.value}: ${line.detail}`).join('\n');
-    finish('win',`${text} · ${result.grade}\n${detail}\n${result.scoreText}`);
+    const sharedRon=otherRonSeats.length?` · 컴퓨터 ${otherRonSeats.join('·컴퓨터 ')}도 함께 론(일포다향)`:'';
+    finish('win',`${text}${sharedRon} · ${result.grade}\n${detail}\n${result.scoreText}`);
   };
   const turnGuide=phase==='ready'
     ? {step:'시작 전',title:'패 13장 받기를 누르세요',detail:'코인이 차감되고 첫 패를 받은 뒤, 한 장을 뽑고 한 장을 버리는 플레이가 시작됩니다.'}
