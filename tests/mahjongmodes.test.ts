@@ -82,11 +82,11 @@ test('완성 모양 판정은 종목별 패 구성을 따른다', () => {
 });
 
 test('버튼 문구가 상태를 구분해 준다', () => {
-  assert.equal(winButtonLabel('riichi', false, null), '아직 미완성');
+  assert.equal(winButtonLabel('riichi', false, null), '패를 맞추는 중');
   assert.equal(winButtonLabel('riichi', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '역 없음');
   assert.equal(winButtonLabel('chinese', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 5 }), '5점 · 부족');
   assert.equal(winButtonLabel('hongkong', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 2 }), '2번 · 부족');
-  assert.equal(winButtonLabel('sichuan', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '정결 미완료');
+  assert.equal(winButtonLabel('sichuan', true, { allowed: false, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '정결 패가 남아 있음');
   assert.equal(winButtonLabel('riichi', true, { allowed: true, blockedReason: '', lines: [], grade: '', scoreText: '', rawPoints: 0 }), '쯔모');
 });
 

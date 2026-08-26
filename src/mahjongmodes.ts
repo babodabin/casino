@@ -250,9 +250,9 @@ export function summariseWin(context: MahjongWinContext): MahjongWinSummary {
 
 /** 화면 버튼에 쓸 문구. 완성 여부와 최소 조건을 구분해 보여줍니다. */
 export function winButtonLabel(mode: MahjongModeKey, shapeComplete: boolean, summary: MahjongWinSummary | null) {
-  if (!shapeComplete) return '아직 미완성';
+  if (!shapeComplete) return '패를 맞추는 중';
   if (summary?.allowed) return '쯔모';
-  if (mode === 'sichuan') return '정결 미완료';
+  if (mode === 'sichuan') return '정결 패가 남아 있음';
   if (mode === 'hongkong') return `${summary?.rawPoints ?? 0}번 · 부족`;
   if (mode === 'chinese') return `${summary?.rawPoints ?? 0}점 · 부족`;
   return '역 없음';

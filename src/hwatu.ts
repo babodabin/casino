@@ -18,6 +18,8 @@ export type HwatuCard = {
   ribbon?: RibbonKind;
   /** 피 한 장이 두 장 몫을 하는 쌍피 */
   double?: boolean;
+  /** 고스톱 선택 규칙의 보너스피 가치(2 또는 3). 일반 48장에는 없습니다. */
+  bonus?: number;
   /** 화면에 보여 줄 이름 */
   name: string;
 };
@@ -81,7 +83,7 @@ export function shuffleHwatu(cards: HwatuCard[], random: () => number = Math.ran
 }
 
 /** 피 점수. 쌍피는 두 장으로 셉니다. */
-export const pieceValue = (card: HwatuCard) => (card.kind === '피' ? (card.double ? 2 : 1) : 0);
+export const pieceValue = (card: HwatuCard) => (card.kind === '피' ? (card.bonus ?? (card.double ? 2 : 1)) : 0);
 
 /** 종류별 장수를 셉니다. 점수 계산의 기본 재료입니다. */
 export function countByKind(cards: HwatuCard[]) {

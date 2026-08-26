@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "format": "four-card horizontal sheet",
+  "cardOrderNote": "Use perMonthCardOrder; positions are zero-based and follow each sheet from left to right.",
+  "completedMonths": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  "pendingMonths": [],
+  "reviewedAgainstReference": true,
+  "correctedMonths": [1, 2, 5, 6, 8, 9, 11, 12],
+  "perMonthCardOrder": {
+    "1": ["광", "홍단", "피", "피"],
+    "2": ["열끗", "홍단", "피", "피"],
+    "3": ["광", "홍단", "피", "피"],
+    "4": ["열끗", "초단", "피", "피"],
+    "5": ["열끗", "초단", "피", "피"],
+    "6": ["열끗", "청단", "피", "피"],
+    "7": ["열끗", "초단", "피", "피"],
+    "8": ["광", "열끗", "피", "피"],
+    "9": ["열끗", "청단", "피", "피"],
+    "10": ["열끗", "청단", "피", "피"],
+    "11": ["광", "쌍피", "피", "피"],
+    "12": ["비광", "열끗", "비띠", "쌍피"]
+  },
+  "files": {
+    "1": "hwatu-month-01-v2.png",
+    "2": "hwatu-month-02-v2.png",
+    "3": "hwatu-month-03.png",
+    "4": "hwatu-month-04.png",
+    "5": "hwatu-month-05-v2.png",
+    "6": "hwatu-month-06-v2.png",
+    "7": "hwatu-month-07.png",
+    "8": "hwatu-month-08-v2.png",
+    "9": "hwatu-month-09-v2.png",
+    "10": "hwatu-month-10.png",
+    "11": "hwatu-month-11-v2.png",
+    "12": "hwatu-month-12-v2.png"
+  }
+}
