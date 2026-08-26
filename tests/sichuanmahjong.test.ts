@@ -4,7 +4,7 @@ import {
   createSichuanTiles, dealSichuan, chooseVoidSuit, countBySuit, isSichuanVoidCleared, nextVoidDiscard,
   pickSwapTiles, swapThreeTiles, canSichuanWin, getSichuanWaits, countRoots, evaluateSichuanFan,
   sichuanScore, createBloodState, settleSichuanWin, settleSichuanMultipleRon, settleSichuanDraw, activeSichuanSeats,
-  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, refundSichuanKanTransfers, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores, shouldComputerDeclareSichuanKan,
+  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, refundSichuanKanTransfers, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores, shouldComputerDeclareSichuanKan, shouldComputerMakeSichuanCall, chooseComputerSichuanDiscard,
 } from '../src/sichuanmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -525,4 +525,28 @@ test('자동 혈전의 가깡 패로 상대가 화료하면 창깡이 되고 가
   assert.equal(result.state.winners.includes(1), true);
   assert.equal(result.kanTransfers.length, 0);
   assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('쓰촨 컴퓨터의 퐁 판단도 난이도에 따라 달라진다', () => {
+  const tiles = hand(['m2','m2','m3','m4','m6','m8','s1','s3','s5','s7','s8','s9','m9']);
+  const option = getSichuanCallOptions(tiles, hand(['m2'])[0], 'p').find((item) => item.kind === 'pon')!;
+  assert.equal(shouldComputerMakeSichuanCall(tiles, option, 'p', 'easy', () => 0.5), false);
+  assert.equal(shouldComputerMakeSichuanCall(tiles, option, 'p', 'normal', () => 0.5), true);
+  assert.equal(shouldComputerMakeSichuanCall(tiles, option, 'p', 'expert', () => 0.89), true);
+  const uncleared = hand(['p1','m2','m2','m3','m4','m6','m8','s1','s3','s5','s7','s8','s9']);
+  assert.equal(shouldComputerMakeSichuanCall(uncleared, option, 'p', 'expert', () => 0), false);
+});
+
+test('쓰촨 버림 난이도는 달라도 정결 패 우선 규칙은 절대 어기지 않는다', () => {
+  const tiles = hand(['p1','p9','m2','m3','m4','m6','m8','s1','s3','s5','s7','s8','s9','m9']);
+  assert.equal(chooseComputerSichuanDiscard(tiles, 'p', 'easy', () => 0.99).suit, 'p');
+  assert.equal(chooseComputerSichuanDiscard(tiles, 'p', 'normal', () => 0.5).suit, 'p');
+  assert.equal(chooseComputerSichuanDiscard(tiles, 'p', 'expert', () => 0.5).suit, 'p');
+});
+
+test('전문가 쓰촨 컴퓨터는 연결된 패보다 고립된 패를 먼저 버린다', () => {
+  const tiles = hand(['m2','m3','m4','m5','m6','m7','s2','s3','s4','s5','s6','s7','s9','m8']);
+  const discarded = chooseComputerSichuanDiscard(tiles, 'p', 'expert', () => 0.5);
+  assert.equal(discarded.suit, 's');
+  assert.equal(discarded.value, 9);
 });

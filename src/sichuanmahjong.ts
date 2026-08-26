@@ -578,6 +578,47 @@ export function shouldComputerDeclareSichuanKan(
   return random() < chance;
 }
 
+/** 난이도별 퐁·대명깡 판단. 전문가는 유효한 부르기를 놓치지 않습니다. */
+export function shouldComputerMakeSichuanCall(
+  hand: MahjongTile[],
+  option: SichuanCallOption,
+  voidSuit: SichuanSuit,
+  level: SichuanComputerLevel,
+  random: () => number = Math.random,
+) {
+  if (!shouldSichuanCall(hand, option, voidSuit)) return false;
+  const chance = option.kind === 'minkan'
+    ? (level === 'easy' ? 0.55 : level === 'normal' ? 0.82 : 1)
+    : (level === 'easy' ? 0.28 : level === 'normal' ? 0.62 : 0.9);
+  return random() < chance;
+}
+
+/**
+ * 난이도별 버림 선택. 모두 정결 패를 먼저 버리는 규칙은 지키되,
+ * 쉬움은 후보를 넓게 고르고 전문가는 연결 가치가 가장 낮은 패을 고릅니다.
+ */
+export function chooseComputerSichuanDiscard(
+  hand: MahjongTile[],
+  voidSuit: SichuanSuit,
+  level: SichuanComputerLevel,
+  random: () => number = Math.random,
+) {
+  const voidTiles = hand.filter((tile) => tile.suit === voidSuit);
+  const candidates = voidTiles.length ? voidTiles : hand;
+  if (!candidates.length) throw new Error('버릴 패가 없습니다.');
+  if (level === 'easy') return candidates[Math.min(candidates.length - 1, Math.floor(random() * candidates.length))];
+  const ranked = candidates.map((tile) => {
+    const sameSuit = hand.filter((other) => other.suit === tile.suit && other.id !== tile.id);
+    const pairs = sameSuit.filter((other) => other.value === tile.value).length;
+    const adjacent = sameSuit.filter((other) => Math.abs(other.value - tile.value) === 1).length;
+    const near = sameSuit.filter((other) => Math.abs(other.value - tile.value) === 2).length;
+    return { tile, value: pairs * 5 + adjacent * 3 + near - (tile.value === 1 || tile.value === 9 ? 1 : 0), tie: random() };
+  }).sort((a, b) => a.value - b.value || a.tie - b.tie);
+  if (level === 'expert') return ranked[0].tile;
+  const pool = ranked.slice(0, Math.min(3, ranked.length));
+  return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))].tile;
+}
+
 // ── 혈전도저 자동 진행 ──────────────────────────────────────────────
 
 export type SichuanAutoResult = {
@@ -715,7 +756,7 @@ export function autoPlaySichuanRemainder(args: {
       }
     }
 
-    const discarded = chooseSichuanDiscard(hands[seat], args.voidSuits[seat], random);
+    const discarded = chooseComputerSichuanDiscard(hands[seat], args.voidSuits[seat], levels[seat] ?? 'normal', random);
     hands[seat] = sortMahjongHand(hands[seat].filter((tile) => tile.id !== discarded.id));
     rivers[seat].push(discarded);
 
@@ -725,7 +766,7 @@ export function autoPlaySichuanRemainder(args: {
       const other = (seat + step) % 4;
       if (state.finished[other]) continue;
       const options = getSichuanCallOptions(hands[other], discarded, args.voidSuits[other]);
-      const pick = options.find((option) => shouldSichuanCall(hands[other], option, args.voidSuits[other]));
+      const pick = options.find((option) => shouldComputerMakeSichuanCall(hands[other], option, args.voidSuits[other], levels[other] ?? 'normal', random));
       if (!pick) continue;
       const applied = applySichuanCall(hands[other], discarded, pick);
       hands[other] = applied.hand;
@@ -743,7 +784,7 @@ export function autoPlaySichuanRemainder(args: {
         wall = replacement.wall;
       }
       if (!hands[other].length) break;
-      const thrown = chooseSichuanDiscard(hands[other], args.voidSuits[other], random);
+      const thrown = chooseComputerSichuanDiscard(hands[other], args.voidSuits[other], levels[other] ?? 'normal', random);
       hands[other] = sortMahjongHand(hands[other].filter((tile) => tile.id !== thrown.id));
       rivers[other].push(thrown);
       // 퐁·깡 뒤에 버린 패도 평범한 버림패와 똑같이 론(복수 론 포함)을 받습니다.
