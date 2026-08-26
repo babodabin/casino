@@ -4,7 +4,7 @@ import {
   createSichuanTiles, dealSichuan, chooseVoidSuit, countBySuit, isSichuanVoidCleared, nextVoidDiscard,
   pickSwapTiles, swapThreeTiles, canSichuanWin, getSichuanWaits, countRoots, evaluateSichuanFan,
   sichuanScore, createBloodState, settleSichuanWin, settleSichuanMultipleRon, settleSichuanDraw, activeSichuanSeats,
-  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, refundSichuanKanTransfers, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores,
+  isSichuanSevenPairs, autoPlaySichuanRemainder, settleSichuanKan, refundSichuanKanTransfers, settleSichuanFullDraw, kanInstantPoints, getSichuanCallOptions, getSichuanKanOptions, applySichuanCall, chooseSichuanDiscard, rankSichuanScores, shouldComputerDeclareSichuanKan,
 } from '../src/sichuanmahjong.ts';
 import { type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -460,5 +460,69 @@ test('이미 화료한 사람은 자동 유국의 차대각과 퇴세 대상에�
   });
   assert.equal(result.state.scores[3], beforeWinner);
   assert.equal(result.state.winners.filter((seat) => seat === 3).length, 1);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('쓰촨 컴퓨터 깡 판단은 쉬움·보통·전문가 실력에 따라 달라진다', () => {
+  const option = getSichuanKanOptions(hand(['m1','m1','m1','m1','m2']), [], 'p')[0];
+  assert.equal(shouldComputerDeclareSichuanKan(option, 'easy', () => 0.5), false);
+  assert.equal(shouldComputerDeclareSichuanKan(option, 'normal', () => 0.5), true);
+  assert.equal(shouldComputerDeclareSichuanKan(option, 'expert', () => 0.999), true);
+  const pon = getSichuanCallOptions(hand(['m2','m2','m3']), hand(['m2'])[0], 'p')[0];
+  assert.equal(shouldComputerDeclareSichuanKan(pon, 'expert', () => 0), false);
+});
+
+test('자동 혈전 컴퓨터는 자기 차례의 암깡을 선언하고 보충패를 뽑는다', () => {
+  const result = autoPlaySichuanRemainder({
+    state: createBloodState(0),
+    hands: [
+      hand(['m1','m1','m1','m1','m2','m4','m6','m8','s1','s3','s5','s7','s9']),
+      hand(['m2','m3','m4','m5','m6','m7','s1','s2','s4','s5','s7','s8','s9']),
+      hand(['m2','m3','m5','m6','m8','m9','s1','s2','s4','s5','s6','s8','s9']),
+      hand(['m2','m4','m5','m7','m8','m9','s1','s3','s4','s6','s7','s8','s9']),
+    ],
+    melds: [[], [], [], []], wall: hand(['s6','m9']), rivers: [[], [], [], []],
+    voidSuits: ['p','p','p','p'], levels: ['expert','easy','easy','easy'], random: () => 0.99,
+  });
+  assert.ok(result.log.some((line) => line.includes('나 암깡')));
+  assert.equal(result.melds[0].some((meld) => meld.length === 4), true);
+  assert.ok(result.kanTransfers.length > 0);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('자동 혈전 컴퓨터는 공개 퐁에 네 번째 패를 붙여 가깡할 수 있다', () => {
+  const result = autoPlaySichuanRemainder({
+    state: createBloodState(0),
+    hands: [
+      hand(['m1','m2','m4','m6','m8','s1','s3','s5','s7','s8']),
+      hand(['m2','m3','m4','m5','m6','m7','s1','s2','s4','s5','s7','s8','s9']),
+      hand(['m2','m3','m5','m6','m8','m9','s1','s2','s4','s5','s6','s8','s9']),
+      hand(['m2','m4','m5','m7','m8','m9','s1','s3','s4','s6','s7','s8','s9']),
+    ],
+    melds: [[hand(['m1','m1','m1'])], [], [], []], wall: hand(['s6','m9']), rivers: [[], [], [], []],
+    voidSuits: ['p','p','p','p'], levels: ['expert','easy','easy','easy'], random: () => 0.99,
+  });
+  assert.ok(result.log.some((line) => line.includes('나 가깡')));
+  assert.equal(result.melds[0][0].length, 4);
+  assert.ok(result.kanTransfers.length > 0);
+  assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
+});
+
+test('자동 혈전의 가깡 패로 상대가 화료하면 창깡이 되고 가깡 점수는 생기지 않는다', () => {
+  const result = autoPlaySichuanRemainder({
+    state: createBloodState(0),
+    hands: [
+      hand(['m1','m2','m4','m6','m8','s1','s3','s5','s7','s8']),
+      hand(['m2','m3','m4','m5','m6','m7','m8','m9','s2','s3','s4','s7','s7']),
+      hand(['m2','m3','m5','m6','m8','m9','s1','s2','s4','s5','s6','s8','s9']),
+      hand(['m2','m4','m5','m7','m8','m9','s1','s3','s4','s6','s7','s8','s9']),
+    ],
+    melds: [[hand(['m1','m1','m1'])], [], [], []], wall: hand(['s6','m9']), rivers: [[], [], [], []],
+    voidSuits: ['p','p','p','p'], levels: ['expert','easy','easy','easy'], random: () => 0.99,
+  });
+  assert.ok(result.log.some((line) => line.includes('창깡')));
+  assert.equal(result.melds[0][0].length, 3);
+  assert.equal(result.state.winners.includes(1), true);
+  assert.equal(result.kanTransfers.length, 0);
   assert.equal(result.state.scores.reduce((sum, value) => sum + value, 0), 0);
 });

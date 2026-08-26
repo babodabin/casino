@@ -562,6 +562,22 @@ export function shouldSichuanCall(hand: MahjongTile[], option: SichuanCallOption
   return hand.length - used >= 2;
 }
 
+export type SichuanComputerLevel = 'easy' | 'normal' | 'expert';
+
+/**
+ * 컴퓨터의 깡 판단입니다. 암깡·가깡은 패를 잃지 않고 즉시 점수도 받지만,
+ * 초보 컴퓨터는 기회를 놓칠 수 있고 전문가는 가능한 깡을 항상 실행합니다.
+ */
+export function shouldComputerDeclareSichuanKan(
+  option: SichuanCallOption,
+  level: SichuanComputerLevel,
+  random: () => number = Math.random,
+) {
+  if (option.kind !== 'ankan' && option.kind !== 'kakan') return false;
+  const chance = level === 'easy' ? 0.35 : level === 'normal' ? 0.72 : 1;
+  return random() < chance;
+}
+
 // ── 혈전도저 자동 진행 ──────────────────────────────────────────────
 
 export type SichuanAutoResult = {
@@ -597,6 +613,8 @@ export function autoPlaySichuanRemainder(args: {
   basePoints?: number;
   startSeat?: number;
   random?: () => number;
+  /** 좌석별 판단 수준. 기본값은 나·쉬움·보통·전문가 순서입니다. */
+  levels?: SichuanComputerLevel[];
 }): SichuanAutoResult {
   const random = args.random ?? Math.random;
   const base = args.basePoints ?? 1;
@@ -607,6 +625,7 @@ export function autoPlaySichuanRemainder(args: {
   let wall = [...args.wall];
   const log: string[] = [];
   const kanTransfers = [...(args.kanTransfers ?? [])];
+  const levels = args.levels ?? ['expert', 'easy', 'normal', 'expert'];
 
   /** 한 장의 버림패에 가능한 모든 론을 모아 일포다향까지 한 번에 정산합니다. */
   const settleRonReactions = (discarder: number, discarded: MahjongTile, refundTransfers: SichuanKanTransfer[] = []) => {
@@ -654,6 +673,46 @@ export function autoPlaySichuanRemainder(args: {
       state = settleSichuanWin(state, { winner: seat, score, winType: 'tsumo' });
       log.push(`${seatLabel(seat)} 쯔모 · ${fans.map((fan) => fan.name).join('·')} ${score.multiplier}배`);
       continue;
+    }
+
+    // 자기 차례에 가능한 암깡·가깡을 난이도에 따라 선택하고 산 뒤에서 보충패를 뽑습니다.
+    const kanOption = getSichuanKanOptions(hands[seat], melds[seat], args.voidSuits[seat])
+      .find((option) => shouldComputerDeclareSichuanKan(option, levels[seat] ?? 'normal', random));
+    if (kanOption) {
+      if (kanOption.kind === 'kakan') {
+        const robbedTile = kanOption.tiles[kanOption.tiles.length - 1];
+        if (settleRonReactions(seat, robbedTile)) {
+          log.push(`창깡 · ${seatLabel(seat)}의 가깡 ${robbedTile.glyph} 취소`);
+          continue;
+        }
+      }
+      if (kanOption.kind === 'ankan') {
+        const ids = new Set(kanOption.tiles.map((tile) => tile.id));
+        hands[seat] = sortMahjongHand(hands[seat].filter((tile) => !ids.has(tile.id)));
+        melds[seat].push([...kanOption.tiles]);
+      } else {
+        const added = kanOption.tiles[kanOption.tiles.length - 1];
+        hands[seat] = sortMahjongHand(hands[seat].filter((tile) => tile.id !== added.id));
+        melds[seat][kanOption.meldIndex!] = [...kanOption.tiles];
+      }
+      const settledKan = settleSichuanKan(state, { kanner: seat, kind: kanOption.kind as SichuanKanKind, basePoints: base });
+      state = settledKan.state;
+      kanTransfers.push(...settledKan.transfers);
+      log.push(`${seatLabel(seat)} ${kanOption.kind === 'ankan' ? '암깡' : '가깡'} · ${settledKan.gained}점 획득`);
+      const replacement = drawSichuanReplacement(hands[seat], wall);
+      hands[seat] = replacement.hand;
+      wall = replacement.wall;
+      if (!replacement.drawn) break;
+      if (canSichuanWin(hands[seat], melds[seat], args.voidSuits[seat])) {
+        const fans = evaluateSichuanFan({ hand: hands[seat], melds: melds[seat], winType: 'tsumo', afterKan: true });
+        const score = sichuanScore({
+          fans, roots: countRoots(hands[seat], melds[seat]), basePoints: base,
+          winType: 'tsumo', activeOpponents: activeSichuanSeats(state).length - 1,
+        });
+        state = settleSichuanWin(state, { winner: seat, score, winType: 'tsumo' });
+        log.push(`${seatLabel(seat)} 깡상화 · ${fans.map((fan) => fan.name).join('·')} ${score.multiplier}배`);
+        continue;
+      }
     }
 
     const discarded = chooseSichuanDiscard(hands[seat], args.voidSuits[seat], random);
