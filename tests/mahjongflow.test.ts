@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, reconcileSichuanKanEvent } from '../src/mahjongflow.ts';
+import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, isMahjongSessionFinished, reconcileSichuanKanEvent } from '../src/mahjongflow.ts';
 import { createBloodState } from '../src/sichuanmahjong.ts';
 import { chooseComputerCall, type MahjongCallOption, type MahjongTile } from '../src/riichimahjong.ts';
 
@@ -73,4 +73,12 @@ test('화면에서 놓친 컴퓨터 대명깡을 정확히 한 번만 정산한�
   assert.equal(second.gained,2);
   assert.deepEqual(second.state.scores,[-2,0,2,0]);
   assert.equal(reconcileSichuanKanEvent(second.state,[0,2],second.settledCount,0),null);
+});
+
+test('새 경기 버튼은 네 마작 각각의 실제 종료 상태를 확인한다',()=>{
+  const states={riichi:false,hongkong:true,chinese:false,sichuan:false};
+  assert.equal(isMahjongSessionFinished('riichi',states),false);
+  assert.equal(isMahjongSessionFinished('hongkong',states),true);
+  assert.equal(isMahjongSessionFinished('chinese',{...states,chinese:true}),true);
+  assert.equal(isMahjongSessionFinished('sichuan',{...states,sichuan:true}),true);
 });

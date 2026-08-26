@@ -3,6 +3,11 @@ import { drawReplacementTile, getMahjongCallOptions, type MahjongCallOption, typ
 
 export type SharedMahjongMode='riichi'|'chinese'|'hongkong'|'sichuan';
 
+/** 공통 시작 버튼이 각 종목의 실제 경기 종료 상태를 읽도록 통일합니다. */
+export function isMahjongSessionFinished(mode:SharedMahjongMode,states:{riichi:boolean;chinese:boolean;hongkong:boolean;sichuan:boolean}){
+  return states[mode];
+}
+
 /** 종목별 공개 부름 규칙을 공통 게임 진행부에서 한 곳으로 강제합니다. */
 export function getModeCallOptions(mode:SharedMahjongMode,hand:MahjongTile[],discarded:MahjongTile,canChi:boolean,voidSuit?:SichuanSuit){
   if(mode==='sichuan'){

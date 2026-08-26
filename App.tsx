@@ -72,7 +72,7 @@ import { summariseWin, isModeWinningShape, canModeWinShape, winButtonLabel, mahj
 import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swapThreeTiles, settleSichuanFullDraw, settleSichuanKan, refundSichuanKanTransfers, settleSichuanMultipleRon, createBloodState, settleSichuanWin, autoPlaySichuanRemainder, activeSichuanSeats, rankSichuanScores, evaluateSichuanFan, sichuanScore, countRoots, sichuanSuits, type SichuanSuit, type SichuanBloodState, type SichuanKanTransfer } from './src/sichuanmahjong';
 import { createHongKongMatch, settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, dealInitialHongKongFlowers, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
 import { createChineseMatch, settleChineseWin, settleChineseMultipleRon, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
-import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, reconcileSichuanKanEvent } from './src/mahjongflow';
+import { chooseCallByPriority, drawModeSupplement, getModeCallOptions, isMahjongSessionFinished, reconcileSichuanKanEvent } from './src/mahjongflow';
 import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, settleMultipleRon, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
@@ -2055,6 +2055,16 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
   const [anyCallMade,setAnyCallMade]=useState(false);
   const [myDiscardClaimed,setMyDiscardClaimed]=useState(false);
   const [turnsTaken,setTurnsTaken]=useState(0);
+  // 공통 시작 버튼은 원래 리치 반장전 종료만 보고 있었습니다.
+  // 다른 세 종목의 최종 종료도 연결해 새 경기에서 참가 코인을 다시 받습니다.
+  useEffect(()=>{
+    if(phase!=='result')return;
+    const finished=isMahjongSessionFinished(mode,{riichi:matchState.finished,hongkong:hkMatch.finished,chinese:cnMatch.finished,sichuan:bloodState.over});
+    if(finished&&!matchState.finished)setMatchState((current)=>({...current,finished:true}));
+  },[phase,mode,hkMatch.finished,cnMatch.finished,bloodState.over,matchState.finished]);
+  useEffect(()=>{
+    if(phase==='playing'&&mode==='chinese'&&cnMatch.finished)setCnMatch(createChineseMatch(0));
+  },[phase,mode,cnMatch.finished]);
   // 깡은 손패 길이와 완성 판정에 모두 영향을 줍니다. 암깡도 몸통 하나로 셉니다.
   const meldCount=openMelds.length+concealedKans.length;
   const kanCount=openMelds.filter((meld)=>meld.length===4).length+concealedKans.length;
@@ -2065,7 +2075,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       setPlayer(mine);setOpponents([swapped[1],swapped[2],swapped[3]]);
       setVoidSuits([chooseVoidSuit(mine),chooseVoidSuit(swapped[1]),chooseVoidSuit(swapped[2]),chooseVoidSuit(swapped[3])]);
       setChoosingVoid(true);
-      if(phase==='ready')setBloodState(createBloodState(0));
+      if(phase==='ready'||bloodState.over)setBloodState(createBloodState(0));
       setBloodLog([]);
       setSichuanKanTransfers([]);
       setSichuanLastKanTransfers([]);
@@ -2140,6 +2150,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
 
   const drawForPlayer=(nextHand:MahjongTile[],nextWall:MahjongTile[],nextOpponents=opponents)=>{
     if(mode==='hongkong'){
+      if(hkMatch.finished)setHkMatch(createHongKongMatch(500));
       const bloom=drawHongKongTurn({hand:nextHand,wall:nextWall,flowerWall,collected:flowers[0],flowerChance:0.06,random:Math.random});
       if(!bloom.drawn){settleExhaustiveDraw(nextHand,nextOpponents);return;}
       if(!riichiDeclared)setTemporaryFuriten(false);
