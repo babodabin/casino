@@ -68,6 +68,10 @@ import { DAILY_MISSION_GOAL, DAILY_MISSION_REWARD, countPlayedOn, missionDayKey,
 import { decidePokerAction, doriEquity, estimateDrawEquity, estimateEquity, pokerActionLabel, seotdaEquity } from './src/pokerai';
 import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
+import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCategoryLabels, yahtzeePayoutMultiplier, yahtzeeTotal, yahtzeeUpperBonus, yahtzeeUpperSubtotal, type YahtzeeCategory, type YahtzeeDie, type YahtzeeScoreCard } from './src/yahtzee';
+import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
+import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
+import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
 import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
 import { dealHoldem, dealOmaha, madeHandCards, resolveHoldem, resolveOmaha } from './src/texasholdem';
 import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
@@ -82,14 +86,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '섰다' | '도리짓고땡';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '섰다' | '도리짓고땡';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -154,12 +158,12 @@ const gameCategories: GameCategory[] = [
     { name: '그레이하운드', icon: '犬', description: '견공 레이스 순위를 예측', status: 'planned' },
   ]},
   { name: '세계 게임', icon: '◎', detail: '세계 전통 · 주사위 · 복권', eyebrow: 'WORLD GAMES', games: [
-    { name: '식보', icon: '⚂', description: '동아시아의 세 주사위 게임', status: 'playable' },
-    { name: '파이 고우', icon: '牌', description: '중국 전통 도미노 조합 게임', status: 'planned' },
-    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 카드 게임', status: 'planned' },
-    { name: '로또', icon: '⑥', description: '번호 여섯 개를 선택하는 추첨 게임', status: 'planned' },
-    { name: '즉석 복권', icon: '票', description: '바로 결과를 확인하는 가상 복권', status: 'planned' },
-    { name: '홀짝', icon: '±', description: '숫자의 홀수와 짝수를 예측', status: 'planned' },
+    { name: '야찌', icon: '⚄', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
+    { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
+    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
+    { name: '로또', icon: '⑥', description: '번호 여섯 개를 선택하는 추첨 게임', status: 'playable' },
+    { name: '즉석 복권', icon: '票', description: '바로 결과를 확인하는 가상 복권', status: 'playable' },
+    { name: '홀짝', icon: '±', description: '숫자의 홀수와 짝수를 예측', status: 'playable' },
   ]},
 ];
 
@@ -175,6 +179,10 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '크랩스': 'crapsSetup',
   '슬롯': 'slotSetup',
   '식보': 'sicboSetup',
+  '야찌': 'yahtzeeSetup',
+  '홀짝': 'oddEvenSetup', '로또':'lottoSetup', '즉석 복권':'scratchSetup',
+  '틴 파티':'teenPattiSetup',
+  '파이 고우':'paiGowSetup',
   '비디오 포커': 'videoPokerSetup',
   '텍사스 홀덤': 'holdemSetup',
   '오마하': 'omahaSetup',
@@ -669,6 +677,25 @@ function CasinoApp() {
     addRecord((count) => ({ id: `${Date.now()}-sicbo-${count}`, game: '식보', result: net > 0 ? 'win' : 'loss', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${sicBoBetLabel(bet)} · ${dice.join('·')} · 합계 ${dice[0] + dice[1] + dice[2]}` }));
   };
 
+  const settleYahtzee = (stake:number, score:number, multiplier:number) => {
+    const payout=stake*multiplier; const net=payout-stake;
+    if(payout>0)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-yahtzee-${count}`,game:'야찌',result:net>0?'win':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail:`최종 ${score}점 · ${multiplier?`${multiplier}배 지급`:'목표 미달'}`}));
+  };
+  const settleWorldInstant=(game:'홀짝'|'로또'|'즉석 복권',stake:number,multiplier:number,detail:string)=>{
+    const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
+  };
+  const settleTeenPatti=(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>{
+    const payout=result==='win'?mine+theirs:result==='push'?mine:0,net=payout-mine;if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-teen-patti-${count}`,game:'틴 파티',result,difficulty,bet:mine,net,playedAt:new Date().toISOString(),detail}));
+  };
+  const settlePaiGow=(stake:number,result:'win'|'loss'|'push',detail:string)=>{
+    const payout=result==='win'?stake*2:result==='push'?stake:0,net=payout-stake;
+    if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-pai-gow-${count}`,game:'파이 고우',result,difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
+  };
+
   const settleVideoPoker = (stake: number, hand: Card[]) => {
     const result = evaluateVideoPoker(hand); const payout = videoPokerPayout(stake, hand); const net = videoPokerNet(stake, hand);
     if (payout > 0) setCoins((current) => current + payout);
@@ -919,6 +946,24 @@ function CasinoApp() {
         {appScreen === 'pachislotGame' && <PachislotGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} motion={motion} onBack={() => setAppScreen('slotSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settlePachislot} />}
         {appScreen === 'sicboSetup' && <SicBoSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sicboGame')} />}
         {appScreen === 'sicboGame' && <SicBoGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} motion={motion} onBack={() => setAppScreen('sicboSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleSicBo} />}
+        {appScreen === 'yahtzeeSetup' && <SimpleSetupScreen title="야찌(Yahtzee) 준비" hero="⚄ ⚂ ⚅ ⚀ ⚃" lead="다섯 주사위로 13개 점수칸을 완성하세요" rules={[
+          '1. 한 라운드에 주사위 다섯 개를 최대 세 번 굴립니다.',
+          '2. 원하는 주사위를 눌러 보관한 뒤 나머지만 다시 굴릴 수 있습니다.',
+          '3. 매 라운드 반드시 비어 있는 점수칸 하나를 선택합니다. 조건을 못 맞추면 그 칸은 0점입니다.',
+          '4. 1~6 상단 점수 합계가 63점 이상이면 보너스 35점을 받습니다.',
+          '5. 13라운드 최종 200점부터 2배, 250점부터 3배로 WC를 돌려받습니다.',
+        ]} startLabel="야찌 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('yahtzeeGame')}/>}
+        {appScreen === 'yahtzeeGame' && <YahtzeeGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('yahtzeeSetup')} onPlaceBet={placeBet} onSettle={settleYahtzee}/>}
+        {appScreen === 'oddEvenSetup' && <SimpleSetupScreen title="홀짝 준비" hero="1 · 2 · 3 · 4" lead="나올 숫자가 홀수인지 짝수인지 선택" rules={['1. 1부터 100 중 숫자 하나를 무작위로 뽑습니다.','2. 추첨 전에 홀 또는 짝을 선택합니다.','3. 맞히면 베팅금의 2배를 돌려받습니다.']} startLabel="홀짝 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('oddEvenGame')}/>}
+        {appScreen === 'oddEvenGame' && <OddEvenGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('oddEvenSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleWorldInstant('홀짝',stake,multiplier,detail)}/>}
+        {appScreen === 'lottoSetup' && <SimpleSetupScreen title="월드 로또 준비" hero="⑥ · 1~45" lead="번호 여섯 개를 직접 선택" rules={['1. 1부터 45 중 서로 다른 번호 6개를 고릅니다.','2. 당첨 번호 6개와 보너스 번호 1개를 추첨합니다.','3. 3개부터 당첨이며 일치 개수가 많을수록 배당이 커집니다.']} startLabel="로또 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('lottoGame')}/>}
+        {appScreen === 'lottoGame' && <LottoGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('lottoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleWorldInstant('로또',stake,multiplier,detail)}/>}
+        {appScreen === 'scratchSetup' && <SimpleSetupScreen title="즉석 복권 준비" hero="票 · SCRATCH" lead="아홉 칸에서 같은 그림을 모으세요" rules={['1. 복권 한 장에는 그림 아홉 개가 숨어 있습니다.','2. 한 장을 구매하면 모든 칸을 바로 공개합니다.','3. 같은 그림 3개는 2배, 4개는 5배, 5개 이상은 20배입니다.']} startLabel="즉석 복권 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('scratchGame')}/>}
+        {appScreen === 'scratchGame' && <ScratchGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('scratchSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleWorldInstant('즉석 복권',stake,multiplier,detail)}/>}
+        {appScreen === 'teenPattiSetup' && <SimpleSetupScreen title="틴 파티(Teen Patti) 준비" hero="A♠ K♠ Q♠" lead="세 장만으로 겨루는 인도의 대표 카드 게임" rules={['1. 나와 컴퓨터가 카드 세 장씩 받고 같은 기본 베팅을 냅니다.','2. 족보는 트레일 > 퓨어 시퀀스 > 시퀀스 > 컬러 > 페어 > 하이 카드 순입니다.','3. 시퀀스는 AKQ가 가장 높고 A23, KQJ 순서로 이어집니다.','4. 카드를 본 뒤 계속하려면 콜, 불리하면 다이를 선택합니다.','5. 쇼다운에서는 양쪽 카드를 모두 공개하고 더 높은 세 장 족보가 팟을 가져갑니다.']} startLabel="틴 파티 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('teenPattiGame')}/>}
+        {appScreen === 'teenPattiGame' && <TeenPattiGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('teenPattiSetup')} onPlaceBet={placeBet} onSettle={settleTeenPatti}/>}
+        {appScreen === 'paiGowSetup' && <SimpleSetupScreen title="파이 고우 포커(Pai Gow Poker) 준비" hero="7장 → 5장 + 2장" lead="두 개의 패를 만들어 딜러의 두 패와 모두 겨루세요" rules={['1. 나와 딜러가 카드 7장씩 받습니다.','2. 내 카드 중 로우 핸드로 쓸 카드 2장을 누르면 나머지 5장이 하이 핸드가 됩니다.','3. 하이 핸드는 일반 포커 족보, 로우 핸드는 원 페어 또는 높은 카드로 비교합니다.','4. 하이 핸드는 반드시 로우 핸드보다 강해야 합니다. 아니면 파울이라 승부할 수 없습니다.','5. 딜러의 하이와 로우를 모두 이기면 승리, 하나씩 이기면 무승부, 모두 지면 패배입니다. 같은 패는 딜러 승리입니다.','6. 초보용 기본판이라 조커와 카지노 수수료는 적용하지 않습니다.']} startLabel="파이 고우 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('paiGowGame')}/>}
+        {appScreen === 'paiGowGame' && <PaiGowGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('paiGowSetup')} onPlaceBet={placeBet} onSettle={settlePaiGow}/>}
         {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('videoPokerSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleVideoPoker} />}
         {appScreen === 'holdemSetup' && <PokerSetupScreen mode="holdem" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('holdemGame')} />}
         {appScreen === 'holdemGame' && <PokerGameScreen mode="holdem" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('텍사스 홀덤',mine,theirs,result,detail)} />}
@@ -1636,6 +1681,78 @@ function SicBoGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBet
   </ScrollView></View>;
 }
 
+function YahtzeeGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(stake:number)=>boolean;onSettle:(stake:number,score:number,multiplier:number)=>void}){
+  const [started,setStarted]=useState(false); const [finished,setFinished]=useState(false);
+  const [dice,setDice]=useState<YahtzeeDie[]>([1,1,1,1,1]); const [held,setHeld]=useState([false,false,false,false,false]);
+  const [rollCount,setRollCount]=useState(0); const [card,setCard]=useState<YahtzeeScoreCard>({});
+  const total=yahtzeeTotal(card); const completed=Object.keys(card).length;
+  const begin=()=>{if(!onPlaceBet(selectedBet))return;setStarted(true);setFinished(false);setDice([1,1,1,1,1]);setHeld([false,false,false,false,false]);setRollCount(0);setCard({});};
+  const roll=()=>{if(!started||finished||rollCount>=3)return;setDice((current)=>rollYahtzeeDice(current,held));setRollCount((value)=>value+1);};
+  const choose=(category:YahtzeeCategory)=>{
+    if(rollCount===0||card[category]!==undefined||finished)return;
+    const value=scoreYahtzeeCategory(category,dice); const next={...card,[category]:value}; setCard(next); setHeld([false,false,false,false,false]); setRollCount(0);
+    if(Object.keys(next).length===yahtzeeCategories.length){const finalScore=yahtzeeTotal(next);const multiplier=yahtzeePayoutMultiplier(finalScore);setFinished(true);onSettle(selectedBet,finalScore,multiplier);}
+  };
+  return <View style={styles.sicboScreen}><ScreenHeader title="야찌(Yahtzee)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD DICE GAME</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{completed}/13칸</Text></View></View>
+    {!started?<><View style={styles.sicboBowl}><Text style={styles.sicboResult}>한 판은 13라운드입니다</Text><Text style={styles.slotRuleText}>200점 이상 2배 · 250점 이상 3배</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={begin}><Text style={styles.primaryButtonText}>{selectedBet.toLocaleString()} WC로 시작</Text></Pressable></>:
+    <><View style={styles.sicboBowl}><Text style={styles.crapsPointLabel}>{finished?'게임 종료':rollCount===0?'새 라운드':`${rollCount}/3회 굴림`}</Text><View style={styles.sicboDiceRow}>{dice.map((value,index)=><Pressable key={index} disabled={rollCount===0||finished} onPress={()=>setHeld((current)=>current.map((item,i)=>i===index?!item:item))} style={[styles.yahtzeeDieButton,held[index]&&styles.yahtzeeHeld]}><Die value={value}/><Text style={styles.yahtzeeHoldText}>{held[index]?'KEEP':'보관'}</Text></Pressable>)}</View><Text style={styles.sicboResult}>현재 {total}점{yahtzeeUpperBonus(card)>0?' · 상단 보너스 +35':''}</Text></View>
+    {!finished?<Pressable disabled={rollCount>=3} style={[styles.primaryButton,styles.rouletteSpinButton,rollCount>=3&&styles.disabledCard]} onPress={roll}><Text style={styles.primaryButtonText}>{rollCount===0?'주사위 굴리기':rollCount<3?'나머지 다시 굴리기':'점수칸을 선택하세요'}</Text></Pressable>:<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={begin}><Text style={styles.primaryButtonText}>새 게임 시작</Text></Pressable>}
+    <View style={styles.yahtzeeSummary}><Text style={styles.slotRulesTitle}>점수 현황</Text><Text style={styles.slotRuleText}>상단 {yahtzeeUpperSubtotal(card)}/63 · 보너스 {yahtzeeUpperBonus(card)} · 총점 {total}</Text></View>
+    <View style={styles.sicboFourGrid}>{yahtzeeCategories.map((category)=>{const saved=card[category];const preview=rollCount>0?scoreYahtzeeCategory(category,dice):0;return <Pressable key={category} disabled={saved!==undefined||rollCount===0||finished} onPress={()=>choose(category)} style={[styles.sicboBetButton,saved!==undefined&&styles.disabledCard]}><Text style={styles.sicboBetTitle}>{yahtzeeCategoryLabels[category]}</Text><Text style={styles.sicboOdds}>{saved!==undefined?`${saved}점`:rollCount>0?`선택 시 ${preview}점`:'—'}</Text></Pressable>;})}</View>
+    {finished&&<View style={styles.setupSummary}><Text style={styles.resultTitle}>최종 {total}점</Text><Text style={styles.resultDetail}>{yahtzeePayoutMultiplier(total)?`${(selectedBet*yahtzeePayoutMultiplier(total)).toLocaleString()} WC 지급`:'목표 점수 미달'}</Text></View>}</>}
+  </ScrollView></View>;
+}
+
+type InstantSettle=(stake:number,multiplier:number,detail:string)=>void;
+function OddEvenGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [choice,setChoice]=useState<OddEvenChoice>('홀');const [value,setValue]=useState<number|null>(null);
+  const play=()=>{if(!onPlaceBet(selectedBet))return;const next=drawOddEven(),win=oddEvenWins(choice,next);setValue(next);onSettle(selectedBet,win?2:0,`${choice} 선택 · ${next}은 ${next%2?'홀':'짝'}`);};
+  return <View style={styles.sicboScreen}><ScreenHeader title="홀짝" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.sicboBowl}><Text style={styles.yahtzeeBigNumber}>{value??'?'}</Text><Text style={styles.sicboResult}>{value===null?'홀 또는 짝을 고르세요':`${value%2?'홀수':'짝수'}가 나왔습니다`}</Text></View><View style={styles.sicboFourGrid}>{(['홀','짝'] as OddEvenChoice[]).map(item=><Pressable key={item} onPress={()=>setChoice(item)} style={[styles.sicboBetButton,choice===item&&styles.sicboBetActive]}><Text style={styles.sicboBetTitle}>{item}</Text><Text style={styles.sicboOdds}>2배 지급</Text></Pressable>)}</View><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={play}><Text style={styles.primaryButtonText}>{choice}에 {selectedBet.toLocaleString()} WC</Text></Pressable></ScrollView></View>;
+}
+function LottoGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [chosen,setChosen]=useState<number[]>([]);const [draw,setDraw]=useState<{numbers:number[];bonus:number}|null>(null);
+  const toggle=(value:number)=>{if(draw)return;setChosen(current=>current.includes(value)?current.filter(v=>v!==value):current.length<6?[...current,value].sort((a,b)=>a-b):current);};
+  const play=()=>{if(chosen.length!==6||!onPlaceBet(selectedBet))return;const next=drawLotto(),result=lottoResult(chosen,next.numbers,next.bonus);setDraw(next);onSettle(selectedBet,result.multiplier,`${result.matches}개 일치${result.bonusHit?' + 보너스':''}`);};
+  return <View style={styles.sicboScreen}><ScreenHeader title="월드 로또" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><Text style={styles.sectionTitle}>내 번호 {chosen.length}/6</Text><View style={styles.yahtzeeNumberGrid}>{Array.from({length:45},(_,i)=>i+1).map(value=><Pressable key={value} onPress={()=>toggle(value)} style={[styles.yahtzeeNumber,chosen.includes(value)&&styles.sicboBetActive]}><Text style={styles.sicboBetTitle}>{value}</Text></Pressable>)}</View>{draw&&<View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>당첨 번호</Text><Text style={styles.rouletteResultTitle}>{draw.numbers.join(' · ')}</Text><Text style={styles.resultDetail}>보너스 {draw.bonus}</Text></View>}<Pressable disabled={chosen.length!==6} style={[styles.primaryButton,styles.fullWidthButton,chosen.length!==6&&styles.disabledCard]} onPress={draw?()=>{setDraw(null);setChosen([]);}:play}><Text style={styles.primaryButtonText}>{draw?'새 번호 고르기':`${selectedBet.toLocaleString()} WC 추첨`}</Text></Pressable></ScrollView></View>;
+}
+function ScratchGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [symbols,setSymbols]=useState<ScratchSymbol[]|null>(null);const play=()=>{if(!onPlaceBet(selectedBet))return;const next=drawScratch(),result=scratchResult(next);setSymbols(next);onSettle(selectedBet,result.multiplier,`${result.symbol||'당첨 없음'} ${result.count}개`);};
+  return <View style={styles.sicboScreen}><ScreenHeader title="즉석 복권" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.yahtzeeScratchGrid}>{(symbols??Array(9).fill('?')).map((symbol,index)=><View key={index} style={styles.yahtzeeScratchCell}><Text style={styles.yahtzeeScratchSymbol}>{symbol}</Text></View>)}</View>{symbols&&<Text style={styles.sicboResult}>{scratchResult(symbols).multiplier?`${scratchResult(symbols).symbol} ${scratchResult(symbols).count}개 · ${scratchResult(symbols).multiplier}배 당첨`:'아쉽지만 미당첨'}</Text>}<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={play}><Text style={styles.primaryButtonText}>{selectedBet.toLocaleString()} WC 복권 구매</Text></Pressable></ScrollView></View>;
+}
+function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}){
+  const [round,setRound]=useState<{player:Card[];opponent:Card[]}|null>(null),[mine,setMine]=useState(0),[theirs,setTheirs]=useState(0),[result,setResult]=useState<'win'|'loss'|'push'|null>(null),[folded,setFolded]=useState(false);
+  const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealTeenPatti());setMine(selectedBet);setTheirs(selectedBet);setResult(null);setFolded(false);};
+  const showdown=(raised=false)=>{if(!round)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';setResult(next);onSettle(myBet,opponentBet,next,`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`);};
+  const fold=()=>{if(!round||result)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
+  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><Text style={styles.pokerSeat}>컴퓨터</Text><View style={styles.cardRow}>{round.opponent.map((card,index)=><PlayingCard key={card.id} card={card} hidden={!result||folded} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View><Text style={styles.pokerSeat}>나 · {evaluateTeenPatti(round.player).label}</Text><View style={styles.cardRow}>{round.player.map(card=><PlayingCard key={card.id} card={card} emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</ScrollView></View>;
+}
+
+function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}){
+  const [round,setRound]=useState<{player:Card[];dealer:Card[]}|null>(null);
+  const [lowIds,setLowIds]=useState<string[]>([]);
+  const [dealerSplit,setDealerSplit]=useState<PaiGowSplit|null>(null);
+  const [outcome,setOutcome]=useState<ReturnType<typeof resolvePaiGow>|null>(null);
+  const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
+  const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
+  const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
+  const chosenLow=round?round.player.filter(card=>lowIds.includes(card.id)):[];
+  const chosenHigh=round?round.player.filter(card=>!lowIds.includes(card.id)):[];
+  const valid=chosenLow.length===2&&isValidPaiGowSplit(chosenHigh,chosenLow);
+  const playerSplit=valid?splitPaiGow(round!.player,lowIds):null;
+  const showdown=()=>{if(!round||!playerSplit)return;const house=arrangePaiGow(round.dealer),resolved=resolvePaiGow(playerSplit,house);setDealerSplit(house);setOutcome(resolved);onSettle(selectedBet,resolved.result,`하이 ${playerSplit.highRank.label} ${resolved.high==='win'?'승':'패'} · 로우 ${playerSplit.lowRank.label} ${resolved.low==='win'?'승':'패'}`);};
+  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View>
+    {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
+    <><Text style={styles.pokerSeat}>딜러 · {dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:'승부 전 비공개'}</Text><View style={styles.cardRow}>{round.dealer.map(card=><PlayingCard key={card.id} card={card} hidden={!outcome} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View>
+    <View style={styles.paiGowDivider}><Text style={styles.paiGowDividerTitle}>내 카드 — 로우로 보낼 2장을 선택</Text><Text style={styles.slotRuleText}>{lowIds.length}/2장 선택 · 선택한 카드는 위로 올라갑니다</Text></View>
+    <View style={styles.cardRow}>{round.player.map(card=><Pressable key={card.id} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+    <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
+    {!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
+    <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
+  </ScrollView></View>;
+}
+
 function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, hand: Card[]) => void }) {
   const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const [hand, setHand] = useState<Card[]>([]); const [deck, setDeck] = useState<Card[]>([]); const [held, setHeld] = useState([false, false, false, false, false]); const [phase, setPhase] = useState<'ready' | 'hold' | 'result'>('ready');
@@ -2161,6 +2278,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     setMessage(dealerSeat===0?`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`:`컴퓨터 ${dealerSeat}이 친 · 컴퓨터부터 시작합니다`);
     setPhase('playing');
   };
+
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
   // 도중유국: 친이 그대로 유지되고 본장만 하나 올라갑니다.
   const settleAbortiveDraw=(label:string,detail:string)=>{
@@ -4347,6 +4465,18 @@ const styles = StyleSheet.create({
   holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 110, backgroundColor: '#075332', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
   holdemSeat: { color: '#F8E6B0', fontSize: 14, fontWeight: '900' },
   holdemCards: { minHeight: 90, flexDirection: 'row', justifyContent: 'center', gap: 7 },
+  pokerTable: { flex: 1, backgroundColor: '#052E22' },
+  pokerPage: { flexGrow: 1, padding: 16, paddingBottom: 42, gap: 16, alignItems: 'center' },
+  pokerSeat: { color: '#F8E6B0', fontSize: 16, fontWeight: '900', marginTop: 5 },
+  pokerActionRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 12 },
+  secondaryButton: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#6681A5' },
+  secondaryButtonText: { color: '#F4F7FC', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  paiGowDivider: { width: '100%', padding: 12, borderRadius: 14, backgroundColor: '#153E31', borderWidth: 1, borderColor: '#5A8C75' },
+  paiGowDividerTitle: { color: '#FFE080', fontSize: 14, fontWeight: '900', marginBottom: 4 },
+  paiGowHandSummary: { width: '100%', flexDirection: 'row', gap: 8 },
+  paiGowResultMark: { color: '#FFE080', fontSize: 16, fontWeight: '900', marginTop: 6 },
+  paiGowShowdownButton: { flex: 1, width: undefined },
+  paiGowWarning: { color: '#FFB39D', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   sevenPokerTable: { minHeight: 570 },
   highLowResultRow: { width: '100%', flexDirection: 'row', gap: 7 },
   highLowResult: { flex: 1, padding: 10, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.34)', borderWidth: 1, borderColor: '#B8933B' },
@@ -4618,6 +4748,16 @@ const styles = StyleSheet.create({
   sicboBowl: { minHeight: 230, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 115, backgroundColor: '#621B22', borderWidth: 5, borderColor: '#D8B451' },
   sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 22, transform: [{ scale: 0.75 }] },
   sicboResult: { fontSize: 16, fontWeight: '900', marginTop: -4 },
+  yahtzeeDieButton: { alignItems:'center', gap:5, padding:4, borderRadius:12, borderWidth:2, borderColor:'transparent' },
+  yahtzeeHeld: { backgroundColor:'rgba(225,182,63,0.22)', borderColor:'#E1B63F', transform:[{translateY:-8}] },
+  yahtzeeHoldText: { color:'#F3D77B', fontSize:9, fontWeight:'900' },
+  yahtzeeSummary: { marginVertical:14, padding:14, borderRadius:14, backgroundColor:'#101C27', borderWidth:1, borderColor:'#314355' },
+  yahtzeeBigNumber: { color:'#FFE28A',fontSize:72,fontWeight:'900' },
+  yahtzeeNumberGrid: { flexDirection:'row',flexWrap:'wrap',gap:6,justifyContent:'center' },
+  yahtzeeNumber: { width:38,height:38,borderRadius:19,alignItems:'center',justifyContent:'center',backgroundColor:'#162332',borderWidth:1,borderColor:'#394B5D' },
+  yahtzeeScratchGrid: { flexDirection:'row',flexWrap:'wrap',gap:10,justifyContent:'center',marginVertical:26 },
+  yahtzeeScratchCell: { width:'29%',aspectRatio:1,alignItems:'center',justifyContent:'center',borderRadius:16,backgroundColor:'#D7B142',borderWidth:3,borderColor:'#FFE69A' },
+  yahtzeeScratchSymbol: { color:'#211703',fontSize:34,fontWeight:'900' },
   sicboRollButton: { marginTop: 14, marginBottom: 2 },
   sicboFourGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sicboNumberGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
