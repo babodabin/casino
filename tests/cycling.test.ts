@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createCycleField,cycleTicketOdds,cycleTicketWins,requiredCycleSelections,settleCycleTicket,simulateCycleRace,type CycleTicket} from '../src/cycling.ts';
+test('경륜 출전 선수 7명을 만든다',()=>{const riders=createCycleField(()=>.4);assert.equal(riders.length,7);assert.equal(new Set(riders.map(r=>r.name)).size,7);assert.ok(riders.every(r=>r.winOdds>=1.4));});
+test('마지막 바퀴와 결승 순위가 중복 없이 나온다',()=>{const riders=createCycleField(()=>.5),race=simulateCycleRace(riders,()=>.3);assert.equal(new Set(race.order).size,7);assert.equal(new Set(race.lastLapOrder).size,7);});
+test('7인 경륜 연승은 2위 안을 맞힌다',()=>{const race={order:[4,2,7,1,3,5,6],lastLapOrder:[1,2,3,4,5,6,7],times:{}};assert.equal(cycleTicketWins({type:'place',selections:[2],stake:100,odds:2},race),true);assert.equal(cycleTicketWins({type:'place',selections:[7],stake:100,odds:2},race),false);});
+test('복승과 쌍승의 순서 조건이 다르다',()=>{const race={order:[4,2,7],lastLapOrder:[1,2,3],times:{}};assert.equal(cycleTicketWins({type:'quinella',selections:[2,4],stake:100,odds:8},race),true);assert.equal(cycleTicketWins({type:'exacta',selections:[2,4],stake:100,odds:8},race),false);});
+test('마권 배당과 지급액을 계산한다',()=>{const riders=createCycleField(()=>.5),odds=cycleTicketOdds('exacta',[1,2],riders),ticket:CycleTicket={type:'exacta',selections:[1,2],stake:500,odds};const race={order:[1,2,3],lastLapOrder:[3,2,1],times:{}};assert.equal(requiredCycleSelections('exacta'),2);assert.equal(settleCycleTicket(ticket,race),Math.round(500*odds));});

@@ -21,6 +21,14 @@ const casinoEntranceAsset = require('./assets/casino-entrance-gold-v1.png');
 const casinoEntranceSource = Platform.OS === 'web'
   ? { uri: './casino-entrance-gold-v1.png' }
   : casinoEntranceAsset;
+const carLogoSources: Record<number, any> = {
+  1: require('./assets/racing-logos/mercedes.png'),
+  2: require('./assets/racing-logos/mclaren.png'),
+  3: require('./assets/racing-logos/redbull.png'),
+  4: require('./assets/racing-logos/ferrari.png'),
+  5: require('./assets/racing-logos/audi.png'),
+  6: require('./assets/racing-logos/astonmartin.png'),
+};
 import {
   createDeck,
   canSplit,
@@ -72,6 +80,12 @@ import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCatego
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
 import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
+import { createHorseField, horseBetLabels, horseTicketOdds, requiredHorseSelections, settleHorseTicket, simulateHorseRace, type Horse, type HorseBetType, type HorseRaceResult, type HorseTicket } from './src/horseracing';
+import { createCycleField, cycleBetLabels, cycleTicketOdds, requiredCycleSelections, settleCycleTicket, simulateCycleRace, type CycleBetType, type CycleRaceResult, type CycleTicket, type Cyclist } from './src/cycling';
+import { boatBetLabels, boatTicketOdds, createBoatField, requiredBoatSelections, settleBoatTicket, simulateBoatRace, type BoatBetType, type BoatRaceResult, type BoatRacer, type BoatTicket } from './src/boatracing';
+import { createGreyhoundField, greyhoundBetLabels, greyhoundTicketOdds, requiredGreyhoundSelections, settleGreyhoundTicket, simulateGreyhoundRace, type Greyhound, type GreyhoundBetType, type GreyhoundRaceResult, type GreyhoundTicket } from './src/greyhound';
+import { carTicketPayout, createCarField, simulateCarRace, type CarRaceResult, type CarRaceTicket, type RaceCar } from './src/carracing';
+import { bullTicketPayout, createBullField, simulateBullTournament, type BullTicket, type BullTournamentResult, type FightingBull } from './src/bullfighting';
 import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
 import { dealHoldem, dealOmaha, madeHandCards, resolveHoldem, resolveOmaha } from './src/texasholdem';
 import { dealSevenPoker, resolveSevenPoker } from './src/sevenpoker';
@@ -86,14 +100,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '섰다' | '도리짓고땡';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '섰다' | '도리짓고땡';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -151,11 +165,13 @@ const gameCategories: GameCategory[] = [
     { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 마작', status: 'playable' },
     { name: '사천 마작', icon: '川', description: '자패 없이 세 종류 숫자패로 승부', status: 'playable' },
   ]},
-  { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 경정', eyebrow: 'RACING', games: [
-    { name: '경마', icon: '馬', description: '말과 기수의 순위를 예측', status: 'planned' },
-    { name: '경륜', icon: '輪', description: '자전거 선수의 결승 순위를 예측', status: 'planned' },
-    { name: '경정', icon: '艇', description: '보트 레이스의 결과를 예측', status: 'planned' },
-    { name: '그레이하운드', icon: '犬', description: '견공 레이스 순위를 예측', status: 'planned' },
+  { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 자동차', eyebrow: 'RACING', games: [
+    { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
+    { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
+    { name: '경정', icon: '艇', description: '6대 보트의 스타트와 1마크 선회를 예측', status: 'playable' },
+    { name: '그레이하운드', icon: '犬', description: '6마리의 출발과 첫 코너, 막판 질주를 예측', status: 'playable' },
+    { name: '자동차 레이스', icon: '🏎', description: '6대 포뮬러 차량 중 우승 차량을 예측', status: 'playable' },
+    { name: '소싸움', icon: '牛', description: '한국 전통 힘겨루기 대회의 최종 우승 소를 예측', status: 'playable' },
   ]},
   { name: '세계 게임', icon: '◎', detail: '세계 전통 · 주사위 · 복권', eyebrow: 'WORLD GAMES', games: [
     { name: '야찌', icon: '⚄', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
@@ -183,6 +199,12 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '홀짝': 'oddEvenSetup', '로또':'lottoSetup', '즉석 복권':'scratchSetup',
   '틴 파티':'teenPattiSetup',
   '파이 고우':'paiGowSetup',
+  '경마':'horseSetup',
+  '경륜':'cycleSetup',
+  '경정':'boatSetup',
+  '그레이하운드':'greyhoundSetup',
+  '자동차 레이스':'carSetup',
+  '소싸움':'bullSetup',
   '비디오 포커': 'videoPokerSetup',
   '텍사스 홀덤': 'holdemSetup',
   '오마하': 'omahaSetup',
@@ -695,6 +717,33 @@ function CasinoApp() {
     if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-pai-gow-${count}`,game:'파이 고우',result,difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
+  const settleHorseRace=(ticket:HorseTicket,race:HorseRaceResult)=>{
+    const payout=settleHorseTicket(ticket,race),net=payout-ticket.stake;
+    if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-horse-${count}`,game:'경마',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`${horseBetLabels[ticket.type]} ${ticket.selections.join('→')} · 결승 ${race.order.slice(0,3).join('→')} · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
+  const settleCycleRace=(ticket:CycleTicket,race:CycleRaceResult)=>{
+    const payout=settleCycleTicket(ticket,race),net=payout-ticket.stake;if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-cycle-${count}`,game:'경륜',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`${cycleBetLabels[ticket.type]} ${ticket.selections.join('→')} · 결승 ${race.order.slice(0,3).join('→')} · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
+  const settleBoatRace=(ticket:BoatTicket,race:BoatRaceResult)=>{
+    const payout=settleBoatTicket(ticket,race),net=payout-ticket.stake;if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-boat-${count}`,game:'경정',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`${boatBetLabels[ticket.type]} ${ticket.selections.join('→')} · 결승 ${race.order.slice(0,3).join('→')} · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
+  const settleGreyhoundRace=(ticket:GreyhoundTicket,race:GreyhoundRaceResult)=>{
+    const payout=settleGreyhoundTicket(ticket,race),net=payout-ticket.stake;if(payout)setCoins((current)=>current+payout);
+    addRecord((count)=>({id:`${Date.now()}-greyhound-${count}`,game:'그레이하운드',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`${greyhoundBetLabels[ticket.type]} ${ticket.selections.join('→')} · 결승 ${race.order.slice(0,3).join('→')} · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
+  const settleCarRace=(ticket:CarRaceTicket,race:CarRaceResult)=>{
+    const payout=carTicketPayout(ticket,race),net=payout-ticket.stake;if(payout)setCoins((current)=>current+payout);
+    const winner=createCarField().find(car=>car.id===race.order[0]);
+    addRecord((count)=>({id:`${Date.now()}-car-${count}`,game:'자동차 레이스',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`우승 ${winner?.koreanName??race.order[0]} · 선택 ${ticket.selection}번 · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
+  const settleBullTournament=(ticket:BullTicket,result:BullTournamentResult)=>{
+    const payout=bullTicketPayout(ticket,result),net=payout-ticket.stake;if(payout)setCoins(current=>current+payout);
+    const winner=createBullField().find(bull=>bull.id===result.champion);
+    addRecord(count=>({id:`${Date.now()}-bull-${count}`,game:'소싸움',result:net>0?'win':'loss',difficulty,bet:ticket.stake,net,playedAt:new Date().toISOString(),detail:`대회 우승 ${winner?.name??result.champion} · 선택 ${ticket.selection}번 · 배당 ${ticket.odds.toFixed(1)}배`}));
+  };
 
   const settleVideoPoker = (stake: number, hand: Card[]) => {
     const result = evaluateVideoPoker(hand); const payout = videoPokerPayout(stake, hand); const net = videoPokerNet(stake, hand);
@@ -964,6 +1013,18 @@ function CasinoApp() {
         {appScreen === 'teenPattiGame' && <TeenPattiGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('teenPattiSetup')} onPlaceBet={placeBet} onSettle={settleTeenPatti}/>}
         {appScreen === 'paiGowSetup' && <SimpleSetupScreen title="파이 고우 포커(Pai Gow Poker) 준비" hero="7장 → 5장 + 2장" lead="두 개의 패를 만들어 딜러의 두 패와 모두 겨루세요" rules={['1. 나와 딜러가 카드 7장씩 받습니다.','2. 내 카드 중 로우 핸드로 쓸 카드 2장을 누르면 나머지 5장이 하이 핸드가 됩니다.','3. 하이 핸드는 일반 포커 족보, 로우 핸드는 원 페어 또는 높은 카드로 비교합니다.','4. 하이 핸드는 반드시 로우 핸드보다 강해야 합니다. 아니면 파울이라 승부할 수 없습니다.','5. 딜러의 하이와 로우를 모두 이기면 승리, 하나씩 이기면 무승부, 모두 지면 패배입니다. 같은 패는 딜러 승리입니다.','6. 초보용 기본판이라 조커와 카지노 수수료는 적용하지 않습니다.']} startLabel="파이 고우 시작" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('paiGowGame')}/>}
         {appScreen === 'paiGowGame' && <PaiGowGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('paiGowSetup')} onPlaceBet={placeBet} onSettle={settlePaiGow}/>}
+        {appScreen === 'horseSetup' && <SimpleSetupScreen title="경마(Horse Racing) 준비" hero="馬 ① ② ③" lead="출전마의 능력과 배당을 보고 결승 순위를 예측하세요" rules={['1. 매 경주 여섯 마리의 속도·지구력·최근 컨디션과 예상 배당을 확인합니다.','2. 단승은 1위 한 마리, 연승은 3위 안에 들 한 마리를 고릅니다.','3. 복승은 1·2위를 순서 없이, 쌍승은 정확한 순서로 맞혀야 합니다.','4. 배당이 높은 말은 적중 가능성이 낮지만 받을 수 있는 WC가 많습니다.','5. 베팅 뒤 경주 시작을 누르면 실제 트랙에서 결승선까지 달리고 순위가 확정됩니다.']} startLabel="경마장 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('horseGame')}/>}
+        {appScreen === 'horseGame' && <HorseRacingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('horseSetup')} onPlaceBet={placeBet} onSettle={settleHorseRace}/>}
+        {appScreen === 'cycleSetup' && <SimpleSetupScreen title="경륜(Keirin) 준비" hero="🚴 ① ② ③ ④" lead="일곱 선수의 전법과 마지막 바퀴 승부를 예측하세요" rules={['1. 선수 7명의 스프린트·지구력·전술과 주 전법을 확인합니다.','2. 선행은 먼저 치고 나가며, 젖히기는 바깥에서 추월하고, 추입은 막판에 속도를 냅니다. 마크는 강한 선수를 따라갑니다.','3. 단승은 1위, 연승은 7인 경기에서 2위 안에 들 선수 한 명을 맞힙니다.','4. 복승은 1·2위를 순서 없이, 쌍승은 정확한 순서로 맞힙니다.','5. 경주는 마지막 바퀴 진입 순서와 최종 스프린트 결과가 달라질 수 있습니다.']} startLabel="벨로드롬 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('cycleGame')}/>}
+        {appScreen === 'cycleGame' && <CycleRacingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('cycleSetup')} onPlaceBet={placeBet} onSettle={settleCycleRace}/>}
+        {appScreen === 'boatSetup' && <SimpleSetupScreen title="경정(Boat Racing) 준비" hero="🚤 ① ② ③ ④ ⑤ ⑥" lead="6대 보트의 스타트와 첫 번째 선회를 예측하세요" rules={['1. 1번 흰색부터 6번 초록색까지 여섯 보트가 출전합니다.','2. 스타트는 출발 타이밍, 선회는 1마크를 도는 능력, 모터는 직선 속도를 뜻합니다.','3. 단승은 1위, 연승은 2위 안에 들 보트 한 대를 맞힙니다.','4. 복승은 1·2위를 순서 없이, 쌍승은 정확한 순서로 맞힙니다.','5. 1마크 선두가 유리하지만 모터 성능에 따라 마지막 직선에서 순위가 바뀔 수 있습니다.']} startLabel="수면 경기장 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('boatGame')}/>}
+        {appScreen === 'boatGame' && <BoatRacingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('boatSetup')} onPlaceBet={placeBet} onSettle={settleBoatRace}/>}
+        {appScreen === 'greyhoundSetup' && <SimpleSetupScreen title="그레이하운드(Greyhound Racing) 준비" hero="🐕 ① ② ③ ④ ⑤ ⑥" lead="트랩에서 출발하는 6마리의 첫 코너와 결승 순위를 예측하세요" rules={['1. 여섯 마리가 각자 번호와 색상이 정해진 출발 트랩에서 동시에 출발합니다.','2. 출발은 초반 가속, 코너는 첫 굽이 통과, 막판은 결승 직선의 추월 능력입니다.','3. 레일형은 안쪽, 중간형은 중앙, 외곽형은 바깥 주로에서 능력을 더 잘 냅니다.','4. 단승은 1위, 연승은 2위 안, 복승은 1·2위 무순서, 쌍승은 정확한 순서를 맞힙니다.','5. 첫 코너 선두가 유리하지만 막판 속도가 좋은 개가 결승 직선에서 역전할 수 있습니다.']} startLabel="그레이하운드 경기장 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('greyhoundGame')}/>}
+        {appScreen === 'greyhoundGame' && <GreyhoundRacingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('greyhoundSetup')} onPlaceBet={placeBet} onSettle={settleGreyhoundRace}/>}
+        {appScreen === 'carSetup' && <SimpleSetupScreen title="자동차 레이스(Formula Racing) 준비" hero="🏎 ① ② ③ ④ ⑤ ⑥" lead="여섯 브랜드 중 결승선을 가장 먼저 통과할 차량을 선택하세요" rules={['1. 차량마다 최고 속도·코너링·안정성이 조금씩 다릅니다.','2. 배당이 낮은 차량은 우승 후보이며, 높은 차량은 이변을 노리는 선택입니다.','3. 이번 기본판은 가장 이해하기 쉬운 단승, 즉 우승 차량 한 대만 선택합니다.','4. 베팅 후 레이스가 시작되며 중간 순위와 최종 1·2·3위를 확인할 수 있습니다.']} startLabel="서킷 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('carGame')}/>}
+        {appScreen === 'carGame' && <CarRacingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('carSetup')} onPlaceBet={placeBet} onSettle={settleCarRace}/>}
+        {appScreen === 'bullSetup' && <SimpleSetupScreen title="한국 전통 소싸움 준비" hero="牛 ① ② ③ ④ ⑤ ⑥" lead="여섯 마리의 힘과 지구력, 투지를 보고 최종 우승 소를 선택하세요" rules={['1. 여섯 마리가 예선·준결승·결승 토너먼트를 치릅니다.','2. 힘은 밀어붙이는 능력, 지구력은 오래 버티는 능력, 투지는 불리할 때 버티는 능력입니다.','3. 1·2번 우승 후보는 예선을 통과한 상태에서 준결승부터 출전합니다.','4. 이번 기본판은 최종 우승 소 한 마리를 맞히는 단승 방식입니다.','5. 실제 상처 묘사 없이 전통적인 힘겨루기 경기로 표현합니다.']} startLabel="소싸움 경기장 입장" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bullGame')}/>}
+        {appScreen === 'bullGame' && <BullfightingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bullSetup')} onPlaceBet={placeBet} onSettle={settleBullTournament}/>}
         {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('videoPokerSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleVideoPoker} />}
         {appScreen === 'holdemSetup' && <PokerSetupScreen mode="holdem" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('holdemGame')} />}
         {appScreen === 'holdemGame' && <PokerGameScreen mode="holdem" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('텍사스 홀덤',mine,theirs,result,detail)} />}
@@ -1750,6 +1811,137 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
     {!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
     <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
+  </ScrollView></View>;
+}
+
+function BullFigure({bull}:{bull:FightingBull}){return <View style={styles.bullFigure}><Text style={[styles.bullEmoji,{color:bull.color}]}>♉</Text><View style={[styles.bullBand,{backgroundColor:bull.color}]}><Text style={styles.bullBandText}>{bull.id}</Text></View></View>}
+
+function BullfightingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:BullTicket,result:BullTournamentResult)=>void}){
+  const [bulls]=useState<FightingBull[]>(()=>createBullField()),[selection,setSelection]=useState<number|null>(null),[phase,setPhase]=useState<'betting'|'tournament'|'finished'>('betting'),[result,setResult]=useState<BullTournamentResult|null>(null),[ticket,setTicket]=useState<BullTicket|null>(null),[shown,setShown]=useState(0);
+  const bullName=(id:number)=>bulls.find(bull=>bull.id===id)?.name??`${id}번`;
+  useEffect(()=>{if(phase!=='tournament'||!result)return;const timer=setInterval(()=>setShown(current=>Math.min(result.matches.length,current+1)),700);return()=>clearInterval(timer);},[phase,result]);
+  useEffect(()=>{if(phase==='tournament'&&result&&ticket&&shown>=result.matches.length){setPhase('finished');onSettle(ticket,result);}},[phase,result,ticket,shown]);
+  const start=()=>{const bull=bulls.find(item=>item.id===selection);if(!bull||!onPlaceBet(selectedBet))return;setTicket({selection:bull.id,stake:selectedBet,odds:bull.odds});setResult(simulateBullTournament(bulls));setShown(0);setPhase('tournament');};
+  const reset=()=>{setSelection(null);setResult(null);setTicket(null);setShown(0);setPhase('betting');};
+  return <View style={styles.bullScreen}><ScreenHeader title="청도 전통 소싸움장" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>KOREAN BULL STRENGTH TOURNAMENT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.bullStatus}><Text style={styles.bullStatusText}>{phase==='betting'?'출전 준비':phase==='tournament'?'경기 진행 중':'우승 확정'}</Text></View></View>
+    <View style={styles.bullArena}><View style={styles.bullArenaRing}><Text style={styles.bullArenaTitle}>{phase==='betting'?'전통 힘겨루기 대회':phase==='finished'&&result?`우승 · ${bullName(result.champion)}`:`${result?.matches[Math.max(0,shown-1)]?.round??'예선'} 진행 중`}</Text><View style={styles.bullFaceoff}><Text style={styles.bullFace}>🐂</Text><Text style={styles.bullVs}>힘겨루기</Text><Text style={[styles.bullFace,{transform:[{scaleX:-1}]}]}>🐂</Text></View></View></View>
+    {phase==='betting'?<><Text style={styles.sectionTitle}>우승 소 선택</Text><View style={styles.bullGrid}>{bulls.map(bull=><Pressable key={bull.id} onPress={()=>setSelection(bull.id)} style={[styles.bullCard,selection===bull.id&&styles.bullCardActive]}><BullFigure bull={bull}/><View style={styles.bullCopy}><Text style={styles.bullName}>{bull.id}. {bull.name}</Text><Text style={styles.bullStats}>힘 {bull.power} · 지구력 {bull.endurance} · 투지 {bull.spirit}</Text><Text style={styles.bullOdds}>{bull.odds.toFixed(1)}배</Text></View>{bull.id<=2&&<Text style={styles.bullSeed}>준결승 시드</Text>}</Pressable>)}</View><View style={styles.bullTicket}><Text style={styles.horseTicketTitle}>대회 우승 예측</Text><Text style={styles.carTicketText}>{selection?`${bullName(selection)} · ${selectedBet.toLocaleString()} WC`:'출전 소 한 마리를 선택하세요'}</Text></View><Pressable disabled={!selection||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(!selection||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>베팅하고 대회 시작</Text></Pressable></>:
+    <View style={styles.bullBracket}><Text style={styles.horseTicketTitle}>{phase==='finished'?'토너먼트 결과':'경기 진행'}</Text>{result?.matches.slice(0,shown).map((match,index)=><View key={index} style={[styles.bullMatch,match.round==='결승'&&styles.bullFinal]}><Text style={styles.bullRound}>{match.round}</Text><Text style={styles.bullMatchText}>{bullName(match.left)} 대 {bullName(match.right)}</Text><Text style={styles.bullWinner}>승리 {bullName(match.winner)}</Text></View>)}{phase==='finished'&&result&&ticket&&<><Text style={styles.bullChampion}>🏆 {bullName(result.champion)} 우승</Text><Text style={styles.horseExpected}>{bullTicketPayout(ticket,result)>0?`${bullTicketPayout(ticket,result).toLocaleString()} WC 적중!`:`${bullName(ticket.selection)} 우승 예측 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 대회</Text></Pressable></>}</View>}
+  </ScrollView></View>;
+}
+
+function FormulaCar({car,small=false}:{car:RaceCar;small?:boolean}){
+  return <View style={[styles.formulaCar,small&&styles.formulaCarSmall]}>
+    <View style={[styles.formulaRearWing,{backgroundColor:car.accent}]}/><View style={[styles.formulaWheel,styles.formulaWheelBack]}/>
+    <View style={[styles.formulaBody,{backgroundColor:car.color}]}><View style={[styles.formulaCockpit,{borderBottomColor:car.accent}]}/><Text style={styles.formulaNumber}>{car.id}</Text></View>
+    <View style={[styles.formulaNose,{borderLeftColor:car.color}]}/><View style={[styles.formulaFrontWing,{backgroundColor:car.accent}]}/><View style={[styles.formulaWheel,styles.formulaWheelFront]}/>
+  </View>;
+}
+
+function CarRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:CarRaceTicket,result:CarRaceResult)=>void}){
+  const [cars]=useState<RaceCar[]>(()=>createCarField()),[selection,setSelection]=useState<number|null>(null),[phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting'),[race,setRace]=useState<CarRaceResult|null>(null),[ticket,setTicket]=useState<CarRaceTicket|null>(null),[progress,setProgress]=useState(0);
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.023)),80);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
+  const start=()=>{const car=cars.find(item=>item.id===selection);if(!car||!onPlaceBet(selectedBet))return;const nextTicket={selection:car.id,stake:selectedBet,odds:car.odds},nextRace=simulateCarRace(cars);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
+  const reset=()=>{setSelection(null);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
+  const carName=(id:number)=>cars.find(car=>car.id===id)?.koreanName??`${id}번`;
+  return <View style={styles.carRaceScreen}><ScreenHeader title="월드 포뮬러 서킷" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD GRAND PRIX · 6 CARS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.carStatus}><Text style={styles.carStatusText}>{phase==='betting'?'출발 준비':phase==='racing'?(progress>.5?'마지막 구간':'레이스 중'):'레이스 종료'}</Text></View></View>
+    <View style={styles.carTrack}>{cars.map(car=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[car.id]):0,place=race?.order.indexOf(car.id)??-1;return <View key={car.id} style={styles.carLane}><View style={styles.carLaneBadge}><Text style={styles.carLaneNumber}>{car.id}</Text></View><View style={styles.carLaneCourse}><View style={[styles.carDistance,{width:`${Math.max(10,laneProgress*84)}%`}]}><FormulaCar car={car} small/></View><View style={styles.carFinishLine}/></View>{phase==='finished'&&<Text style={styles.carPlace}>{place+1}위</Text>}</View>})}</View>
+    {phase==='racing'&&race&&progress>.48&&<View style={styles.carLivePanel}><Text style={styles.carLiveTitle}>중간 순위</Text><Text style={styles.carLiveText}>{race.midRaceOrder.slice(0,3).map(carName).join(' → ')}</Text></View>}
+    {phase==='betting'?<><Text style={styles.sectionTitle}>우승 차량 선택</Text><View style={styles.carGrid}>{cars.map(car=><Pressable key={car.id} onPress={()=>setSelection(car.id)} style={[styles.carCard,selection===car.id&&styles.carCardActive]}><View style={[styles.carLogoPlate,{borderColor:car.accent}]}><Image source={carLogoSources[car.id]} style={styles.carLogo} resizeMode="contain"/></View><View style={styles.carCardCopy}><Text style={styles.carName}>{car.id}. {car.koreanName}</Text><Text style={styles.carStats}>속도 {car.speed} · 코너 {car.cornering} · 안정 {car.stability}</Text><Text style={styles.carOdds}>{car.odds.toFixed(1)}배</Text></View><FormulaCar car={car}/></Pressable>)}</View><View style={styles.carTicket}><Text style={styles.horseTicketTitle}>우승 예측 티켓</Text><Text style={styles.carTicketText}>{selection?`${carName(selection)} · ${selectedBet.toLocaleString()} WC`:'차량 한 대를 선택하세요'}</Text>{selection&&<Text style={styles.horseExpected}>적중 시 {Math.round(selectedBet*(cars.find(car=>car.id===selection)?.odds??0)).toLocaleString()} WC</Text>}</View><Pressable disabled={!selection||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(!selection||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>베팅하고 레이스 시작</Text></Pressable></>:
+    <View style={styles.carResult}><Text style={styles.horseTicketTitle}>{phase==='racing'?'서킷을 질주하고 있습니다':'최종 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {carName(race.order[0])}{'\n'}🥈 {carName(race.order[1])}　🥉 {carName(race.order[2])}</Text><Text style={styles.horseExpected}>{carTicketPayout(ticket,race)>0?`${carTicketPayout(ticket,race).toLocaleString()} WC 적중!`:`${carName(ticket.selection)} 우승 예측 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 레이스</Text></Pressable></>}</View>}
+  </ScrollView></View>;
+}
+
+function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:HorseTicket,result:HorseRaceResult)=>void}){
+  const [horses,setHorses]=useState<Horse[]>(()=>createHorseField());
+  const [betType,setBetType]=useState<HorseBetType>('win');
+  const [selections,setSelections]=useState<number[]>([]);
+  const [phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting');
+  const [race,setRace]=useState<HorseRaceResult|null>(null);
+  const [ticket,setTicket]=useState<HorseTicket|null>(null);
+  const [progress,setProgress]=useState(0);
+  const needed=requiredHorseSelections(betType),odds=horseTicketOdds(betType,selections,horses);
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.025)),80);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
+  const chooseType=(type:HorseBetType)=>{if(phase!=='betting')return;setBetType(type);setSelections([]);};
+  const chooseHorse=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  const startRace=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateHorseRace(horses);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
+  const newRace=()=>{setHorses(createHorseField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  return <View style={styles.horseScreen}><ScreenHeader title="월드 경마장" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>SEOUL NIGHT RACE · 1,600M</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'마권 판매 중':phase==='racing'?'경주 진행 중':'경주 확정'}</Text></View></View>
+    <View style={styles.horseTrack}>{horses.map(horse=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[horse.id]):0;const place=race?.order.indexOf(horse.id)??-1;return <View key={horse.id} style={styles.horseLane}><View style={styles.horseLaneNumber}><Text style={styles.horseLaneNumberText}>{horse.id}</Text></View><View style={styles.horseLaneCourse}><View style={[styles.horseDistance,{width:`${Math.max(5,laneProgress*88)}%`}]}><Text style={styles.horseRunner}>🏇</Text></View><View style={styles.horseFinishLine}/></View>{phase==='finished'&&<Text style={styles.horsePlace}>{place+1}위</Text>}</View>;})}</View>
+    {phase==='betting'?<><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as HorseBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{horseBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'3위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>출전마 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{horses.map(horse=><Pressable key={horse.id} onPress={()=>chooseHorse(horse.id)} style={[styles.horseCard,selections.includes(horse.id)&&styles.horseCardActive]}><View style={[styles.horseNumberBadge,{backgroundColor:horse.color}]}><Text style={styles.horseNumberText}>{horse.id}</Text></View><View style={styles.horseInfo}><Text style={styles.horseName}>{horse.name}</Text><Text style={styles.horseStats}>속도 {horse.speed} · 지구력 {horse.stamina} · 컨디션 {horse.form}</Text></View><View><Text style={styles.horseOdds}>{betType==='place'?horse.placeOdds.toFixed(1):horse.winOdds.toFixed(1)}배</Text>{selections.includes(horse.id)&&<Text style={styles.horsePickOrder}>{selections.indexOf(horse.id)+1}번째</Text>}</View></Pressable>)}</View>
+    <View style={styles.horseTicket}><Text style={styles.horseTicketTitle}>마권</Text><Text style={styles.slotRuleText}>{horseBetLabels[betType]} · {selections.length?selections.join(' → '):'말을 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View><Pressable disabled={selections.length!==needed||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(selections.length!==needed||selectedBet>coins)&&styles.disabledCard]} onPress={startRace}><Text style={styles.primaryButtonText}>베팅하고 경주 시작</Text></Pressable></>:
+    <View style={styles.horseResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'결승선을 향해 달리고 있습니다':'경주 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번 　🥈 {race.order[1]}번 　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleHorseTicket(ticket,race)>0?`${settleHorseTicket(ticket,race).toLocaleString()} WC 적중!`:`${horseBetLabels[ticket.type]} 마권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={newRace}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
+  </ScrollView></View>;
+}
+
+function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:CycleTicket,result:CycleRaceResult)=>void}){
+  const [riders,setRiders]=useState<Cyclist[]>(()=>createCycleField()),[betType,setBetType]=useState<CycleBetType>('win'),[selections,setSelections]=useState<number[]>([]),[phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting'),[race,setRace]=useState<CycleRaceResult|null>(null),[ticket,setTicket]=useState<CycleTicket|null>(null),[progress,setProgress]=useState(0);
+  const needed=requiredCycleSelections(betType),odds=cycleTicketOdds(betType,selections,riders);
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.022)),80);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
+  const chooseType=(type:CycleBetType)=>{if(phase==='betting'){setBetType(type);setSelections([]);}};
+  const choose=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateCycleRace(riders);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
+  const reset=()=>{setRiders(createCycleField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  return <View style={styles.cycleScreen}><ScreenHeader title="월드 벨로드롬" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>GWANGMYEONG · 7 RIDERS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'경주권 판매 중':phase==='racing'?(progress>.68?'🔔 마지막 바퀴':'대열 주행 중'):'순위 확정'}</Text></View></View>
+    <View style={styles.cycleTrack}>{riders.map(rider=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[rider.id]):0,place=race?.order.indexOf(rider.id)??-1;return <View key={rider.id} style={styles.cycleLane}><View style={[styles.cycleJersey,{backgroundColor:rider.color}]}><Text style={[styles.horseLaneNumberText,rider.id===2&&{color:'#FFF'}]}>{rider.id}</Text></View><View style={styles.horseLaneCourse}><View style={[styles.horseDistance,{width:`${Math.max(5,laneProgress*88)}%`}]}><Text style={styles.cycleRider}>🚴</Text></View><View style={styles.horseFinishLine}/></View>{phase==='finished'&&<Text style={styles.horsePlace}>{place+1}위</Text>}</View>;})}</View>
+    {phase==='racing'&&race&&progress>.68&&<View style={styles.cycleBell}><Text style={styles.cycleBellTitle}>🔔 마지막 바퀴 진입</Text><Text style={styles.slotRuleText}>현재 대열 {race.lastLapOrder.slice(0,4).join(' → ')} · 막판 추입이 시작됩니다</Text></View>}
+    {phase==='betting'?<><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as CycleBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{cycleBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>선수 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{riders.map(rider=><Pressable key={rider.id} onPress={()=>choose(rider.id)} style={[styles.horseCard,selections.includes(rider.id)&&styles.horseCardActive]}><View style={[styles.cycleJerseyLarge,{backgroundColor:rider.color}]}><Text style={[styles.horseNumberText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View><View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.horseName}>{rider.name}</Text><Text style={styles.cycleStyle}>{rider.style}</Text></View><Text style={styles.horseStats}>스프린트 {rider.sprint} · 지구력 {rider.endurance} · 전술 {rider.tactics}</Text></View><View><Text style={styles.horseOdds}>{betType==='place'?rider.placeOdds.toFixed(1):rider.winOdds.toFixed(1)}배</Text>{selections.includes(rider.id)&&<Text style={styles.horsePickOrder}>{selections.indexOf(rider.id)+1}번째</Text>}</View></Pressable>)}</View>
+    <View style={styles.cycleTicket}><Text style={styles.horseTicketTitle}>경주권</Text><Text style={styles.cycleTicketText}>{cycleBetLabels[betType]} · {selections.length?selections.join(' → '):'선수를 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View><Pressable disabled={selections.length!==needed||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(selections.length!==needed||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>경주권 구매 · 출발</Text></Pressable></>:
+    <View style={styles.horseResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'경주가 진행 중입니다':'경륜 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번　🥈 {race.order[1]}번　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleCycleTicket(ticket,race)>0?`${settleCycleTicket(ticket,race).toLocaleString()} WC 적중!`:`${cycleBetLabels[ticket.type]} 경주권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
+  </ScrollView></View>;
+}
+
+function BoatRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:BoatTicket,result:BoatRaceResult)=>void}){
+  const [boats,setBoats]=useState<BoatRacer[]>(()=>createBoatField()),[betType,setBetType]=useState<BoatBetType>('win'),[selections,setSelections]=useState<number[]>([]),[phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting'),[race,setRace]=useState<BoatRaceResult|null>(null),[ticket,setTicket]=useState<BoatTicket|null>(null),[progress,setProgress]=useState(0);
+  const needed=requiredBoatSelections(betType),odds=boatTicketOdds(betType,selections,boats);
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.021)),80);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
+  const chooseType=(type:BoatBetType)=>{if(phase==='betting'){setBetType(type);setSelections([]);}};
+  const choose=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateBoatRace(boats);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
+  const reset=()=>{setBoats(createBoatField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  return <View style={styles.boatScreen}><ScreenHeader title="월드 경정장" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>MISARI WATER COURSE · 6 BOATS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'승자투표권 판매 중':phase==='racing'?(progress>.43?'1마크 통과':'스타트 경합'):'순위 확정'}</Text></View></View>
+    <View style={styles.boatCourse}>{boats.map(boat=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[boat.id]):0,place=race?.order.indexOf(boat.id)??-1;return <View key={boat.id} style={styles.boatLane}><View style={[styles.boatLaneBadge,{backgroundColor:boat.color}]}><Text style={[styles.horseLaneNumberText,{color:boat.textColor}]}>{boat.id}</Text></View><View style={styles.boatWater}><View style={[styles.horseDistance,{width:`${Math.max(7,laneProgress*88)}%`}]}><Text style={styles.boatWake}>≈≈<Text style={styles.boatRunner}>🚤</Text></Text></View><View style={styles.boatFinishLine}/></View>{phase==='finished'&&<Text style={styles.boatPlace}>{place+1}위</Text>}</View>})}</View>
+    {phase==='racing'&&race&&progress>.43&&<View style={styles.boatMarkPanel}><Text style={styles.boatMarkTitle}>⚑ 1마크 선회</Text><Text style={styles.boatMarkText}>선회 순서 {race.firstMarkOrder.slice(0,4).join(' → ')} · 이제 모터 직선 승부입니다</Text></View>}
+    {phase==='betting'?<><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as BoatBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.boatBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{boatBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>보트 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{boats.map(boat=><Pressable key={boat.id} onPress={()=>choose(boat.id)} style={[styles.boatCard,selections.includes(boat.id)&&styles.boatCardActive]}><View style={[styles.boatLargeBadge,{backgroundColor:boat.color}]}><Text style={[styles.horseNumberText,{color:boat.textColor}]}>{boat.id}</Text></View><View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.boatName}>{boat.name}</Text><Text style={styles.boatStyle}>{boat.style}</Text></View><Text style={styles.boatStats}>스타트 {boat.start} · 선회 {boat.turn} · 모터 {boat.motor}</Text></View><View><Text style={styles.boatOdds}>{betType==='place'?boat.placeOdds.toFixed(1):boat.winOdds.toFixed(1)}배</Text>{selections.includes(boat.id)&&<Text style={styles.boatPickOrder}>{selections.indexOf(boat.id)+1}번째</Text>}</View></Pressable>)}</View>
+    <View style={styles.boatTicket}><Text style={styles.horseTicketTitle}>승자투표권</Text><Text style={styles.boatTicketText}>{boatBetLabels[betType]} · {selections.length?selections.join(' → '):'보트를 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View><Pressable disabled={selections.length!==needed||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(selections.length!==needed||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>투표권 구매 · 경주 시작</Text></Pressable></>:
+    <View style={styles.boatResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'물보라를 가르며 질주 중입니다':'경정 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번　🥈 {race.order[1]}번　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleBoatTicket(ticket,race)>0?`${settleBoatTicket(ticket,race).toLocaleString()} WC 적중!`:`${boatBetLabels[ticket.type]} 투표권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
+  </ScrollView></View>;
+}
+
+function GreyhoundRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:GreyhoundTicket,result:GreyhoundRaceResult)=>void}){
+  const [dogs,setDogs]=useState<Greyhound[]>(()=>createGreyhoundField()),[betType,setBetType]=useState<GreyhoundBetType>('win'),[selections,setSelections]=useState<number[]>([]),[phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting'),[race,setRace]=useState<GreyhoundRaceResult|null>(null),[ticket,setTicket]=useState<GreyhoundTicket|null>(null),[progress,setProgress]=useState(0);
+  const needed=requiredGreyhoundSelections(betType),odds=greyhoundTicketOdds(betType,selections,dogs);
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.024)),75);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
+  const chooseType=(type:GreyhoundBetType)=>{if(phase==='betting'){setBetType(type);setSelections([]);}};
+  const choose=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateGreyhoundRace(dogs);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
+  const reset=()=>{setDogs(createGreyhoundField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  return <View style={styles.greyhoundScreen}><ScreenHeader title="월드 그레이하운드 스타디움" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>NIGHT SPRINT · 480M · 6 TRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'베팅 접수 중':phase==='racing'?(progress>.4?'첫 코너 통과':'트랩 오픈'):'공식 순위'}</Text></View></View>
+    <View style={styles.greyhoundTrack}>{dogs.map(dog=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[dog.id]):0,place=race?.order.indexOf(dog.id)??-1;return <View key={dog.id} style={styles.greyhoundLane}><View style={[styles.greyhoundTrap,{backgroundColor:dog.vestColor}]}><Text style={[styles.horseLaneNumberText,{color:dog.textColor}]}>{dog.id}</Text></View><View style={styles.greyhoundCourse}><View style={[styles.horseDistance,{width:`${Math.max(6,laneProgress*88)}%`}]}><Text style={styles.greyhoundRunner}>🐕</Text></View><View style={styles.greyhoundFinish}/></View>{phase==='finished'&&<Text style={styles.greyhoundPlace}>{place+1}위</Text>}</View>})}</View>
+    {phase==='racing'&&race&&progress>.4&&<View style={styles.greyhoundBend}><Text style={styles.greyhoundBendTitle}>◖ 첫 코너 통과</Text><Text style={styles.greyhoundBendText}>현재 순서 {race.firstBendOrder.slice(0,4).join(' → ')} · 결승 직선 추격이 시작됩니다</Text></View>}
+    {phase==='betting'?<><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as GreyhoundBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.greyhoundBetActive]}><Text style={styles.horseBetTypeTitle}>{greyhoundBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>출전견 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{dogs.map(dog=><Pressable key={dog.id} onPress={()=>choose(dog.id)} style={[styles.greyhoundCard,selections.includes(dog.id)&&styles.greyhoundCardActive]}><View style={[styles.greyhoundVest,{backgroundColor:dog.vestColor}]}><Text style={[styles.horseNumberText,{color:dog.textColor}]}>{dog.id}</Text></View><View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.greyhoundName}>{dog.name}</Text><Text style={styles.greyhoundLine}>{dog.line}</Text></View><Text style={styles.greyhoundStats}>출발 {dog.breakSpeed} · 코너 {dog.cornering} · 막판 {dog.finishSpeed}</Text></View><View><Text style={styles.greyhoundOdds}>{betType==='place'?dog.placeOdds.toFixed(1):dog.winOdds.toFixed(1)}배</Text>{selections.includes(dog.id)&&<Text style={styles.greyhoundPick}>{selections.indexOf(dog.id)+1}번째</Text>}</View></Pressable>)}</View>
+    <View style={styles.greyhoundTicket}><Text style={styles.horseTicketTitle}>레이스 티켓</Text><Text style={styles.greyhoundTicketText}>{greyhoundBetLabels[betType]} · {selections.length?selections.join(' → '):'출전견을 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View><Pressable disabled={selections.length!==needed||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(selections.length!==needed||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>티켓 구매 · 트랩 오픈</Text></Pressable></>:
+    <View style={styles.greyhoundResult}><Text style={styles.horseTicketTitle}>{phase==='racing'?'인공 토끼를 쫓아 질주 중입니다':'그레이하운드 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번　🥈 {race.order[1]}번　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleGreyhoundTicket(ticket,race)>0?`${settleGreyhoundTicket(ticket,race).toLocaleString()} WC 적중!`:`${greyhoundBetLabels[ticket.type]} 티켓 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 레이스</Text></Pressable></>}</View>}
   </ScrollView></View>;
 }
 
@@ -4477,6 +4669,162 @@ const styles = StyleSheet.create({
   paiGowResultMark: { color: '#FFE080', fontSize: 16, fontWeight: '900', marginTop: 6 },
   paiGowShowdownButton: { flex: 1, width: undefined },
   paiGowWarning: { color: '#FFB39D', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  bullScreen: { flex: 1, backgroundColor: '#17120D' },
+  bullStatus: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#332313', borderWidth: 1, borderColor: '#C58A42' },
+  bullStatusText: { color: '#FFD99A', fontSize: 11, fontWeight: '900' },
+  bullArena: { marginTop: 16, padding: 13, borderRadius: 22, backgroundColor: '#8D5931', borderWidth: 4, borderColor: '#D8B374' },
+  bullArenaRing: { minHeight: 150, alignItems: 'center', justifyContent: 'center', borderRadius: 75, backgroundColor: '#C98B4B', borderWidth: 3, borderColor: '#F1D29B' },
+  bullArenaTitle: { color: '#321D0C', fontSize: 15, fontWeight: '900' },
+  bullFaceoff: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12 },
+  bullFace: { fontSize: 46 },
+  bullVs: { color: '#FFF3D5', fontSize: 10, fontWeight: '900', backgroundColor: '#6B3518', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, overflow: 'hidden' },
+  bullGrid: { gap: 8 },
+  bullCard: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#2B2119', borderWidth: 1, borderColor: '#6F5238' },
+  bullCardActive: { backgroundColor: '#49331D', borderColor: '#F0BD68', borderWidth: 2 },
+  bullFigure: { width: 52, height: 52, alignItems: 'center', justifyContent: 'center', borderRadius: 26, backgroundColor: '#110E0B', position: 'relative' },
+  bullEmoji: { fontSize: 40, fontWeight: '900' },
+  bullBand: { position: 'absolute', right: -3, bottom: -2, width: 20, height: 20, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#FFF0C8' },
+  bullBandText: { color: '#FFF', fontSize: 9, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 2 },
+  bullCopy: { flex: 1 },
+  bullName: { color: '#FFF0D0', fontSize: 14, fontWeight: '900' },
+  bullStats: { color: '#CDB99E', fontSize: 9, marginTop: 4 },
+  bullOdds: { color: '#F7C878', fontSize: 12, fontWeight: '900', marginTop: 3 },
+  bullSeed: { color: '#FFE0A4', fontSize: 8, fontWeight: '900', backgroundColor: '#62411F', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 7, overflow: 'hidden' },
+  bullTicket: { marginTop: 14, padding: 14, borderRadius: 15, backgroundColor: '#362515', borderWidth: 1, borderColor: '#9E6A31' },
+  bullBracket: { marginTop: 14, padding: 14, borderRadius: 17, backgroundColor: '#2C2118', borderWidth: 1, borderColor: '#74543A', gap: 7 },
+  bullMatch: { minHeight: 54, padding: 9, borderRadius: 11, backgroundColor: '#3B2C21', borderLeftWidth: 4, borderLeftColor: '#A97842' },
+  bullFinal: { backgroundColor: '#4A351B', borderLeftColor: '#F0BD54' },
+  bullRound: { color: '#E3B978', fontSize: 8, fontWeight: '900' },
+  bullMatchText: { color: '#FFF0D7', fontSize: 11, fontWeight: '800', marginTop: 2 },
+  bullWinner: { color: '#F1CA88', fontSize: 9, fontWeight: '900', marginTop: 2 },
+  bullChampion: { color: '#FFE18A', fontSize: 20, fontWeight: '900', textAlign: 'center', marginVertical: 8 },
+  carRaceScreen: { flex: 1, backgroundColor: '#090D14' },
+  carStatus: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#221E16', borderWidth: 1, borderColor: '#E1B84A' },
+  carStatusText: { color: '#FFE18A', fontSize: 11, fontWeight: '900' },
+  carTrack: { marginTop: 15, paddingVertical: 6, borderRadius: 18, overflow: 'hidden', backgroundColor: '#242931', borderWidth: 4, borderColor: '#5C626C' },
+  carLane: { height: 53, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#626873' },
+  carLaneBadge: { width: 28, height: 28, marginHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: 5, backgroundColor: '#F4F0E6' },
+  carLaneNumber: { color: '#15171A', fontSize: 13, fontWeight: '900' },
+  carLaneCourse: { flex: 1, height: 49, justifyContent: 'center', position: 'relative', borderLeftWidth: 1, borderLeftColor: '#777', borderRightWidth: 1, borderRightColor: '#777' },
+  carDistance: { minWidth: 42, height: 38, justifyContent: 'center' },
+  carFinishLine: { position: 'absolute', right: 7, width: 5, height: 49, backgroundColor: '#FFF', borderLeftWidth: 2, borderLeftColor: '#111' },
+  carPlace: { width: 36, color: '#FFF3C3', fontSize: 11, fontWeight: '900', textAlign: 'center' },
+  formulaCar: { width: 73, height: 30, position: 'relative', justifyContent: 'center' },
+  formulaCarSmall: { transform: [{scale:.82}], transformOrigin: 'left center' },
+  formulaRearWing: { position: 'absolute', left: 0, top: 5, width: 10, height: 20, borderRadius: 2 },
+  formulaBody: { position: 'absolute', left: 8, top: 8, width: 39, height: 15, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,.42)' },
+  formulaCockpit: { position: 'absolute', right: 5, top: -7, width: 13, height: 7, borderLeftWidth: 5, borderRightWidth: 5, borderBottomWidth: 7, borderLeftColor: 'transparent', borderRightColor: 'transparent' },
+  formulaNumber: { color: '#FFF', fontSize: 8, lineHeight: 13, fontWeight: '900', marginLeft: 6, textShadowColor: '#000', textShadowRadius: 2 },
+  formulaNose: { position: 'absolute', left: 45, top: 10, width: 0, height: 0, borderTopWidth: 6, borderBottomWidth: 6, borderLeftWidth: 18, borderTopColor: 'transparent', borderBottomColor: 'transparent' },
+  formulaFrontWing: { position: 'absolute', right: 0, top: 7, width: 5, height: 17, borderRadius: 2 },
+  formulaWheel: { position: 'absolute', width: 9, height: 7, borderRadius: 2, backgroundColor: '#080808' },
+  formulaWheelBack: { left: 11, bottom: 1 },
+  formulaWheelFront: { right: 9, bottom: 1 },
+  carLivePanel: { marginTop: 10, padding: 12, borderRadius: 13, backgroundColor: '#172131', borderWidth: 1, borderColor: '#4E719E' },
+  carLiveTitle: { color: '#82B9F4', fontSize: 11, fontWeight: '900' },
+  carLiveText: { color: '#F4F7FB', fontSize: 12, fontWeight: '800', marginTop: 4 },
+  carGrid: { gap: 9 },
+  carCard: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 9, borderRadius: 15, backgroundColor: '#171D27', borderWidth: 1, borderColor: '#3A4657' },
+  carCardActive: { backgroundColor: '#292614', borderColor: '#F0C24B', borderWidth: 2 },
+  carLogoPlate: { width: 55, height: 51, padding: 5, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#10151D', borderWidth: 2 },
+  carLogo: { width: '100%', height: '100%' },
+  carCardCopy: { flex: 1 },
+  carName: { color: '#FFF5D7', fontSize: 13, fontWeight: '900' },
+  carStats: { color: '#AEB8C7', fontSize: 8, marginTop: 4 },
+  carOdds: { color: '#FFD86B', fontSize: 12, fontWeight: '900', marginTop: 3 },
+  carTicket: { marginTop: 14, padding: 14, borderRadius: 15, backgroundColor: '#211D13', borderWidth: 1, borderColor: '#B98C26' },
+  carTicketText: { color: '#FFF3C5', fontSize: 12, fontWeight: '800', marginTop: 4 },
+  carResult: { marginTop: 12, padding: 16, borderRadius: 17, backgroundColor: '#171E29', borderWidth: 1, borderColor: '#53677F' },
+  horseScreen: { flex: 1, backgroundColor: '#091D16' },
+  horsePage: { padding: 14, paddingBottom: 42, gap: 13 },
+  horseTrack: { paddingVertical: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#8B5A32', borderWidth: 5, borderColor: '#D3B477' },
+  horseLane: { height: 54, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.25)' },
+  horseLaneNumber: { width: 32, height: 32, marginHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: '#F7F1E3' },
+  horseLaneNumberText: { color: '#161616', fontSize: 15, fontWeight: '900' },
+  horseLaneCourse: { flex: 1, height: 48, justifyContent: 'center', position: 'relative' },
+  horseDistance: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
+  horseRunner: { fontSize: 28 },
+  horseFinishLine: { position: 'absolute', right: 8, width: 4, height: 48, backgroundColor: '#F7F1E3', borderLeftWidth: 2, borderLeftColor: '#161616' },
+  horsePlace: { width: 38, color: '#FFF4CE', fontSize: 12, fontWeight: '900' },
+  horseBetTypeRow: { flexDirection: 'row', gap: 6 },
+  horseBetType: { flex: 1, minHeight: 62, alignItems: 'center', justifyContent: 'center', padding: 5, borderRadius: 12, backgroundColor: '#142B22', borderWidth: 1, borderColor: '#3E5A4E' },
+  horseBetTypeActive: { backgroundColor: '#473713', borderColor: '#F0C75B', borderWidth: 2 },
+  horseBetTypeTitle: { color: '#FFF3C8', fontSize: 14, fontWeight: '900' },
+  horseBetTypeDetail: { color: '#AFC4BA', fontSize: 8, marginTop: 4, textAlign: 'center' },
+  horseCards: { gap: 7 },
+  horseCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#14251F', borderWidth: 1, borderColor: '#385247' },
+  horseCardActive: { backgroundColor: '#352D17', borderColor: '#F0C75B', borderWidth: 2 },
+  horseNumberBadge: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 21, borderWidth: 2, borderColor: '#FFF' },
+  horseNumberText: { color: '#FFF', fontSize: 18, fontWeight: '900' },
+  horseInfo: { flex: 1 },
+  horseName: { color: '#FFF4D4', fontSize: 14, fontWeight: '900', marginBottom: 4 },
+  horseStats: { color: '#AAC0B5', fontSize: 9, lineHeight: 14 },
+  horseOdds: { color: '#FFD96B', fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  horsePickOrder: { color: '#F2C85B', fontSize: 9, fontWeight: '800', textAlign: 'right', marginTop: 3 },
+  horseTicket: { padding: 14, borderRadius: 16, backgroundColor: '#F1E3BC', borderWidth: 2, borderColor: '#B98A2D' },
+  horseTicketTitle: { color: '#FFE080', fontSize: 18, fontWeight: '900', marginBottom: 7 },
+  horseExpected: { color: '#E6C765', fontSize: 13, fontWeight: '800', marginTop: 7 },
+  horseResultPanel: { padding: 16, borderRadius: 18, backgroundColor: '#132C23', borderWidth: 1, borderColor: '#527665' },
+  horsePodium: { color: '#FFF2C0', fontSize: 17, fontWeight: '900', textAlign: 'center', marginVertical: 12 },
+  cycleScreen: { flex: 1, backgroundColor: '#101B27' },
+  cycleTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2' },
+  cycleLane: { height: 49, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.32)' },
+  cycleJersey: { width: 31, height: 31, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 2, borderColor: '#D7E2E9' },
+  cycleJerseyLarge: { width: 44, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#D7E2E9' },
+  cycleRider: { fontSize: 27, transform: [{ scaleX: -1 }] },
+  cycleBell: { padding: 12, borderRadius: 14, backgroundColor: '#3A2F12', borderWidth: 1, borderColor: '#E0B949' },
+  cycleBellTitle: { color: '#FFE071', fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  cycleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  cycleStyle: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden', color: '#BDE3FF', backgroundColor: '#24475E', fontSize: 9, fontWeight: '900' },
+  cycleTicket: { padding: 14, borderRadius: 16, backgroundColor: '#172B3A', borderWidth: 2, borderColor: '#6BA2C7' },
+  cycleTicketText: { color: '#E7F4FC', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  boatScreen: { flex: 1, backgroundColor: '#071D2A' },
+  boatCourse: { paddingVertical: 7, borderRadius: 22, overflow: 'hidden', backgroundColor: '#087AA0', borderWidth: 5, borderColor: '#84D9E9' },
+  boatLane: { height: 52, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.38)' },
+  boatLaneBadge: { width: 32, height: 32, marginHorizontal: 6, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
+  boatWater: { flex: 1, height: 48, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(32,190,219,.13)' },
+  boatWake: { color: '#BCEEF6', fontSize: 15, fontWeight: '900' },
+  boatRunner: { fontSize: 27 },
+  boatFinishLine: { position: 'absolute', right: 8, width: 4, height: 48, backgroundColor: '#FF6B45', borderLeftWidth: 2, borderLeftColor: '#FFF' },
+  boatPlace: { width: 38, color: '#E6FBFF', fontSize: 12, fontWeight: '900' },
+  boatMarkPanel: { padding: 12, borderRadius: 14, backgroundColor: '#0C4053', borderWidth: 1, borderColor: '#4ED1E6' },
+  boatMarkTitle: { color: '#79EBFA', fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  boatMarkText: { color: '#D6F8FC', fontSize: 11, lineHeight: 17, fontWeight: '700' },
+  boatBetTypeActive: { backgroundColor: '#064A60', borderColor: '#5DE8F4', borderWidth: 2 },
+  boatCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#0E3040', borderWidth: 1, borderColor: '#317287' },
+  boatCardActive: { backgroundColor: '#124E5E', borderColor: '#61E9F3', borderWidth: 2 },
+  boatLargeBadge: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 23, borderWidth: 3, borderColor: '#FFF' },
+  boatName: { color: '#E9FCFF', fontSize: 14, fontWeight: '900' },
+  boatStyle: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden', color: '#7CF0FB', backgroundColor: '#075166', fontSize: 9, fontWeight: '900' },
+  boatStats: { color: '#A9D7DF', fontSize: 9, lineHeight: 14, marginTop: 4 },
+  boatOdds: { color: '#77EFF7', fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  boatPickOrder: { color: '#A8F7FC', fontSize: 9, fontWeight: '800', textAlign: 'right', marginTop: 3 },
+  boatTicket: { padding: 14, borderRadius: 16, backgroundColor: '#0C3B4B', borderWidth: 2, borderColor: '#46BED2' },
+  boatTicketText: { color: '#E3FBFE', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  boatResultPanel: { padding: 16, borderRadius: 18, backgroundColor: '#0B3545', borderWidth: 1, borderColor: '#4ACADD' },
+  greyhoundScreen: { flex: 1, backgroundColor: '#17111D' },
+  greyhoundTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#75523A', borderWidth: 6, borderColor: '#BFC6CC' },
+  greyhoundLane: { height: 51, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.25)' },
+  greyhoundTrap: { width: 33, height: 33, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 4, borderWidth: 2, borderColor: '#FFF' },
+  greyhoundCourse: { flex: 1, height: 48, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(72,43,28,.25)' },
+  greyhoundRunner: { fontSize: 28, transform: [{ scaleX: -1 }] },
+  greyhoundFinish: { position: 'absolute', right: 8, width: 4, height: 48, backgroundColor: '#FFF', borderLeftWidth: 2, borderLeftColor: '#111' },
+  greyhoundPlace: { width: 38, color: '#FFF1DB', fontSize: 12, fontWeight: '900' },
+  greyhoundBend: { padding: 12, borderRadius: 14, backgroundColor: '#35263D', borderWidth: 1, borderColor: '#B992CD' },
+  greyhoundBendTitle: { color: '#E5BFFF', fontSize: 15, fontWeight: '900', marginBottom: 4 },
+  greyhoundBendText: { color: '#F0DEF7', fontSize: 11, lineHeight: 17, fontWeight: '700' },
+  greyhoundBetActive: { backgroundColor: '#51375E', borderColor: '#D5A2ED', borderWidth: 2 },
+  greyhoundCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#2A202F', borderWidth: 1, borderColor: '#614D69' },
+  greyhoundCardActive: { backgroundColor: '#493452', borderColor: '#D1A0E7', borderWidth: 2 },
+  greyhoundVest: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 7, borderWidth: 3, borderColor: '#FFF' },
+  greyhoundName: { color: '#FFF0D9', fontSize: 14, fontWeight: '900' },
+  greyhoundLine: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden', color: '#E7C5F4', backgroundColor: '#51375E', fontSize: 9, fontWeight: '900' },
+  greyhoundStats: { color: '#C5B3C9', fontSize: 9, lineHeight: 14, marginTop: 4 },
+  greyhoundOdds: { color: '#E0AFE9', fontSize: 14, fontWeight: '900', textAlign: 'right' },
+  greyhoundPick: { color: '#E1B7ED', fontSize: 9, fontWeight: '800', textAlign: 'right', marginTop: 3 },
+  greyhoundTicket: { padding: 14, borderRadius: 16, backgroundColor: '#32243A', borderWidth: 2, borderColor: '#A478B8' },
+  greyhoundTicketText: { color: '#F9EFFF', fontSize: 12, lineHeight: 18, fontWeight: '700' },
+  greyhoundResult: { padding: 16, borderRadius: 18, backgroundColor: '#302338', borderWidth: 1, borderColor: '#AD7DC2' },
   sevenPokerTable: { minHeight: 570 },
   highLowResultRow: { width: '100%', flexDirection: 'row', gap: 7 },
   highLowResult: { flex: 1, padding: 10, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.34)', borderWidth: 1, borderColor: '#B8933B' },
