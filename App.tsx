@@ -1992,7 +1992,13 @@ function PredictGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
     onSettle(selectedBet,settled.multiplier,`${group} · ${question.title} · ${pick==='yes'?'예':'아니오'} 선택 · 정답 ${question.result==='yes'?'예':'아니오'}`);
   };
 
-  const label=(item:PredictQuestion,pick:PredictSide)=>pick==='yes'?item.yesLabel:item.noLabel;
+  // kalshi가 예·아니오 설명을 같은 값으로 주는 마켓이 많습니다("Barcelona" / "Barcelona").
+  // 그대로 두면 양쪽에 같은 글자가 붙어 헷갈리므로, 다를 때만 보여 줍니다.
+  const label=(item:PredictQuestion,pick:PredictSide)=>{
+    const yes=(item.yesLabel??'').trim(),no=(item.noLabel??'').trim();
+    if(pick==='yes')return yes||'그렇다';
+    return no&&no!==yes?no:'아니다';
+  };
   const closed=question?question.closeTime.slice(0,10):'';
 
   return <View style={styles.predictScreen}><ScreenHeader title="예측 마켓(Prediction Market)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
