@@ -4415,7 +4415,8 @@ function BlackjackGameScreen(props: {
   const [deck, setDeck] = useState(initial.deck);
   const [player, setPlayer] = useState(initial.player);
   const [dealer, setDealer] = useState(initial.dealer);
-  const [phase, setPhase] = useState<'player' | 'result'>('player');
+  // 'reveal'은 딜러가 뒷장을 뒤집고 17까지 한 장씩 뽑는 동안입니다. 다 열려야 정산합니다.
+  const [phase, setPhase] = useState<'player' | 'reveal' | 'result'>('player');
   const [result, setResult] = useState<RoundResult | null>(null);
   const [totalBet, setTotalBet] = useState(props.bet);
   const [splitHand, setSplitHand] = useState<Card[] | null>(null);
@@ -4425,6 +4426,8 @@ function BlackjackGameScreen(props: {
   const [insuranceOpen, setInsuranceOpen] = useState(initial.dealer[0].rank === 'A');
   const [insuranceMessage, setInsuranceMessage] = useState<string | null>(null);
   const settled = useRef(false);
+  const reveal = useReveal();
+  const [pendingSettle, setPendingSettle] = useState<(() => void) | null>(null);
 
   const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
     const nextResult = resolveRound(nextPlayer, nextDealer);
@@ -4433,11 +4436,13 @@ function BlackjackGameScreen(props: {
     setDeck(nextDeck);
     setResult(nextResult);
     setTotalBet(roundBet);
-    setPhase('result');
-    if (!settled.current) {
+    reveal.reset();
+    setPhase('reveal');
+    setPendingSettle(() => () => {
+      if (settled.current) return;
       settled.current = true;
       props.onSettle(nextResult, roundBet);
-    }
+    });
   };
 
   useEffect(() => {
@@ -4510,12 +4515,14 @@ function BlackjackGameScreen(props: {
     setDealer(dealerResult.hand);
     setDeck(dealerResult.deck);
     setSplitResults(results);
-    setPhase('result');
-    if (!settled.current) {
+    reveal.reset();
+    setPhase('reveal');
+    setPendingSettle(() => () => {
+      if (settled.current) return;
       settled.current = true;
       props.onSettle(results[0], props.bet);
       props.onSettle(results[1], props.bet);
-    }
+    });
   };
 
   const split = () => {
@@ -4543,7 +4550,18 @@ function BlackjackGameScreen(props: {
 
   const net = result ? netForResult(totalBet, result) : 0;
   const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
-  const dealerScore = phase === 'result' ? handValue(dealer) : '?';
+  // 딜러 카드는 앞장 한 장만 보이다가, 뒤집기를 누를 때마다 한 장씩 열립니다.
+  const dealerOpen = phase === 'player' ? 1 : phase === 'reveal' ? Math.min(dealer.length, 1 + reveal.opened) : dealer.length;
+  const dealerLeft = Math.max(0, dealer.length - 1);
+  const openDealerCard = () => {
+    const next = Math.min(dealerLeft, reveal.opened + 1);
+    reveal.open(dealerLeft);
+    if (next < dealerLeft) return;
+    setPhase('result');
+    pendingSettle?.();
+    setPendingSettle(null);
+  };
+  const dealerScore = phase === 'result' ? handValue(dealer) : phase === 'reveal' ? handValue(dealer.slice(0, dealerOpen)) : '?';
 
   return (
     <View style={styles.blackjackTable}>
@@ -4558,7 +4576,7 @@ function BlackjackGameScreen(props: {
           <Text style={styles.scoreBadge}>{dealerScore}</Text>
         </View>
         <View style={styles.cardRow}>
-          {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} hidden={phase === 'player' && index === 1} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
+          {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
         </View>
 
         <View style={styles.tableRule}><Text style={styles.tableRuleText}>딜러는 17 이상에서 멈춥니다</Text></View>
@@ -4597,6 +4615,10 @@ function BlackjackGameScreen(props: {
               {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} />)}
             </View>
           </>
+        )}
+
+        {phase === 'reveal' && (
+          <RevealButton opened={reveal.opened} total={dealerLeft} onPress={openDealerCard} label="딜러 뒷장 뒤집기" />
         )}
 
         {phase === 'player' && !insuranceOpen && (
