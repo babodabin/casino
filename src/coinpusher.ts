@@ -1,88 +1,131 @@
 // 코인 푸셔 — 오락실 동전 밀어내기 기계입니다.
 // 동전을 한 개 넣으면 밀판이 한 번 앞으로 밀고, 앞턱을 넘어간 동전이 내 몫이 됩니다.
-// 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아지는 것이 이 기계의 재미입니다.
 //
-// 자리는 두 방향으로 봅니다. depth는 앞턱까지의 거리(0이 안쪽, 1이 앞턱),
-// lane은 좌우 자리(0이 왼쪽 끝, 1이 오른쪽 끝)입니다.
-// 앞쪽 양옆에는 실제 기계처럼 빠지는 홈이 있어서, 그리로 간 동전은 사라집니다.
-// 이 홈이 이 게임의 하우스 몫입니다.
+// 판은 세로 줄 일곱 개로 나뉘어 있습니다. 넣을 때 **어느 줄에 떨어뜨릴지 고릅니다.**
+// 이게 이 게임의 유일한 판단이고, 두 가지가 걸려 있습니다.
+//
+//   쌓기 — 한 줄에 동전이 많이 모일수록 그 줄이 한 번에 더 많이 밀립니다.
+//          실제 기계에서 뭉쳐 있는 동전이 한꺼번에 쏟아지는 것과 같습니다.
+//   흘림 — 동전은 밀리면서 옆줄로 조금씩 새는데, 바깥 줄에서 더 새면 옆홈으로 빠져 사라집니다.
+//          가장자리는 위험하고 가운데는 안전합니다.
+//
+// depth는 앞턱까지의 거리로 0이 안쪽, 1이 앞턱입니다.
 
 export type PusherKind = '코인' | '금화';
-export type PusherCoin = { id: number; depth: number; lane: number; kind: PusherKind };
+export type PusherCoin = { id: number; column: number; depth: number; kind: PusherKind };
 export type PusherField = { coins: PusherCoin[]; nextId: number };
-export type PusherPush = { field: PusherField; dropped: PusherCoin; won: PusherCoin[]; lost: PusherCoin[]; multiplier: number };
+export type PusherPush = {
+  field: PusherField;
+  dropped: PusherCoin;
+  won: PusherCoin[];
+  lost: PusherCoin[];
+  /** 이번에 각 줄이 얼마나 밀렸는지. 화면에서 밀리는 모습을 그릴 때 씁니다. */
+  advance: number[];
+  multiplier: number;
+};
 
 /** 앞턱을 넘어가면 받습니다. 금화는 여러 배입니다. */
 export const pusherCoinPayout = 1;
 export const pusherGoldPayout = 8;
-// 아래 수치는 여러 조합을 돌려 보고 고른 것입니다. 넣은 동전은 결국 앞턱으로 넘어가거나
-// 옆홈으로 빠지는데, 옆홈으로 빠지는 몫이 이 게임의 하우스 몫입니다.
-// 실제로 재 보면 한 번 넣을 때 앞턱으로 0.92개가 넘어가고 0.08개가 옆홈으로 빠집니다.
-//   30번 넣으면 111.9% · 60번 102.6% · 150번 96.3% · 400번 93.7% · 1500번 92.5%
-// 처음에 깔아 준 동전 때문에 짧게 하면 높고, 오래 할수록 92%로 모입니다.
-// 이 선물이 판을 저장해 두는 이유입니다. 열 때마다 다시 깔면 짧게 하고 나가기를
-// 반복하는 것이 이득이 됩니다.
-// 한 번 넣었을 때 나오는 개수는 없음 28% · 한 개 52% · 두 개 18% · 세 개 1.4%입니다.
-/** 양옆 홈의 폭. 이 바깥으로 밀린 동전은 빠져서 사라집니다. */
-export const pusherLaneMargin = 0.14;
-/** 이 깊이보다 앞쪽에서만 옆으로 빠질 수 있습니다. 안쪽은 벽이 막고 있습니다. */
-export const pusherChuteStart = 0.35;
-/** 밀판이 한 번에 미는 거리. 실제로는 앞뒤로 흔들려서 판마다 조금씩 다릅니다. */
-export const pusherStroke = 0.075;
-export const pusherStrokeJitter = 0.5;
-/** 동전이 서로 부딪히며 좌우로 흔들리는 정도. 이 값이 클수록 옆홈으로 많이 빠집니다. */
-export const pusherLaneJitter = 0.165;
-// 처음 한 번만 깔아 주는 동전입니다. 판을 저장해 두고 이어서 쓰기 때문에
-// 게임을 다시 열어도 다시 깔리지 않습니다. 매번 새로 깔면 짧게 하고 나가는 것이 이득이 됩니다.
-export const pusherStartingCoins = 10;
+export const pusherColumns = 7;
+export const pusherCenterColumn = 3;
+
+// 아래 수치는 여러 조합을 돌려 보고 골랐습니다. 자세한 값은 커밋 메시지에 적어 두었습니다.
+/** 밀판이 미는 거리. 줄에 동전이 없으면 이만큼만, 꽉 차 있으면 아래 배수까지 밀립니다. */
+export const pusherStroke = 0.045;
+export const pusherPackedBoost = 1.9;
+/** 이 개수쯤 모이면 미는 힘이 다 붙습니다. */
+export const pusherPackedAt = 5;
+export const pusherStrokeJitter = 0.45;
+/** 한 번 밀 때 옆줄로 밀려나는 확률. 바깥 벽에 닿으면 튕겨 나오고 판 밖으로 나가지는 않습니다. */
+export const pusherDriftChance = 0.3;
+/** 이 깊이보다 앞쪽은 벽이 끝나 동전이 흔들리고, 바닥 구멍에 빠질 수도 있습니다. */
+export const pusherChuteStart = 0.2;
+/**
+ * 앞쪽 바닥 구멍에 빠질 확률. 어느 줄이든 똑같습니다.
+ * 줄마다 다르게 두면 한 줄이 정답이 되어 고르는 재미가 사라지므로 일부러 고르게 두었습니다.
+ * 이 구멍이 이 게임의 하우스 몫 전부입니다.
+ */
+export const pusherSwallow = 0.0055;
+/** 처음 한 번만 깔아 주는 동전입니다. 판을 저장해 이어 쓰므로 다시 깔리지 않습니다. */
+export const pusherStartingCoins = 12;
 export const pusherStartingGold = 1;
 
 export const pusherPayout = (kind: PusherKind): number => (kind === '금화' ? pusherGoldPayout : pusherCoinPayout);
+export const clampColumn = (column: number): number => Math.max(0, Math.min(pusherColumns - 1, Math.round(column)));
 
-/** 기계에 이미 쌓여 있는 동전. 빈 판에서 시작하면 한참 동안 아무것도 안 나오기 때문입니다. */
 export function createPusherField(random: () => number = Math.random): PusherField {
   const coins: PusherCoin[] = [];
   let nextId = 1;
-  // 앞뒤로 고루 깔아 둡니다. 전부 안쪽에 두면 처음 열 번쯤은 아무것도 안 넘어와서
-  // 기계가 고장 난 것처럼 보입니다. 판을 저장해 이어 쓰므로 이 선물은 평생 한 번뿐입니다.
+  // 앞뒤로 고루 깔아 둡니다. 전부 안쪽에 두면 처음 열 번쯤 아무것도 안 넘어와 고장 난 것처럼 보입니다.
   for (let index = 0; index < pusherStartingCoins; index += 1) {
-    coins.push({ id: nextId++, depth: 0.1 + random() * 0.8, lane: 0.25 + random() * 0.5, kind: '코인' });
+    coins.push({ id: nextId++, column: 1 + Math.floor(random() * (pusherColumns - 2)), depth: 0.1 + random() * 0.8, kind: '코인' });
   }
   for (let index = 0; index < pusherStartingGold; index += 1) {
-    coins.push({ id: nextId++, depth: 0.3 + random() * 0.35, lane: 0.4 + random() * 0.2, kind: '금화' });
+    coins.push({ id: nextId++, column: 2 + Math.floor(random() * 3), depth: 0.3 + random() * 0.35, kind: '금화' });
   }
   return { coins: coins.sort((a, b) => b.depth - a.depth), nextId };
 }
 
-/** 동전 한 개를 넣고 밀판을 한 번 밉니다. */
-export function dropPusherCoin(field: PusherField, random: () => number = Math.random): PusherPush {
-  const dropped: PusherCoin = { id: field.nextId, depth: 0.02 + random() * 0.07, lane: 0.36 + random() * 0.28, kind: '코인' };
-  const moved = [...field.coins, dropped].map((coin) => ({
-    ...coin,
-    depth: coin.depth + pusherStroke * (1 - pusherStrokeJitter / 2 + random() * pusherStrokeJitter),
-    lane: coin.lane + (random() - 0.5) * pusherLaneJitter,
-  }));
+/** 줄마다 이번에 얼마나 밀릴지. 동전이 뭉쳐 있는 줄이 더 많이 밀립니다. */
+export function columnAdvance(field: PusherField, random: () => number = Math.random): number[] {
+  const counts = new Array(pusherColumns).fill(0);
+  for (const coin of field.coins) counts[coin.column] += 1;
+  return counts.map((count) => {
+    const packed = Math.min(1, count / pusherPackedAt);
+    const power = 1 + (pusherPackedBoost - 1) * packed;
+    return pusherStroke * power * (1 - pusherStrokeJitter / 2 + random() * pusherStrokeJitter);
+  });
+}
+
+/**
+ * 동전 한 개를 고른 줄에 넣고 밀판을 한 번 밉니다.
+ * column은 0부터 6까지이고, 범위를 벗어나면 가장 가까운 줄로 맞춥니다.
+ */
+export function dropPusherCoin(field: PusherField, column: number = pusherCenterColumn, random: () => number = Math.random): PusherPush {
+  const target = clampColumn(column);
+  const dropped: PusherCoin = { id: field.nextId, column: target, depth: 0.02 + random() * 0.06, kind: '코인' };
+  const before: PusherField = { coins: [...field.coins, dropped], nextId: field.nextId };
+  const advance = columnAdvance(before, random);
 
   const won: PusherCoin[] = [], lost: PusherCoin[] = [], staying: PusherCoin[] = [];
-  for (const coin of moved) {
-    if (coin.depth >= 1) won.push(coin);
-    else if (coin.depth > pusherChuteStart && (coin.lane < pusherLaneMargin || coin.lane > 1 - pusherLaneMargin)) lost.push(coin);
-    else staying.push(coin);
+  for (const coin of before.coins) {
+    const depth = coin.depth + advance[coin.column];
+    let nextColumn = coin.column;
+    // 앞쪽에서는 벽이 끝나 옆줄로 밀려납니다. 바깥 벽에 닿으면 튕겨 나옵니다.
+    if (depth > pusherChuteStart && random() < pusherDriftChance) nextColumn = clampColumn(nextColumn + (random() < 0.5 ? -1 : 1));
+    // 앞쪽 바닥 구멍. 어느 줄이든 확률이 같습니다.
+    if (depth > pusherChuteStart && random() < pusherSwallow) { lost.push({ ...coin, depth, column: nextColumn }); continue; }
+    if (depth >= 1) { won.push({ ...coin, depth: 1, column: nextColumn }); continue; }
+    staying.push({ ...coin, depth, column: nextColumn });
   }
 
   const multiplier = won.reduce((sum, coin) => sum + pusherPayout(coin.kind), 0);
   return {
     field: { coins: staying.sort((a, b) => b.depth - a.depth), nextId: field.nextId + 1 },
-    dropped, won, lost, multiplier,
+    dropped, won, lost, advance, multiplier,
   };
 }
 
-/** 한 판(여러 번 넣기)을 통째로 돌립니다. 환급률을 재거나 테스트할 때 씁니다. */
-export function runPusherSession(drops: number, random: () => number = Math.random): { paid: number; won: number; lost: number } {
+/** 넣을 줄을 고르는 방식. 환급률을 잴 때 여러 방식을 견줍니다. */
+export type PusherAim = (field: PusherField, random: () => number) => number;
+export const aimCenter: PusherAim = () => pusherCenterColumn;
+export const aimEdge: PusherAim = () => 0;
+export const aimRandom: PusherAim = (_field, random) => Math.floor(random() * pusherColumns);
+/** 앞쪽에 동전이 가장 많이 몰린 줄에 보태는 방식. 사람이 생각할 법한 가장 좋은 수입니다. */
+export const aimFullest: PusherAim = (field) => {
+  const weight = new Array(pusherColumns).fill(0);
+  for (const coin of field.coins) if (coin.depth > 0.45) weight[coin.column] += coin.depth;
+  let best = pusherCenterColumn;
+  for (let column = 0; column < pusherColumns; column += 1) if (weight[column] > weight[best]) best = column;
+  return best;
+};
+
+export function runPusherSession(drops: number, aim: PusherAim = aimCenter, random: () => number = Math.random): { paid: number; won: number; lost: number } {
   let field = createPusherField(random);
   let paid = 0, wonCount = 0, lostCount = 0;
   for (let drop = 0; drop < drops; drop += 1) {
-    const push = dropPusherCoin(field, random);
+    const push = dropPusherCoin(field, aim(field, random), random);
     field = push.field;
     paid += push.multiplier;
     wonCount += push.won.length;

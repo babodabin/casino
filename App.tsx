@@ -81,7 +81,7 @@ import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCatego
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import { arrangeChinesePoker, dealChinesePoker, evaluateChineseArrangement, resolveChinesePoker, type ChineseArrangement, type ChineseResult } from './src/chinesepoker';
 import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
-import { createPusherField, dropPusherCoin, pusherChuteStart, pusherGoldPayout, pusherLaneMargin, type PusherCoin, type PusherField } from './src/coinpusher';
+import { createPusherField, dropPusherCoin, pusherCenterColumn, pusherChuteStart, pusherColumns, pusherGoldPayout, type PusherCoin, type PusherField } from './src/coinpusher';
 import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canBeatBigTwo, chooseBigTwoPlay, classifyBigTwo, legalBigTwoPlays, passBigTwo, playBigTwo, startBigTwo, stepBigTwo, type BigTwoState } from './src/bigtwo';
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
@@ -1960,76 +1960,115 @@ function ChinesePokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
   </ScrollView></View>;
 }
 
+type PusherView={id:number;kind:PusherCoin['kind'];fromDepth:number;fromColumn:number;toDepth:number;toColumn:number;fate:'stay'|'won'|'lost'};
+const pusherFrames=16, pusherFrameMs=28;
+
 function CoinPusherGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
   const [field,setField]=useState<PusherField|null>(null);
-  const [won,setWon]=useState<PusherCoin[]>([]);
-  const [lost,setLost]=useState<PusherCoin[]>([]);
-  const [dropping,setDropping]=useState(false);
+  const [lane,setLane]=useState(pusherCenterColumn);
+  const [view,setView]=useState<PusherView[]>([]);
+  const [progress,setProgress]=useState(1);
+  const [tray,setTray]=useState<PusherCoin[]>([]);
+  const [swallowed,setSwallowed]=useState(0);
   const [history,setHistory]=useState<number[]>([]);
+  const busy=progress<1;
+
+  const showField=(coins:PusherCoin[])=>setView(coins.map((coin)=>({id:coin.id,kind:coin.kind,fromDepth:coin.depth,fromColumn:coin.column,toDepth:coin.depth,toColumn:coin.column,fate:'stay'})));
 
   // 판은 실제 기계처럼 저장해 두고 이어서 씁니다.
   useEffect(()=>{
     let alive=true;
+    const use=(next:PusherField)=>{if(!alive)return;setField(next);showField(next.coins);};
     AsyncStorage.getItem(STORAGE_KEYS.pusherField).then((raw)=>{
-      if(!alive)return;
       if(raw){
         try{
           const parsed=JSON.parse(raw);
-          if(parsed&&Array.isArray(parsed.coins)&&typeof parsed.nextId==='number'){setField(parsed);return;}
+          if(parsed&&Array.isArray(parsed.coins)&&typeof parsed.nextId==='number'&&parsed.coins.every((c:PusherCoin)=>typeof c.column==='number')){use(parsed);return;}
         }catch{}
       }
-      setField(createPusherField());
-    }).catch(()=>{if(alive)setField(createPusherField());});
+      use(createPusherField());
+    }).catch(()=>use(createPusherField()));
     return()=>{alive=false;};
   },[]);
 
+  // 밀리는 동안 한 칸씩 그림을 옮깁니다.
+  useEffect(()=>{
+    if(progress>=1)return;
+    const timer=setTimeout(()=>setProgress((current)=>Math.min(1,current+1/pusherFrames)),pusherFrameMs);
+    return()=>clearTimeout(timer);
+  },[progress]);
+
   const drop=()=>{
-    if(!field||dropping||selectedBet>coins)return;
+    if(!field||busy||selectedBet>coins)return;
     if(!onPlaceBet(selectedBet))return;
-    setDropping(true);
-    const push=dropPusherCoin(field);
-    setField(push.field);setWon(push.won);setLost(push.lost);
+    const push=dropPusherCoin(field,lane);
+    const previous=new Map(field.coins.map((coin)=>[coin.id,coin]));
+    previous.set(push.dropped.id,{...push.dropped,depth:-0.06});   // 위에서 떨어지는 것처럼 보이게 합니다
+    const make=(coin:PusherCoin,fate:PusherView['fate'],toDepth:number):PusherView=>{
+      const start=previous.get(coin.id)??coin;
+      return {id:coin.id,kind:coin.kind,fromDepth:start.depth,fromColumn:start.column,toDepth,toColumn:coin.column,fate};
+    };
+    setView([
+      ...push.field.coins.map((coin)=>make(coin,'stay',coin.depth)),
+      ...push.won.map((coin)=>make(coin,'won',1.14)),
+      ...push.lost.map((coin)=>make(coin,'lost',coin.depth)),
+    ]);
+    setProgress(0);
+    setField(push.field);
+    setTray(push.won);
+    setSwallowed(push.lost.length);
     setHistory((current)=>[push.won.length,...current].slice(0,10));
     AsyncStorage.setItem(STORAGE_KEYS.pusherField,JSON.stringify(push.field)).catch(()=>{});
-    const goldCount=push.won.filter((coin)=>coin.kind==='금화').length;
-    const detail=push.won.length===0?`밀렸지만 넘어온 것 없음 · 판에 ${push.field.coins.length}개`
-      :`${push.won.length}개 획득${goldCount?` (금화 ${goldCount})`:''} · 판에 ${push.field.coins.length}개`;
+    const gold=push.won.filter((coin)=>coin.kind==='금화').length;
+    const detail=push.won.length===0?`${lane+1}번 줄에 넣음 · 넘어온 것 없음 · 판에 ${push.field.coins.length}개`
+      :`${lane+1}번 줄에 넣어 ${push.won.length}개 획득${gold?` (금화 ${gold})`:''} · 판에 ${push.field.coins.length}개`;
     onSettle(selectedBet,push.multiplier,detail);
-    setTimeout(()=>setDropping(false),320);
   };
 
-  const payoutText=won.length===0?'':`${won.length}개 · ${won.reduce((sum,coin)=>sum+(coin.kind==='금화'?pusherGoldPayout:1),0)}배`;
+  const eased=progress<1?1-(1-progress)*(1-progress):1;   // 밀판이 처음에 빠르고 끝에서 느려집니다
+  const gained=tray.reduce((sum,coin)=>sum+(coin.kind==='금화'?pusherGoldPayout:1),0);
+
   return <View style={styles.pusherScreen}><ScreenHeader title="코인 푸셔(Coin Pusher)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>COIN PUSHER · 금화 {pusherGoldPayout}배</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{field?`판에 ${field.coins.length}개`:'기계 여는 중'}</Text></View></View>
 
+    <Text style={styles.sectionTitle}>넣을 줄 고르기</Text>
+    <View style={styles.pusherLaneRow}>{Array.from({length:pusherColumns},(_,column)=><Pressable key={column} disabled={busy} onPress={()=>setLane(column)} style={[styles.pusherLane,lane===column&&styles.pusherLaneActive]}>
+      <Text style={[styles.pusherLaneText,lane===column&&styles.pusherLaneTextActive]}>{column+1}</Text>
+    </Pressable>)}</View>
+
     <View style={styles.pusherCabinet}>
-      <View style={styles.pusherPlate}><Text style={styles.pusherPlateText}>밀판</Text></View>
+      <View style={[styles.pusherPlate,busy&&{transform:[{translateY:Math.sin(eased*Math.PI)*7}]}]}><Text style={styles.pusherPlateText}>밀판</Text></View>
       <View style={styles.pusherBed}>
-        <View style={[styles.pusherChute,{left:0,width:`${pusherLaneMargin*100}%`,top:`${pusherChuteStart*100}%`}]}/>
-        <View style={[styles.pusherChute,{right:0,width:`${pusherLaneMargin*100}%`,top:`${pusherChuteStart*100}%`}]}/>
-        {field?.coins.map((coin)=><View key={coin.id} style={[styles.pusherCoin,coin.kind==='금화'&&styles.pusherGold,{top:`${coin.depth*100}%`,left:`${coin.lane*100}%`}]}>
-          {coin.kind==='금화'&&<Text style={styles.pusherGoldMark}>金</Text>}
-        </View>)}
-        {lost.map((coin)=><View key={`lost-${coin.id}`} style={[styles.pusherCoin,styles.pusherCoinLost,{top:'92%',left:`${coin.lane<0.5?pusherLaneMargin/2*100:(1-pusherLaneMargin/2)*100}%`}]}/>)}
+        <View style={[styles.pusherWallEnd,{top:`${pusherChuteStart*100}%`}]}/>
+        <View style={[styles.pusherAimLine,{left:`${(lane+0.5)/pusherColumns*100}%`}]}/>
+        {view.map((item)=>{
+          const depth=item.fromDepth+(item.toDepth-item.fromDepth)*eased;
+          const column=item.fromColumn+(item.toColumn-item.fromColumn)*eased;
+          const opacity=item.fate==='lost'?1-eased:1;
+          return <View key={item.id} style={[styles.pusherCoin,item.kind==='금화'&&styles.pusherGold,{top:`${depth*100}%`,left:`${(column+0.5)/pusherColumns*100}%`,opacity}]}>
+            {item.kind==='금화'&&<Text style={styles.pusherGoldMark}>金</Text>}
+          </View>;
+        })}
       </View>
       <View style={styles.pusherLip}><Text style={styles.pusherLipText}>앞턱</Text></View>
       <View style={styles.pusherTray}>
-        {won.length>0?won.map((coin)=><View key={`won-${coin.id}`} style={[styles.pusherCoin,styles.pusherCoinTray,coin.kind==='금화'&&styles.pusherGold]}>{coin.kind==='금화'&&<Text style={styles.pusherGoldMark}>金</Text>}</View>)
+        {tray.length>0?tray.map((coin)=><View key={`tray-${coin.id}`} style={[styles.pusherCoin,styles.pusherCoinTray,coin.kind==='금화'&&styles.pusherGold]}>{coin.kind==='금화'&&<Text style={styles.pusherGoldMark}>金</Text>}</View>)
           :<Text style={styles.pusherTrayEmpty}>{field?'받침대가 비었습니다':''}</Text>}
       </View>
     </View>
 
-    {payoutText?<Text style={styles.pusherPayout}>{payoutText} · {Math.round(selectedBet*won.reduce((sum,coin)=>sum+(coin.kind==='금화'?pusherGoldPayout:1),0)).toLocaleString()} WC</Text>
-      :<Text style={styles.tujeonAdvice}>{lost.length>0?`${lost.length}개가 옆홈으로 빠졌습니다`:'동전을 넣으면 밀판이 한 번 밉니다'}</Text>}
+    {tray.length>0?<Text style={styles.pusherPayout}>{tray.length}개 · {Math.round(selectedBet*gained).toLocaleString()} WC</Text>
+      :<Text style={styles.tujeonAdvice}>{swallowed>0?`${swallowed}개가 앞쪽 구멍에 빠졌습니다`:'줄을 고르고 동전을 넣으세요'}</Text>}
 
     {history.length>0&&<View style={styles.yutHistory}><Text style={styles.slotRulesTitle}>최근 나온 개수</Text><View style={styles.yutHistoryRow}>{history.map((count,index)=><Text key={index} style={[styles.yutHistoryChip,count>=2&&styles.yutHistoryChipRare]}>{count}</Text>)}</View></View>}
 
-    <Pressable disabled={!field||dropping||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(!field||dropping||selectedBet>coins)&&styles.disabledCard]} onPress={drop}>
-      <Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${selectedBet.toLocaleString()} WC 넣기`}</Text>
+    <Pressable disabled={!field||busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(!field||busy||selectedBet>coins)&&styles.disabledCard]} onPress={drop}>
+      <Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${lane+1}번 줄에 ${selectedBet.toLocaleString()} WC 넣기`}</Text>
     </Pressable>
-    <View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>앞턱을 넘어간 동전 하나가 베팅금 1배입니다.</Text><Text style={styles.slotRuleText}>금화는 {pusherGoldPayout}배로 쳐줍니다.</Text><Text style={styles.slotRuleText}>앞쪽 양옆 홈으로 빠진 동전은 사라집니다.</Text><Text style={styles.slotRuleText}>판은 그대로 남아 다음에 이어서 합니다.</Text></View>
+    <View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>앞턱을 넘어간 동전 하나가 베팅금 1배, 금화는 {pusherGoldPayout}배입니다.</Text><Text style={styles.slotRuleText}>동전이 뭉친 줄일수록 한 번에 더 많이 밀립니다.</Text><Text style={styles.slotRuleText}>앞쪽 바닥 구멍은 어느 줄이든 똑같이 뚫려 있어, 어디에 넣어도 기댓값은 같습니다.</Text><Text style={styles.slotRuleText}>판은 그대로 남아 다음에 이어서 합니다.</Text></View>
   </ScrollView></View>;
 }
+
 
 const bigTwoPlayers=4;
 const bigTwoSeatName=(index:number)=>index===0?'나':`컴퓨터 ${index}`;
@@ -5295,7 +5334,14 @@ const styles = StyleSheet.create({
   pusherPlate: { height: 22, backgroundColor: '#28324A', alignItems: 'center', justifyContent: 'center' },
   pusherPlateText: { color: '#8E9AAC', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
   pusherBed: { height: 250, backgroundColor: '#152033', position: 'relative', overflow: 'hidden' },
-  pusherChute: { position: 'absolute', bottom: 0, backgroundColor: '#0A0E16', borderTopWidth: 1, borderColor: '#2A3346' },
+  // 벽이 끝나는 자리. 이 앞부터 동전이 옆으로 밀리고 바닥 구멍에 빠질 수 있습니다.
+  pusherWallEnd: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#2A3346' },
+  pusherAimLine: { position: 'absolute', top: 0, bottom: 0, width: 2, marginLeft: -1, backgroundColor: 'rgba(209,166,60,0.28)' },
+  pusherLaneRow: { width: '100%', flexDirection: 'row', gap: 5 },
+  pusherLane: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  pusherLaneActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.8)' },
+  pusherLaneText: { color: '#8E9AAC', fontSize: 13, fontWeight: '800' },
+  pusherLaneTextActive: { color: colors.gold },
   pusherCoin: { position: 'absolute', width: 17, height: 17, marginLeft: -9, marginTop: -9, borderRadius: 9, backgroundColor: '#C9CFD8', borderWidth: 1, borderColor: '#8E97A5', alignItems: 'center', justifyContent: 'center' },
   pusherGold: { backgroundColor: colors.gold, borderColor: '#8A6414' },
   pusherGoldMark: { color: '#3A2C08', fontSize: 9, fontWeight: '900' },
