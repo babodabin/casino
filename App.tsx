@@ -178,7 +178,7 @@ const gameCategories: GameCategory[] = [
     { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
     { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
     { name: '경정', icon: '艇', description: '6대 보트의 스타트와 1마크 선회를 예측', status: 'playable' },
-    { name: '코인 푸셔', icon: '◉', description: '동전을 넣어 밀어내는 오락실 기계', status: 'playable' },
+    { name: '그레이하운드', icon: '犬', description: '6마리의 출발과 첫 코너, 막판 질주를 예측', status: 'playable' },
     { name: '피시 레이스', icon: '魚', description: '여섯 물고기의 수중 장애물 경주 우승자를 예측', status: 'playable' },
     { name: '행운의 물고기', icon: '🐠', description: '갈림길을 헤엄친 물고기가 들어갈 동굴을 예측', status: 'playable' },
   ]},
