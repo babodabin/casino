@@ -18,8 +18,10 @@ export const pusherGoldPayout = 8;
 // 아래 수치는 여러 조합을 돌려 보고 고른 것입니다. 넣은 동전은 결국 앞턱으로 넘어가거나
 // 옆홈으로 빠지는데, 옆홈으로 빠지는 몫이 이 게임의 하우스 몫입니다.
 // 실제로 재 보면 한 번 넣을 때 앞턱으로 0.92개가 넘어가고 0.08개가 옆홈으로 빠집니다.
-//   60번 넣으면 100.7% · 150번 95.3% · 400번 94.1% · 1500번 92.4%
+//   30번 넣으면 111.9% · 60번 102.6% · 150번 96.3% · 400번 93.7% · 1500번 92.5%
 // 처음에 깔아 준 동전 때문에 짧게 하면 높고, 오래 할수록 92%로 모입니다.
+// 이 선물이 판을 저장해 두는 이유입니다. 열 때마다 다시 깔면 짧게 하고 나가기를
+// 반복하는 것이 이득이 됩니다.
 // 한 번 넣었을 때 나오는 개수는 없음 28% · 한 개 52% · 두 개 18% · 세 개 1.4%입니다.
 /** 양옆 홈의 폭. 이 바깥으로 밀린 동전은 빠져서 사라집니다. */
 export const pusherLaneMargin = 0.14;
@@ -41,11 +43,13 @@ export const pusherPayout = (kind: PusherKind): number => (kind === '금화' ? p
 export function createPusherField(random: () => number = Math.random): PusherField {
   const coins: PusherCoin[] = [];
   let nextId = 1;
+  // 앞뒤로 고루 깔아 둡니다. 전부 안쪽에 두면 처음 열 번쯤은 아무것도 안 넘어와서
+  // 기계가 고장 난 것처럼 보입니다. 판을 저장해 이어 쓰므로 이 선물은 평생 한 번뿐입니다.
   for (let index = 0; index < pusherStartingCoins; index += 1) {
-    coins.push({ id: nextId++, depth: 0.05 + random() * 0.35, lane: 0.25 + random() * 0.5, kind: '코인' });
+    coins.push({ id: nextId++, depth: 0.1 + random() * 0.8, lane: 0.25 + random() * 0.5, kind: '코인' });
   }
   for (let index = 0; index < pusherStartingGold; index += 1) {
-    coins.push({ id: nextId++, depth: 0.05 + random() * 0.21, lane: 0.4 + random() * 0.2, kind: '금화' });
+    coins.push({ id: nextId++, depth: 0.3 + random() * 0.35, lane: 0.4 + random() * 0.2, kind: '금화' });
   }
   return { coins: coins.sort((a, b) => b.depth - a.depth), nextId };
 }
