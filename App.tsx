@@ -2022,11 +2022,14 @@ function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
         return <View key={id} style={styles.jokerCard}><Text style={styles.jokerName}>{joker?.name??id}</Text><Text style={styles.jokerEffect}>{joker?.text??''}</Text></View>;
       })}</View>
 
-      <Text style={styles.sectionTitle}>{done?'낸 패':`내 패 — ${picked.length}/5장 선택`}</Text>
-      <View style={styles.chineseHandRow}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+      <View style={styles.feltTable}><View style={styles.feltSurface}>
+        <View style={styles.feltGlow} pointerEvents="none"/>
+        <Text style={styles.feltLabel}>{done?'낸 패':`내 패 — ${picked.length}/5장 선택`}</Text>
+        <View style={styles.chineseHandRow}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+        <Text style={styles.jokerPreview}>{preview?`${preview.hand.type} · 칩 ${preview.chips} × 배수 ${preview.mult} = ${preview.score.toLocaleString()}점`:done?'':'낼 카드를 고르세요'}</Text>
+      </View></View>
 
       {!done?<>
-        <Text style={styles.jokerPreview}>{preview?`${preview.hand.type} · 칩 ${preview.chips} × 배수 ${preview.mult} = ${preview.score.toLocaleString()}점`:'낼 카드를 고르세요'}</Text>
         <View style={styles.pokerActionRow}>
           <Pressable style={styles.secondaryButton} onPress={suggest}><Text style={styles.secondaryButtonText}>골라주기</Text></Pressable>
           <Pressable disabled={chosen.length===0||round.discardsLeft<=0} style={[styles.secondaryButton,(chosen.length===0||round.discardsLeft<=0)&&styles.disabledCard]} onPress={discard}><Text style={styles.secondaryButtonText}>버리기</Text></Pressable>
@@ -5484,6 +5487,14 @@ const styles = StyleSheet.create({
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
   chineseHandRow: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
+  // 화려한 실내 사진은 입구에만 두고, 게임 화면에는 재질만 가져옵니다.
+  // 판 바깥(잔액·버튼·규칙)은 어둡게 두어야 눈이 판으로 갑니다.
+  feltTable: { width: '100%', padding: 7, borderRadius: 22, backgroundColor: '#4A3122', borderWidth: 1, borderColor: '#6B4A2E' },
+  feltSurface: { borderRadius: 16, backgroundColor: '#17553C', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
+  // 테이블 위에 조명이 떨어진 것처럼 가운데를 살짝 밝힙니다.
+  feltGlow: { position: 'absolute', top: '-45%', left: '8%', right: '8%', height: '110%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.055)' },
+  feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
   jokerScreen: { flex: 1, backgroundColor: '#0B0F17' },
   jokerScoreRow: { width: '100%', flexDirection: 'row', gap: 8 },
   jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
@@ -5495,7 +5506,8 @@ const styles = StyleSheet.create({
   jokerCard: { flex: 1, gap: 3, padding: 9, borderRadius: 11, backgroundColor: 'rgba(42,34,14,0.6)', borderWidth: 1, borderColor: colors.gold },
   jokerName: { color: colors.gold, fontSize: 13, fontWeight: '900' },
   jokerEffect: { color: '#C3CBD8', fontSize: 10, fontWeight: '700', lineHeight: 14 },
-  jokerPreview: { color: colors.gold, fontSize: 15, fontWeight: '900' },
+  // 펠트 위에 올라가는 글자라 금색을 조금 밝게 씁니다.
+  jokerPreview: { color: '#F2D98B', fontSize: 15, fontWeight: '900' },
   predictScreen: { flex: 1, backgroundColor: '#0B0F17' },
   predictTabs: { width: '100%', flexDirection: 'row', gap: 8 },
   predictTab: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
