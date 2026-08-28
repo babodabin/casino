@@ -79,6 +79,10 @@ import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
 import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCategoryLabels, yahtzeePayoutMultiplier, yahtzeeTotal, yahtzeeUpperBonus, yahtzeeUpperSubtotal, type YahtzeeCategory, type YahtzeeDie, type YahtzeeScoreCard } from './src/yahtzee';
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
+import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
+import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
+import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
+import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
 import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
 import { createHorseField, horseBetLabels, horseTicketOdds, requiredHorseSelections, settleHorseTicket, simulateHorseRace, type Horse, type HorseBetType, type HorseRaceResult, type HorseTicket } from './src/horseracing';
@@ -1833,6 +1837,208 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
     {!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
     <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
+  </ScrollView></View>;
+}
+
+
+const shellCupColors=['#B4552F','#2F6D8C','#6A4E8F'];
+const fishName=(field:RaceFish[],id:number)=>{const fish=field.find(item=>item.id===id);return fish?`${fish.id}. ${fish.name}`:`${id}번`;};
+
+function YutStickView({face,tumbling}:{face:YutFace;tumbling:boolean}){
+  return <View style={[styles.yutStick,face==='배'?styles.yutStickFlat:styles.yutStickRound,tumbling&&styles.yutStickTumbling]}>
+    {face==='배'&&<View style={styles.yutStickMark}/>}
+    <Text style={[styles.yutStickFaceText,face==='배'?styles.yutStickFaceFlatText:styles.yutStickFaceRoundText]}>{face}</Text>
+  </View>;
+}
+
+function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [choice,setChoice]=useState<YutOutcome>('개');
+  const [sticks,setSticks]=useState<YutFace[]>(['등','등','등','등']);
+  const [outcome,setOutcome]=useState<YutOutcome|null>(null);
+  const [throwing,setThrowing]=useState(false);
+  const [history,setHistory]=useState<YutOutcome[]>([]);
+  useEffect(()=>{
+    if(!throwing)return;
+    const spin=setInterval(()=>setSticks(throwYutSticks()),90);
+    const stop=setTimeout(()=>{
+      clearInterval(spin);
+      const result=throwYut();
+      setSticks(result.sticks);setOutcome(result.outcome);setThrowing(false);
+      setHistory(current=>[result.outcome,...current].slice(0,12));
+      onSettle(selectedBet,yutMultiplier(choice,result.outcome),`${choice}에 베팅 · ${result.outcome}(배 ${result.sticks.filter(face=>face==='배').length}개)`);
+    },1000);
+    return()=>{clearInterval(spin);clearTimeout(stop);};
+  },[throwing]);
+  const start=()=>{if(throwing||selectedBet>coins)return;if(!onPlaceBet(selectedBet))return;setOutcome(null);setThrowing(true);};
+  const won=outcome!==null&&outcome===choice;
+  return <View style={styles.yutScreen}><ScreenHeader title="윷 베팅" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>YUT · 도 개 걸 윷 모</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{throwing?'윷을 던지는 중':outcome?`결과 ${outcome}`:'결과를 고르세요'}</Text></View></View>
+    <View style={styles.yutMat}>
+      <View style={styles.yutStickRow}>{sticks.map((face,index)=><YutStickView key={index} face={face} tumbling={throwing}/>)}</View>
+      <Text style={[styles.yutOutcomeText,won&&styles.yutOutcomeWin]}>{throwing?'…':outcome??'준비'}</Text>
+      <Text style={styles.yutOutcomeDetail}>{throwing?'윷가락이 구르는 중입니다':outcome?`배 ${sticks.filter(face=>face==='배').length}개 · ${won?`${yutPayout[choice]}배 적중`:'미적중'}`:'배가 위로 오는 개수로 결과가 정해집니다'}</Text>
+    </View>
+    <Text style={styles.sectionTitle}>결과 선택</Text>
+    <View style={styles.yutChoiceGrid}>{yutOutcomes.map(item=><Pressable key={item} disabled={throwing} onPress={()=>setChoice(item)} style={[styles.yutChoice,choice===item&&styles.yutChoiceActive,outcome===item&&styles.yutChoiceHit]}>
+      <Text style={styles.yutChoiceName}>{item}</Text>
+      <Text style={styles.yutChoiceDetail}>{yutDescription[item]}</Text>
+      <Text style={styles.yutChoiceOdds}>{yutPayout[item]}배</Text>
+      <Text style={styles.yutChoiceChance}>{(yutProbability[item]*100).toFixed(1)}%</Text>
+    </Pressable>)}</View>
+    {history.length>0&&<View style={styles.yutHistory}><Text style={styles.slotRulesTitle}>최근 결과</Text><View style={styles.yutHistoryRow}>{history.map((item,index)=><Text key={index} style={[styles.yutHistoryChip,(item==='윷'||item==='모')&&styles.yutHistoryChipRare]}>{item}</Text>)}</View></View>}
+    <Pressable disabled={throwing||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(throwing||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${choice}에 ${selectedBet.toLocaleString()} WC 던지기`}</Text></Pressable>
+  </ScrollView></View>;
+}
+
+function ShellGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [round,setRound]=useState<ShellRound|null>(null);
+  const [phase,setPhase]=useState<'ready'|'peek'|'shuffle'|'pick'|'done'>('ready');
+  const [step,setStep]=useState(0);
+  const [choice,setChoice]=useState<number|null>(null);
+  const roundRef=useRef<ShellRound|null>(null);
+  useEffect(()=>{
+    if(phase!=='peek')return;
+    const timer=setTimeout(()=>{setStep(0);setPhase('shuffle');},1400);
+    return()=>clearTimeout(timer);
+  },[phase]);
+  useEffect(()=>{
+    if(phase!=='shuffle'||!roundRef.current)return;
+    const total=roundRef.current.swaps.length;
+    if(step>=total){const timer=setTimeout(()=>setPhase('pick'),350);return()=>clearTimeout(timer);}
+    const timer=setTimeout(()=>setStep(current=>current+1),330);
+    return()=>clearTimeout(timer);
+  },[phase,step]);
+  const start=()=>{if(selectedBet>coins||!onPlaceBet(selectedBet))return;const next=createShellRound(8);roundRef.current=next;setRound(next);setChoice(null);setStep(0);setPhase('peek');};
+  const pick=(position:number)=>{
+    if(phase!=='pick'||!round)return;
+    setChoice(position);setPhase('done');
+    onSettle(selectedBet,shellMultiplier(position,round),`${position+1}번 자리 선택 · 공은 ${round.final+1}번`);
+  };
+  const layout=round?shellLayoutAfter(round,phase==='ready'||phase==='peek'?0:step):[0,1,2];
+  const ballPosition=round?(phase==='ready'||phase==='peek'?round.start:round.final):-1;
+  const showBall=phase==='peek'||phase==='done';
+  const won=phase==='done'&&choice===round?.final;
+  return <View style={styles.shellScreen}><ScreenHeader title="공 어디에?" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>SHELL GAME · 3 CUPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='ready'?'대기 중':phase==='peek'?'공 위치 공개':phase==='shuffle'?`섞는 중 ${step}/${round?.swaps.length??0}`:phase==='pick'?'컵을 고르세요':won?'적중':'미적중'}</Text></View></View>
+    <View style={styles.shellTable}>
+      <View style={styles.shellCupRow}>{[0,1,2].map(position=>{
+        const cup=layout[position],hasBall=showBall&&ballPosition===position;
+        return <Pressable key={position} disabled={phase!=='pick'} onPress={()=>pick(position)} style={[styles.shellCupSlot,phase==='pick'&&styles.shellCupSlotPickable,choice===position&&styles.shellCupSlotChosen]}>
+          <View style={[styles.shellCup,{backgroundColor:shellCupColors[cup]},hasBall&&styles.shellCupLifted]}><Text style={styles.shellCupLabel}>{position+1}</Text></View>
+          <View style={styles.shellBallSlot}>{hasBall?<View style={styles.shellBall}/>:<View style={styles.shellBallShadow}/>}</View>
+        </Pressable>;
+      })}</View>
+      <Text style={styles.shellHint}>{phase==='ready'?'게임을 시작하면 공이 든 컵을 먼저 보여줍니다':phase==='peek'?'이 컵에 공이 들어 있습니다':phase==='shuffle'?'컵의 움직임을 끝까지 따라가세요':phase==='pick'?'공이 들어 있다고 생각하는 컵을 누르세요':won?`${shellPayout}배 적중! ${(selectedBet*shellPayout).toLocaleString()} WC`:`공은 ${(round?.final??0)+1}번 자리에 있었습니다`}</Text>
+    </View>
+    <View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>컵 세 개가 여덟 번 자리를 바꿉니다.</Text><Text style={styles.slotRuleText}>맞히면 베팅금의 {shellPayout}배를 돌려받습니다.</Text><Text style={styles.slotRuleText}>운이 아니라 눈으로 따라가면 맞출 수 있습니다.</Text></View>
+    {(phase==='ready'||phase==='done')&&<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${selectedBet.toLocaleString()} WC 걸고 시작`}</Text></Pressable>}
+  </ScrollView></View>;
+}
+
+function FishRaceGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [field,setField]=useState<RaceFish[]>(()=>createFishField());
+  const [selection,setSelection]=useState<number|null>(null);
+  const [phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting');
+  const [race,setRace]=useState<FishRaceResult|null>(null);
+  const [progress,setProgress]=useState(0);
+  const [ticket,setTicket]=useState<FishTicket|null>(null);
+  const settledRef=useRef(false);
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.022)),70);return()=>clearInterval(timer);},[phase]);
+  useEffect(()=>{
+    if(phase!=='racing'||progress<1||!race||!ticket||settledRef.current)return;
+    settledRef.current=true;setPhase('finished');
+    const won=ticket.selection===race.order[0];
+    onSettle(ticket.stake,won?ticket.odds:0,`${fishName(field,ticket.selection)} 선택 · 우승 ${fishName(field,race.order[0])}`);
+  },[phase,progress,race,ticket]);
+  const start=()=>{
+    if(!selection||selectedBet>coins||!onPlaceBet(selectedBet))return;
+    const odds=field.find(fish=>fish.id===selection)?.odds??0;
+    settledRef.current=false;setTicket({selection,stake:selectedBet,odds});setRace(simulateFishRace(field));setProgress(0);setPhase('racing');
+  };
+  const reset=()=>{setField(createFishField());setSelection(null);setRace(null);setTicket(null);setProgress(0);settledRef.current=false;setPhase('betting');};
+  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  const shownLap=Math.min(fishRaceLaps,Math.max(1,Math.ceil(progress*fishRaceLaps)));
+  const lapEvents=race?race.events.filter(event=>event.lap===shownLap):[];
+  return <View style={styles.fishScreen}><ScreenHeader title="피시 레이스" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CORAL SPRINT · 6 LANES</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'베팅 접수 중':phase==='racing'?`${shownLap}구간 통과`:'경기 종료'}</Text></View></View>
+    <View style={styles.fishTank}>{field.map(fish=>{
+      const laneProgress=race?Math.min(1,progress*maxTime/race.times[fish.id]):0;
+      const place=race?race.order.indexOf(fish.id):-1;
+      const isMine=(ticket?.selection??selection)===fish.id;
+      return <View key={fish.id} style={[styles.fishLane,isMine&&styles.racingChosenLane]}>
+        <View style={[styles.fishBadge,{backgroundColor:fish.color}]}><Text style={styles.fishBadgeText}>{fish.id}</Text></View>
+        <View style={styles.fishCourse}>
+          <View style={styles.fishWeeds}><Text style={styles.fishWeedText}>🌿</Text><Text style={styles.fishWeedText}>🫧</Text><Text style={styles.fishWeedText}>🪨</Text></View>
+          <View style={[styles.fishSwim,{width:`${Math.max(7,laneProgress*88)}%`}]}><Text style={styles.fishRunner}>{fish.emoji}</Text>{isMine&&<Text style={styles.racingTrackPick}>내 선택</Text>}</View>
+          <View style={styles.fishFinish}/>
+        </View>
+        {phase==='finished'&&<Text style={styles.fishPlace}>{place+1}위</Text>}
+      </View>;
+    })}</View>
+    {phase==='racing'&&lapEvents.length>0&&<View style={styles.fishEventPanel}><Text style={styles.fishEventTitle}>{shownLap}구간 상황</Text>{lapEvents.slice(0,3).map((event,index)=><Text key={index} style={styles.fishEventText}>{fishName(field,event.fish)} · {fishEventText[event.kind]}</Text>)}</View>}
+    {phase==='betting'?<>
+      <RacingPickBanner label={selection?`${fishName(field,selection)} · ${selectedBet.toLocaleString()} WC`:'아래에서 우승 물고기를 고르세요'} disabled={!selection||selectedBet>coins} onStart={start} startLabel="출발 신호"/>
+      <Text style={styles.sectionTitle}>우승 물고기 선택</Text>
+      <View style={styles.horseCards}>{field.map(fish=><Pressable key={fish.id} onPress={()=>setSelection(fish.id)} style={[styles.fishCard,selection===fish.id&&styles.fishCardActive]}>
+        <View style={[styles.fishCardBadge,{backgroundColor:fish.color}]}><Text style={styles.fishCardEmoji}>{fish.emoji}</Text></View>
+        <View style={styles.horseInfo}><Text style={styles.fishName}>{fish.id}. {fish.name}</Text><Text style={styles.fishStats}>속도 {fish.speed} · 민첩 {fish.agility} · 뒷심 {fish.stamina}</Text></View>
+        <View><Text style={styles.fishOdds}>{fish.odds.toFixed(1)}배</Text>{selection===fish.id&&<Text style={styles.racingSelectedTag}>내 선택</Text>}</View>
+      </Pressable>)}</View>
+      <View style={styles.carTicket}><Text style={styles.horseTicketTitle}>우승 예측 티켓</Text><Text style={styles.carTicketText}>{selection?`${fishName(field,selection)} · ${selectedBet.toLocaleString()} WC`:'물고기 한 마리를 선택하세요'}</Text>{selection&&<Text style={styles.horseExpected}>적중 시 {Math.round(selectedBet*(field.find(fish=>fish.id===selection)?.odds??0)).toLocaleString()} WC</Text>}</View>
+    </>:<View style={styles.carTicket}>
+      <Text style={styles.horseTicketTitle}>{phase==='racing'?'수중 장애물 구간을 통과하는 중입니다':'피시 레이스 결과'}</Text>
+      {phase==='finished'&&race&&ticket&&<>
+        <Text style={styles.horsePodium}>🥇 {fishName(field,race.order[0])}　🥈 {fishName(field,race.order[1])}　🥉 {fishName(field,race.order[2])}</Text>
+        <Text style={styles.horseExpected}>{ticket.selection===race.order[0]?`${Math.round(ticket.stake*ticket.odds).toLocaleString()} WC 적중!`:`${fishName(field,ticket.selection)} 미적중`}</Text>
+        <Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable>
+      </>}
+    </View>}
+  </ScrollView></View>;
+}
+
+function LuckyFishGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [choice,setChoice]=useState<number|null>(null);
+  const [path,setPath]=useState<LuckyFishPath|null>(null);
+  const [step,setStep]=useState(0);
+  const [phase,setPhase]=useState<'betting'|'swimming'|'finished'>('betting');
+  const pathRef=useRef<LuckyFishPath|null>(null);
+  const choiceRef=useRef<number|null>(null);
+  useEffect(()=>{
+    if(phase!=='swimming'||!pathRef.current)return;
+    if(step>=luckyFishForks){
+      const current=pathRef.current,picked=choiceRef.current;
+      const timer=setTimeout(()=>{
+        setPhase('finished');
+        if(picked!==null)onSettle(selectedBet,luckyFishMultiplier(picked,current),`${luckyFishCaves[picked].name} 선택 · 도착 ${luckyFishCaves[current.cave].name}`);
+      },500);
+      return()=>clearTimeout(timer);
+    }
+    const timer=setTimeout(()=>setStep(value=>value+1),520);
+    return()=>clearTimeout(timer);
+  },[phase,step]);
+  const start=()=>{
+    if(choice===null||selectedBet>coins||!onPlaceBet(selectedBet))return;
+    const next=swimLuckyFish();pathRef.current=next;choiceRef.current=choice;setPath(next);setStep(0);setPhase('swimming');
+  };
+  const reset=()=>{setPath(null);pathRef.current=null;setStep(0);setChoice(null);choiceRef.current=null;setPhase('betting');};
+  const offset=path?luckyFishOffset(path,step):.5;
+  const won=phase==='finished'&&path!==null&&choice===path.cave;
+  return <View style={styles.luckyFishScreen}><ScreenHeader title="행운의 물고기" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>LUCKY FISH · 6 CAVES</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'동굴을 고르세요':phase==='swimming'?`갈림길 ${Math.min(step+1,luckyFishForks)}/${luckyFishForks}`:won?'적중':'미적중'}</Text></View></View>
+    <View style={styles.luckyReef}>
+      <View style={[styles.luckyFishSwimmer,{left:`${(offset*(luckyFishCaveCount-1)+.5)*100/luckyFishCaveCount}%`,top:6+step*30}]}><Text style={styles.luckyFishEmoji}>🐠</Text></View>
+      {Array.from({length:luckyFishForks},(_,level)=><View key={level} style={styles.luckyForkRow}>{Array.from({length:level+2},(_,branch)=><View key={branch} style={styles.luckyForkCell}><View style={[styles.luckyForkDot,phase!=='betting'&&step>level&&styles.luckyForkDotPassed]}/></View>)}</View>)}
+      <View style={styles.luckyMouthRow}>{luckyFishCaves.map(cave=><View key={cave.id} style={styles.luckyForkCell}><View style={[styles.luckyMouth,{backgroundColor:cave.color},phase==='finished'&&path?.cave===cave.id&&styles.luckyMouthLanded]}><Text style={styles.luckyMouthText}>{cave.payout}</Text></View></View>)}</View>
+      <Text style={styles.luckyReefHint}>{phase==='betting'?'물고기는 갈림길마다 좌우로 갈라집니다':phase==='swimming'?(path&&step>0?`${path.turns[step-1]}으로 꺾었습니다`:'출발합니다'):path?`${luckyFishCaves[path.cave].name}에 도착`:''}</Text>
+    </View>
+    <View style={styles.luckyCaveRow}>{luckyFishCaves.map(cave=><Pressable key={cave.id} disabled={phase!=='betting'} onPress={()=>setChoice(cave.id)} style={[styles.luckyCave,{borderColor:cave.color},choice===cave.id&&styles.luckyCaveActive,phase==='finished'&&path?.cave===cave.id&&styles.luckyCaveLanded]}>
+      <View style={[styles.luckyCaveMouth,{backgroundColor:cave.color}]}/>
+      <Text style={styles.luckyCaveName}>{cave.name}</Text>
+      <Text style={styles.luckyCaveOdds}>{cave.payout}배</Text>
+      <Text style={styles.luckyCaveChance}>{(luckyFishProbability(cave.id)*100).toFixed(1)}%</Text>
+    </Pressable>)}</View>
+    {phase==='finished'&&<View style={styles.carTicket}><Text style={styles.horseTicketTitle}>{won?'적중!':'다음 기회에'}</Text><Text style={styles.carTicketText}>{won&&choice!==null?`${luckyFishCaves[choice].payout}배 · ${(selectedBet*luckyFishCaves[choice].payout).toLocaleString()} WC`:path?`물고기는 ${luckyFishCaves[path.cave].name}으로 들어갔습니다`:''}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></View>}
+    {phase==='betting'&&<Pressable disabled={choice===null||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(choice===null||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':choice===null?'동굴을 선택하세요':`${luckyFishCaves[choice].name}에 ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}
   </ScrollView></View>;
 }
 
@@ -5185,6 +5391,94 @@ const styles = StyleSheet.create({
   sicboHeroDice: { color: '#FFF1C4', fontSize: 48, marginBottom: 10 },
   sicboRules: { marginTop: 18, padding: 16, borderRadius: 17, backgroundColor: '#21151A', borderWidth: 1, borderColor: '#76505A' },
   sicboScreen: { flex: 1, backgroundColor: '#120B0D' },
+
+  yutScreen: { flex: 1, backgroundColor: '#12100A' },
+  yutMat: { marginTop: 16, padding: 18, borderRadius: 20, alignItems: 'center', backgroundColor: '#2A2415', borderWidth: 2, borderColor: '#8A6E2F' },
+  yutStickRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  yutStick: { width: 34, height: 116, borderRadius: 17, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2 },
+  yutStickFlat: { backgroundColor: '#EFE0C0', borderColor: '#B79A63' },
+  yutStickRound: { backgroundColor: '#6B4A25', borderColor: '#3E2A13' },
+  yutStickTumbling: { opacity: .72 },
+  yutStickMark: { position: 'absolute', top: 16, width: 12, height: 12, borderRadius: 6, backgroundColor: '#B1382F' },
+  yutStickFaceText: { fontSize: 11, fontWeight: '900' },
+  yutStickFaceFlatText: { color: '#6B4A25' },
+  yutStickFaceRoundText: { color: '#D9C39A' },
+  yutOutcomeText: { color: '#FFE28A', fontSize: 46, fontWeight: '900' },
+  yutOutcomeWin: { color: '#7BE495' },
+  yutOutcomeDetail: { color: '#D8CDAE', fontSize: 12, marginTop: 4, textAlign: 'center' },
+  yutChoiceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  yutChoice: { width: '31.5%', minHeight: 96, alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 14, backgroundColor: '#221E14', borderWidth: 1, borderColor: '#574C30' },
+  yutChoiceActive: { borderWidth: 3, borderColor: '#F0C24B', backgroundColor: '#3B3116' },
+  yutChoiceHit: { backgroundColor: '#1F3A25', borderColor: '#7BE495' },
+  yutChoiceName: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  yutChoiceDetail: { color: '#C7BC9E', fontSize: 9, marginTop: 3, textAlign: 'center' },
+  yutChoiceOdds: { color: '#FFD75C', fontSize: 13, fontWeight: '900', marginTop: 5 },
+  yutChoiceChance: { color: '#9C927A', fontSize: 9, marginTop: 2 },
+  yutHistory: { marginTop: 16, padding: 14, borderRadius: 15, backgroundColor: '#1B1810', borderWidth: 1, borderColor: '#4A4028' },
+  yutHistoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  yutHistoryChip: { color: '#E6DCC0', fontSize: 12, fontWeight: '800', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9, overflow: 'hidden', backgroundColor: '#2F2818' },
+  yutHistoryChipRare: { color: '#231700', backgroundColor: '#FFD75C' },
+
+  shellScreen: { flex: 1, backgroundColor: '#0D1420' },
+  shellTable: { marginTop: 16, paddingVertical: 24, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#16283B', borderWidth: 2, borderColor: '#2F5875' },
+  shellCupRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  shellCupSlot: { width: '31%', alignItems: 'center', paddingVertical: 8, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
+  shellCupSlotPickable: { borderColor: '#4E85AE', backgroundColor: 'rgba(78,133,174,.16)' },
+  shellCupSlotChosen: { borderColor: '#FFD75C', backgroundColor: 'rgba(255,215,92,.16)' },
+  shellCup: { width: 72, height: 84, borderTopLeftRadius: 34, borderTopRightRadius: 34, borderBottomLeftRadius: 8, borderBottomRightRadius: 8, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2, borderColor: 'rgba(0,0,0,.35)' },
+  shellCupLifted: { transform: [{ translateY: -26 }] },
+  shellCupLabel: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
+  shellCupLabelText: { color: '#FFFFFF' },
+  shellBallSlot: { height: 26, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  shellBall: { width: 22, height: 22, borderRadius: 11, backgroundColor: '#F5D76E', borderWidth: 2, borderColor: '#B08C1E' },
+  shellBallShadow: { width: 34, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,.28)' },
+  shellHint: { color: '#BFD4E5', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 18 },
+
+  fishScreen: { flex: 1, backgroundColor: '#06202B' },
+  fishTank: { paddingVertical: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0E4A63', borderWidth: 5, borderColor: '#1D7FA1' },
+  fishLane: { height: 52, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.18)' },
+  fishBadge: { width: 30, height: 30, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 2, borderColor: '#FFFFFF' },
+  fishBadgeText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  fishCourse: { flex: 1, height: 46, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(6,40,55,.35)' },
+  fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
+  fishWeedText: { fontSize: 15, opacity: .5 },
+  fishSwim: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
+  fishRunner: { fontSize: 25 },
+  fishFinish: { position: 'absolute', right: 6, width: 5, height: 44, backgroundColor: '#F2A0A0', borderRadius: 2 },
+  fishPlace: { width: 40, color: '#FFE28A', fontSize: 12, fontWeight: '900', textAlign: 'center' },
+  fishEventPanel: { padding: 12, borderRadius: 14, backgroundColor: '#0B2E3D', borderWidth: 1, borderColor: '#1D7FA1' },
+  fishEventTitle: { color: '#8FE3F5', fontSize: 13, fontWeight: '900', marginBottom: 5 },
+  fishEventText: { color: '#CFE9F2', fontSize: 11, lineHeight: 18 },
+  fishCard: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 9, padding: 9, borderRadius: 15, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76' },
+  fishCardActive: { backgroundColor: '#123F4F', borderColor: '#F0C24B', borderWidth: 2 },
+  fishCardBadge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,.7)' },
+  fishCardEmoji: { fontSize: 22 },
+  fishName: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  fishStats: { color: '#A9C9D6', fontSize: 11, marginTop: 3 },
+  fishOdds: { color: '#FFD75C', fontSize: 15, fontWeight: '900', textAlign: 'right' },
+
+  luckyFishScreen: { flex: 1, backgroundColor: '#071A2B' },
+  luckyReef: { minHeight: 250, marginTop: 16, padding: 14, borderRadius: 20, backgroundColor: '#0C3350', borderWidth: 2, borderColor: '#1E6E96', position: 'relative' },
+  luckyFishSwimmer: { position: 'absolute', zIndex: 3, marginLeft: -14 },
+  luckyFishEmoji: { fontSize: 26 },
+  luckyForkRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+  luckyForkCell: { width: `${100/6}%`, alignItems: 'center' },
+  luckyForkDot: { width: 9, height: 9, borderRadius: 5, backgroundColor: 'rgba(255,255,255,.28)' },
+  luckyForkDotPassed: { backgroundColor: '#FFD75C' },
+  luckyMouthRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 22 },
+  luckyMouth: { width: '86%', height: 26, borderTopLeftRadius: 13, borderTopRightRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: .65 },
+  luckyMouthLanded: { opacity: 1, borderWidth: 2, borderColor: '#7BE495' },
+  luckyMouthText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  luckyReefHint: { color: '#BBDCEC', fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 16 },
+  luckyCaveRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 16 },
+  luckyCave: { width: '31.5%', minHeight: 104, alignItems: 'center', justifyContent: 'center', padding: 6, borderRadius: 14, backgroundColor: '#0E2A40', borderWidth: 2 },
+  luckyCaveActive: { backgroundColor: '#1B4462', borderColor: '#FFD75C' },
+  luckyCaveLanded: { backgroundColor: '#1F4A31', borderColor: '#7BE495' },
+  luckyCaveMouth: { width: 34, height: 22, borderTopLeftRadius: 17, borderTopRightRadius: 17, marginBottom: 6 },
+  luckyCaveName: { color: '#FFFFFF', fontSize: 11, fontWeight: '800', textAlign: 'center' },
+  luckyCaveOdds: { color: '#FFD75C', fontSize: 15, fontWeight: '900', marginTop: 4 },
+  luckyCaveChance: { color: '#8FA9BC', fontSize: 9, marginTop: 2 },
+
   sicboPage: { padding: 18, paddingBottom: 46 },
   sicboBowl: { minHeight: 230, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 115, backgroundColor: '#621B22', borderWidth: 5, borderColor: '#D8B451' },
   sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 22, transform: [{ scale: 0.75 }] },
