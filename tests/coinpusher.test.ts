@@ -7,7 +7,7 @@ const steady=()=>0.5;
 const field=(...coins:PusherCoin[]):PusherField=>({coins,nextId:100});
 const coin=(column:number,depth:number,kind:PusherCoin['kind']='코인',id=1):PusherCoin=>({id,depth,column,kind});
 
-test('기계에는 동전 마흔다섯 개와 경품 네 개가 미리 깔려 있다',()=>{
+test('기계에는 동전 여든다섯 개와 경품 네 개가 미리 깔려 있다',()=>{
   const start=createPusherField(seeded(5));
   assert.equal(start.coins.length,pusherStartingCoins+pusherStartingPrizes.length);
   assert.deepEqual(start.coins.filter(item=>item.kind!=='코인').map(item=>item.kind).sort(),[...pusherStartingPrizes].sort());

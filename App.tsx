@@ -2046,7 +2046,7 @@ function CoinPusherGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
           const column=item.fromColumn+(item.toColumn-item.fromColumn)*eased;
           const opacity=item.fate==='lost'?1-eased:1;
           const shape=item.kind==='금화'?styles.pusherGold:item.kind==='구슬'?styles.pusherBall:item.kind==='금괴'?styles.pusherBar:null;
-          return <View key={item.id} style={[styles.pusherCoin,shape,{top:`${depth*100}%`,left:`${(column+0.5)/pusherColumns*100}%`,opacity,zIndex:Math.round(depth*200)}]}>
+          return <View key={item.id} style={[styles.pusherCoin,shape,{top:`${depth*100}%`,left:`${(column+0.5)/pusherColumns*100}%`,opacity,zIndex:Math.round(depth*200)+(item.kind==='코인'?0:400)}]}>
             {(item.kind==='금화'||item.kind==='금괴')&&<Text style={styles.pusherGoldMark}>金</Text>}
           </View>;
         })}

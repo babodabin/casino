@@ -34,7 +34,7 @@ export const pusherCenterColumn = 4;
 
 // 아래 수치는 여러 조합을 돌려 보고 골랐습니다. 자세한 값은 커밋 메시지에 적어 두었습니다.
 /** 밀판이 미는 거리. 줄에 동전이 없으면 이만큼만, 꽉 차 있으면 아래 배수까지 밀립니다. */
-export const pusherStroke = 0.008;
+export const pusherStroke = 0.006;
 export const pusherPackedBoost = 1.6;
 /** 이 개수쯤 모이면 미는 힘이 다 붙습니다. */
 export const pusherPackedAt = 14;
@@ -48,9 +48,9 @@ export const pusherChuteStart = 0.18;
  * 줄마다 다르게 두면 한 줄이 정답이 되어 고르는 재미가 사라지므로 일부러 고르게 두었습니다.
  * 이 구멍이 이 게임의 하우스 몫 전부입니다.
  */
-export const pusherSwallow = 0.0008;
+export const pusherSwallow = 0.0006;
 /** 처음 한 번만 깔아 주는 동전입니다. 판을 저장해 이어 쓰므로 다시 깔리지 않습니다. */
-export const pusherStartingCoins = 45;
+export const pusherStartingCoins = 85;
 /**
  * 기계에 원래 얹혀 있는 경품. 한 번 나가면 다시 채우지 않습니다.
  * 다시 채우면 공짜 값이 끝없이 들어와 환급률이 130%를 넘습니다.
