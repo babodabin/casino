@@ -2025,7 +2025,7 @@ function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
       <View style={styles.feltTable}><View style={styles.feltSurface}>
         <View style={styles.feltGlow} pointerEvents="none"/>
         <Text style={styles.feltLabel}>{done?'낸 패':`내 패 — ${picked.length}/5장 선택`}</Text>
-        <View style={styles.chineseHandRow}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+        <View style={styles.handRowPlain}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
         <Text style={styles.jokerPreview}>{preview?`${preview.hand.type} · 칩 ${preview.chips} × 배수 ${preview.mult} = ${preview.score.toLocaleString()}점`:done?'':'낼 카드를 고르세요'}</Text>
       </View></View>
 
@@ -5296,6 +5296,21 @@ const colors = {
   red: '#E36C72',
 };
 
+/**
+ * 카드가 놓이는 판의 재질. 나무 테두리 안에 초록 펠트입니다.
+ * 화려한 실내 사진은 입구에만 두고 게임 화면에는 재질만 가져옵니다.
+ * 판 바깥(잔액·버튼·규칙)은 어두운 채로 두어야 눈이 판으로 갑니다.
+ * 게임마다 색을 다르게 두지 않고 하나로 통일했습니다. 한 재질이 곧 한 규칙입니다.
+ */
+const feltLook = {
+  backgroundColor: '#17553C',
+  borderRadius: 16,
+  borderWidth: 6,
+  borderColor: '#4A3122',
+  paddingHorizontal: 11,
+  paddingVertical: 11,
+} as const;
+
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.bg },
   screen: { flex: 1 },
@@ -5454,7 +5469,7 @@ const styles = StyleSheet.create({
   handHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 },
   handTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
   scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
-  cardRow: { minHeight: 126, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  cardRow: { ...feltLook, minHeight: 126, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   playingCard: { width: 72, height: 108, borderRadius: 10, padding: 8, justifyContent: 'space-between', backgroundColor: '#F7F1E3', borderWidth: 1, borderColor: '#D4C9B2' },
   cardWinner: { transform: [{ translateY: -16 }, { scale: 1.06 }], borderWidth: 3, borderColor: '#F2C85B', shadowColor: '#FFD35F', shadowOpacity: 0.9, shadowRadius: 10, elevation: 9 },
   cardSelected: { transform: [{ translateY: -10 }, { scale: 1.04 }], borderWidth: 2, borderColor: '#D6DCE6' },
@@ -5475,7 +5490,7 @@ const styles = StyleSheet.create({
   paiGowHandSummary: { width: '100%', flexDirection: 'row', gap: 8 },
   paiGowResultMark: { color: '#FFE080', fontSize: 16, fontWeight: '900', marginTop: 6 },
   paiGowShowdownButton: { flex: 1, width: undefined },
-  chineseRow: { width: '100%', borderRadius: 14, borderWidth: 1, borderColor: '#2A3346', backgroundColor: 'rgba(16,22,34,0.72)', padding: 10, gap: 8, marginBottom: 10 },
+  chineseRow: { ...feltLook, width: '100%', gap: 8, marginBottom: 10 },
   chineseRowActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
   chineseRowWon: { borderColor: '#3FA96A' },
   chineseRowLost: { borderColor: '#B4413F' },
@@ -5486,7 +5501,9 @@ const styles = StyleSheet.create({
   chineseSlotRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
-  chineseHandRow: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  chineseHandRow: { ...feltLook, width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  /** 이미 펠트 위에 올라가 있는 줄. 펠트를 두 번 겹치지 않게 맨 모양으로 둡니다. */
+  handRowPlain: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
   // 화려한 실내 사진은 입구에만 두고, 게임 화면에는 재질만 가져옵니다.
   // 판 바깥(잔액·버튼·규칙)은 어둡게 두어야 눈이 판으로 갑니다.
@@ -5568,7 +5585,7 @@ const styles = StyleSheet.create({
   bigTwoTableLabel: { color: colors.gold, fontSize: 13, fontWeight: '800' },
   bigTwoLog: { width: '100%', gap: 2, paddingHorizontal: 2 },
   bigTwoLogLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '600' },
-  tujeonRow: { width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
+  tujeonRow: { ...feltLook, width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
   // 투전목은 길고 좁은 종이패라 서양 카드보다 홀쭉하게 그립니다.
   tujeonCard: { width: 52, height: 96, borderRadius: 7, backgroundColor: '#F3E7CE', borderWidth: 1, borderColor: '#C6B189', alignItems: 'center', paddingVertical: 6, gap: 2 },
   tujeonCardBand: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -6323,7 +6340,7 @@ const styles = StyleSheet.create({
   tableDeckShadow: { position:'absolute', width:50, height:69, borderRadius:7, backgroundColor:'rgba(0,0,0,0.35)', transform:[{translateX:5},{translateY:5},{rotate:'4deg'}] },
   tableDeckCard: { width:50, height:69, borderRadius:7, alignItems:'center', justifyContent:'center', backgroundColor:'#182847', borderWidth:3, borderColor:'#E2D7B0', transform:[{rotate:'-2deg'}] },
   tableDeckLabel: { color:'#D8CC9B', fontSize:8, fontWeight:'900', letterSpacing:1, marginTop:4 },
-  hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
+  hwatuHand: { ...feltLook, flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
   hwatuCardCaption: { position:'absolute', left:2, right:2, bottom:1, height:15, borderRadius:4, backgroundColor:'rgba(18,24,20,0.88)', flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:4 },
