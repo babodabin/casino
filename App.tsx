@@ -81,6 +81,7 @@ import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCatego
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import { arrangeChinesePoker, dealChinesePoker, evaluateChineseArrangement, resolveChinesePoker, type ChineseArrangement, type ChineseResult } from './src/chinesepoker';
 import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
+import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canBeatBigTwo, chooseBigTwoPlay, classifyBigTwo, legalBigTwoPlays, passBigTwo, playBigTwo, startBigTwo, stepBigTwo, type BigTwoState } from './src/bigtwo';
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
@@ -107,14 +108,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -184,7 +185,7 @@ const gameCategories: GameCategory[] = [
     { name: '야찌', icon: '⚄', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
     { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
     { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
-    { name: '로또', icon: '⑥', description: '번호 여섯 개를 선택하는 추첨 게임', status: 'playable' },
+    { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
     { name: '즉석 복권', icon: '票', description: '바로 결과를 확인하는 가상 복권', status: 'playable' },
     { name: '공 어디에?', icon: '●', description: '빠르게 섞이는 컵 속 공의 위치를 찾는 게임', status: 'playable' },
   ]},
@@ -229,6 +230,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '맞고': 'matgoSetup',
   '민화투': 'minhwatuSetup',
   '투전': 'tujeonSetup',
+  '빅투': 'bigTwoSetup',
   '육백': 'yukbaekSetup',
   '윷 베팅': 'yutSetup',
   '섰다': 'seotdaSetup',
@@ -720,7 +722,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1063,6 +1065,8 @@ function CasinoApp() {
         {appScreen === 'chinesePokerGame' && <ChinesePokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('chinesePokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('차이니즈 포커',stake,multiplier,detail)}/>}
         {appScreen === 'tujeonSetup' && <SimpleSetupScreen title="투전 준비" hero="鬪箋 · 여든 장" lead="같은 숫자를 짝지어 상대와 겨룹니다" rules={['1. 여덟 무리(사람·물고기·새·꿩·별·말·노루·토끼)에 1부터 10까지, 모두 여든 장입니다.','2. 다섯 장을 받아 같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.','3. 짝이 하나도 없으면 다섯 장을 더한 끝자리가 끗이고, 9가 가보 0이 망통입니다.','4. 패를 보고 나쁘면 죽을 수 있습니다. 죽으면 베팅금의 0.35배만 돌려받습니다.','5. 승부해서 이기면 1.9배, 비기면 그대로 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('tujeonGame')}/>}
         {appScreen === 'tujeonGame' && <TujeonGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('tujeonSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('투전',stake,multiplier,detail)}/>}
+        {appScreen === 'bigTwoSetup' && <SimpleSetupScreen title="빅투 준비" hero="♦3 · · · 2♠" lead="열세 장을 먼저 다 내려놓으면 이깁니다" rules={['1. 네 명이 열세 장씩 나눠 갖습니다. ♦3을 가진 사람이 먼저 내고 첫 장에는 ♦3이 들어가야 합니다.','2. 숫자는 3이 가장 약하고 2가 가장 셉니다. 같은 숫자면 ♦ ♣ ♥ ♠ 순으로 세집니다.','3. 한 장·두 장(페어)·세 장(트리플)·다섯 장(스트레이트 이상)만 낼 수 있습니다.','4. 앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다. 낼 게 없으면 넘깁니다.','5. 먼저 다 내면 '+bigTwoWinPayout[4]+'배입니다. 져도 세 장 이하로 털었으면 절반을 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bigTwoGame')}/>}
+        {appScreen === 'bigTwoGame' && <BigTwoGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
@@ -1942,6 +1946,98 @@ function ChinesePokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
         </View>
       </>}
       {result&&<>
+        <Text style={styles.sicboResult}>{summary}</Text>
+        <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
+      </>}
+    </>}
+  </ScrollView></View>;
+}
+
+const bigTwoPlayers=4;
+const bigTwoSeatName=(index:number)=>index===0?'나':`컴퓨터 ${index}`;
+
+function BigTwoGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [state,setState]=useState<BigTwoState|null>(null);
+  const [picked,setPicked]=useState<string[]>([]);
+  const settledRef=useRef(false);
+
+  const start=()=>{
+    if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    settledRef.current=false;setPicked([]);setState(startBigTwo(bigTwoPlayers));
+  };
+
+  // 컴퓨터 차례는 한 박자 쉬고 저절로 넘어갑니다.
+  useEffect(()=>{
+    if(!state||state.winner!==null||state.turn===0)return;
+    const timer=setTimeout(()=>setState(current=>(current&&current.winner===null&&current.turn!==0)?stepBigTwo(current):current),750);
+    return()=>clearTimeout(timer);
+  },[state]);
+
+  useEffect(()=>{
+    if(!state||state.winner===null||settledRef.current)return;
+    settledRef.current=true;
+    const won=state.winner===0,mine=state.hands[0].length;
+    onSettle(selectedBet,bigTwoMultiplier(bigTwoPlayers,won,mine),won?'먼저 다 내려놓았습니다':`${bigTwoSeatName(state.winner)}가 먼저 냄 · 내 손에 ${mine}장`);
+  },[state]);
+
+  const myHand=state?state.hands[0]:[];
+  const myTurn=!!state&&state.winner===null&&state.turn===0;
+  const opening=state?bigTwoOpeningCard(state):undefined;
+  const chosen=myHand.filter(card=>picked.includes(card.id));
+  const combo=chosen.length?classifyBigTwo(chosen):null;
+  const openingOk=!opening||chosen.some(card=>card.id===opening);
+  const canPlay=myTurn&&!!combo&&canBeatBigTwo(combo,state!.current)&&openingOk;
+  const canPass=myTurn&&!!state?.current;
+  const stuck=myTurn&&legalBigTwoPlays(myHand,state!.current,opening).length===0;
+
+  const toggle=(id:string)=>{if(!myTurn)return;setPicked(current=>current.includes(id)?current.filter(item=>item!==id):[...current,id]);};
+  const play=()=>{if(!state||!canPlay)return;setState(playBigTwo(state,chosen));setPicked([]);};
+  const pass=()=>{if(!state||!canPass)return;setState(passBigTwo(state));setPicked([]);};
+  const suggest=()=>{if(!state||!myTurn)return;const pick=chooseBigTwoPlay(myHand,state.current,opening);setPicked(pick?pick.cards.map(card=>card.id):[]);};
+
+  const hint=!state?'':state.winner!==null?''
+    :!myTurn?`${bigTwoSeatName(state.turn)} 차례입니다`
+    :stuck?'낼 수 있는 게 없습니다. 넘기세요.'
+    :opening?'첫 장에는 ♦3이 들어가야 합니다'
+    :!chosen.length?state.current?`${state.current.type}보다 센 ${state.current.cards.length}장을 고르세요`:'아무거나 골라 내세요'
+    :!combo?'낼 수 없는 모양입니다'
+    :!canBeatBigTwo(combo,state.current)?`${combo.type}로는 앞사람을 이기지 못합니다`
+    :`${combo.type} · 낼 수 있습니다`;
+
+  const summary=!state||state.winner===null?'':state.winner===0
+    ?`먼저 다 내려놓았습니다! ${Math.round(selectedBet*bigTwoWinPayout[bigTwoPlayers]).toLocaleString()} WC`
+    :myHand.length<=3?`${bigTwoSeatName(state.winner)}가 먼저 냈지만 ${myHand.length}장만 남아 절반을 돌려받았습니다`
+    :`${bigTwoSeatName(state.winner)}가 먼저 냈습니다 · 내 손에 ${myHand.length}장`;
+
+  return <View style={styles.pokerTable}><ScreenHeader title="빅투(Big Two)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View>
+    {!state?<>
+      <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>네 명이 열세 장씩</Text><Text style={styles.slotRuleText}>먼저 다 내려놓으면 이깁니다. 3이 가장 약하고 2가 가장 셉니다.</Text><Text style={styles.slotRuleText}>앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다.</Text></View>
+      <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'판 시작'}</Text></Pressable>
+    </>:<>
+      <View style={styles.bigTwoSeats}>{[1,2,3].map(seat=><View key={seat} style={[styles.bigTwoSeat,state.turn===seat&&state.winner===null&&styles.bigTwoSeatActive,state.winner===seat&&styles.bigTwoSeatWon]}>
+        <Text style={styles.bigTwoSeatName}>{bigTwoSeatName(seat)}</Text>
+        <Text style={styles.bigTwoSeatCount}>{state.hands[seat].length}장</Text>
+      </View>)}</View>
+
+      <View style={styles.bigTwoTable}>
+        <Text style={styles.bigTwoTableLabel}>{state.current?`바닥 · ${bigTwoSeatName(state.leader)}의 ${state.current.type}`:'바닥이 비었습니다'}</Text>
+        <View style={styles.cardRow}>{state.current?state.current.cards.map(card=><PlayingCard key={card.id} card={card} compact/>):<Text style={styles.slotRuleText}>새로 시작하는 차례입니다</Text>}</View>
+      </View>
+
+      {state.log.length>0&&<View style={styles.bigTwoLog}>{state.log.slice(-3).map((line,index)=><Text key={index} style={styles.bigTwoLogLine}>{line}</Text>)}</View>}
+
+      <Text style={styles.sectionTitle}>내 패 {myHand.length}장</Text>
+      <View style={styles.chineseHandRow}>{myHand.map(card=><Pressable key={card.id} disabled={!myTurn} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+
+      {state.winner===null?<>
+        <Text style={styles.tujeonAdvice}>{hint}</Text>
+        <View style={styles.pokerActionRow}>
+          <Pressable disabled={!myTurn} style={[styles.secondaryButton,!myTurn&&styles.disabledCard]} onPress={suggest}><Text style={styles.secondaryButtonText}>골라주기</Text></Pressable>
+          <Pressable disabled={!canPass} style={[styles.secondaryButton,!canPass&&styles.disabledCard]} onPress={pass}><Text style={styles.secondaryButtonText}>넘기기</Text></Pressable>
+          <Pressable disabled={!canPlay} style={[styles.primaryButton,styles.paiGowShowdownButton,!canPlay&&styles.disabledCard]} onPress={play}><Text style={styles.primaryButtonText}>내기</Text></Pressable>
+        </View>
+      </>:<>
         <Text style={styles.sicboResult}>{summary}</Text>
         <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
       </>}
@@ -5116,6 +5212,16 @@ const styles = StyleSheet.create({
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
   chineseHandRow: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  bigTwoSeats: { width: '100%', flexDirection: 'row', gap: 8 },
+  bigTwoSeat: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 9, borderRadius: 10, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  bigTwoSeatActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
+  bigTwoSeatWon: { borderColor: '#3FA96A' },
+  bigTwoSeatName: { color: '#9AA6B8', fontSize: 11, fontWeight: '800' },
+  bigTwoSeatCount: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  bigTwoTable: { width: '100%', gap: 8, padding: 12, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  bigTwoTableLabel: { color: colors.gold, fontSize: 13, fontWeight: '800' },
+  bigTwoLog: { width: '100%', gap: 2, paddingHorizontal: 2 },
+  bigTwoLogLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '600' },
   tujeonRow: { width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
   // 투전목은 길고 좁은 종이패라 서양 카드보다 홀쭉하게 그립니다.
   tujeonCard: { width: 52, height: 96, borderRadius: 7, backgroundColor: '#F3E7CE', borderWidth: 1, borderColor: '#C6B189', alignItems: 'center', paddingVertical: 6, gap: 2 },
