@@ -5302,11 +5302,13 @@ const colors = {
  * 판 바깥(잔액·버튼·규칙)은 어두운 채로 두어야 눈이 판으로 갑니다.
  * 게임마다 색을 다르게 두지 않고 하나로 통일했습니다. 한 재질이 곧 한 규칙입니다.
  */
+// 색은 새로 만들지 않고 이미 있던 홀덤 테이블(holdemTable)의 초록과 나무색을 그대로 씁니다.
+// 앱 안에 초록이 두 개 있으면 같은 테이블에 앉은 느낌이 깨집니다.
 const feltLook = {
-  backgroundColor: '#17553C',
+  backgroundColor: '#075332',
   borderRadius: 16,
-  borderWidth: 6,
-  borderColor: '#4A3122',
+  borderWidth: 7,
+  borderColor: '#6B3E20',
   paddingHorizontal: 11,
   paddingVertical: 11,
 } as const;
@@ -5507,8 +5509,8 @@ const styles = StyleSheet.create({
   // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
   // 화려한 실내 사진은 입구에만 두고, 게임 화면에는 재질만 가져옵니다.
   // 판 바깥(잔액·버튼·규칙)은 어둡게 두어야 눈이 판으로 갑니다.
-  feltTable: { width: '100%', padding: 7, borderRadius: 22, backgroundColor: '#4A3122', borderWidth: 1, borderColor: '#6B4A2E' },
-  feltSurface: { borderRadius: 16, backgroundColor: '#17553C', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
+  feltTable: { width: '100%', padding: 7, borderRadius: 22, backgroundColor: '#6B3E20', borderWidth: 1, borderColor: '#8A5730' },
+  feltSurface: { borderRadius: 16, backgroundColor: '#075332', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
   // 테이블 위에 조명이 떨어진 것처럼 가운데를 살짝 밝힙니다.
   feltGlow: { position: 'absolute', top: '-45%', left: '8%', right: '8%', height: '110%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.055)' },
   feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
