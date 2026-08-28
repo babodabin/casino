@@ -5595,7 +5595,8 @@ const styles = StyleSheet.create({
   bigTwoTableLabel: { color: colors.gold, fontSize: 13, fontWeight: '800' },
   bigTwoLog: { width: '100%', gap: 2, paddingHorizontal: 2 },
   bigTwoLogLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '600' },
-  tujeonRow: { ...feltLook, width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
+  // 투전은 종이패를 방바닥이나 돗자리에서 하지, 초록 펠트 테이블에서 하지 않습니다.
+  tujeonRow: { width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
   // 투전목은 길고 좁은 종이패라 서양 카드보다 홀쭉하게 그립니다.
   tujeonCard: { width: 52, height: 96, borderRadius: 7, backgroundColor: '#F3E7CE', borderWidth: 1, borderColor: '#C6B189', alignItems: 'center', paddingVertical: 6, gap: 2 },
   tujeonCardBand: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
@@ -6350,7 +6351,8 @@ const styles = StyleSheet.create({
   tableDeckShadow: { position:'absolute', width:50, height:69, borderRadius:7, backgroundColor:'rgba(0,0,0,0.35)', transform:[{translateX:5},{translateY:5},{rotate:'4deg'}] },
   tableDeckCard: { width:50, height:69, borderRadius:7, alignItems:'center', justifyContent:'center', backgroundColor:'#182847', borderWidth:3, borderColor:'#E2D7B0', transform:[{rotate:'-2deg'}] },
   tableDeckLabel: { color:'#D8CC9B', fontSize:8, fontWeight:'900', letterSpacing:1, marginTop:4 },
-  hwatuHand: { ...feltLook, flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
+  // 화투도 마찬가지로 담요 위에서 하지 초록 펠트가 아닙니다.
+  hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
   hwatuCardCaption: { position:'absolute', left:2, right:2, bottom:1, height:15, borderRadius:4, backgroundColor:'rgba(18,24,20,0.88)', flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:4 },
