@@ -15,6 +15,36 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 6. **배경 사진** — 첫 페이지는 건드릴 필요 없습니다. 슬롯·카지노 게임·카드 게임 뒤에 깔 사진을 정해야 하고, **파일을 `assets/`에 넣어 주셔야 합니다**(대화에 올린 사진은 저장소에 못 넣습니다)
 7. **움직임 다듬기** — 윷 던지는 느낌, 비디오포커 카드 회전, 피시 레이스 물고기 멈칫
 
+## 어디를 고치면 되는지
+
+`App.tsx`가 6,400줄이라 매번 찾아 헤매면 시간이 많이 듭니다. 줄 번호는 금방 어긋나므로
+**함수 이름과 스타일 이름**으로 적어 둡니다. 이 이름으로 검색하면 바로 나옵니다.
+
+| 할 일 | 화면 함수 | 손댈 스타일 · 값 |
+| --- | --- | --- |
+| 1. 경륜 원형 트랙 | `CycleRacingGameScreen` | `cycleTrack` · `cycleLane` · `cycleRider` · `cycleJersey` |
+| 2. 홀덤·오마하 나눠 열기 | `PokerGameScreen` (`mode`로 홀덤/오마하 겸용) | 안에 있는 `stage` 상태, `holdemCommunity` · `holdemCards` |
+| 3. 테이블 모양 | 카드 게임 전반 | `holdemTable`(이미 둥근 테이블, 반경 110) · `feltLook`(공용 펠트) · `cardRow` |
+| 4. 카드 크기 | — | `playingCard` 72×108 · `compactPlayingCard` 58×88 · `hwatuCard` 52×78(**건드리지 말 것**) · `tujeonCard` 52×96 |
+| 5. 스크린낚시 | 새로 만들기 | 아래 "새 게임 붙이는 자리" 참고 |
+| 6. 배경 사진 | 화면별 바탕 | `app`(앱 전체) · `detailScreen` · `pokerTable` `#052E22` · `baccaratScreen` `#071D25` |
+| 7. 윷 던지는 느낌 | `YutBetGameScreen`, `YutStickView` | `yutStick` · `yutStickTumbling` · `yutMat` |
+| 7. 비디오포커 회전 | `VideoPokerGameScreen` | `videoPokerHand` · `videoPokerCardWrap` |
+| 7. 피시 레이스 멈칫 | `FishRaceGameScreen` | `fishSwim` · `fishLane` · `fishRunner`, 사건은 `src/fishrace.ts`의 `events` |
+
+**한 장씩 공개를 다른 게임에 더 넣을 때** — 공용 도구가 이미 있습니다.
+`useReveal()`(연 장수 세기)와 `<RevealButton opened total onPress label/>`. 쓰는 방법은
+`BaccaratGameScreen`이나 `TujeonGameScreen`을 그대로 보고 따라 하면 됩니다.
+핵심은 **정산(`onSettle`)을 마지막 장이 열린 뒤로 미루는 것**입니다.
+
+### 새 게임 붙이는 자리 (다섯 군데를 다 고쳐야 합니다)
+
+1. `src/<이름>.ts` — 판정 로직 (반드시 `.ts`, `.tsx` 아님)
+2. `tests/<이름>.test.ts` + `package.json`의 `test` 스크립트에 파일 이름 추가
+3. `App.tsx`의 `gameCategories` — 목록에 한 줄
+4. `App.tsx`의 `AppScreen` 타입, `gameEntryScreens`, `settleNewGame`의 게임 이름 목록
+5. `App.tsx`에 `<이름>SetupScreen`(대개 `SimpleSetupScreen` 재사용)과 `<이름>GameScreen` 렌더 줄
+
 ## 지금 상태
 
 - 마지막 커밋 `6d7c56a`
