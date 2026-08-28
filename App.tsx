@@ -3215,7 +3215,7 @@ function HwatuCardView({ card, hidden = false, emphasis, showMonth=false }: { ca
   const webImageUri=source&&typeof source==='object'&&'uri' in source?String(source.uri):'';
   const webImageStyle=webImageUri&&Platform.OS==='web'?({backgroundImage:`url("${webImageUri}")`,backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat'} as any):null;
   return (
-    <View style={[styles.hwatuCard, card.kind === '광' && styles.hwatuBright, emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
+    <View style={[styles.hwatuCard, card.kind === '광' && (source ? styles.hwatuBrightEdge : styles.hwatuBright), emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
       {source?(Platform.OS==='web'?<View style={[styles.hwatuCardImage,webImageStyle]}/>:<Image source={source} resizeMode="contain" style={styles.hwatuCardImage}/>):<HwatuMonthPicture month={card.month}/>}
       {showMonth&&<View style={styles.hwatuCardCaption}><Text style={styles.hwatuMonth}>{card.month}월</Text><Text style={styles.hwatuKind}>{label}</Text></View>}
     </View>
@@ -5685,6 +5685,9 @@ const styles = StyleSheet.create({
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
   hwatuCardCaption: { position:'absolute', left:2, right:2, bottom:1, height:15, borderRadius:4, backgroundColor:'rgba(18,24,20,0.88)', flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:4 },
   hwatuBright: { backgroundColor: '#FBF1CE', borderColor: colors.gold },
+  // 그림이 있는 광 카드는 크림색 바탕을 깔지 않습니다. 카드 그림이 틀보다 좁아서(가로 비율 0.44~0.53,
+  // 틀은 0.67) 바탕을 깔면 그림 양옆에 흰 띠가 그대로 보입니다. 대신 금색 테두리로만 광을 표시합니다.
+  hwatuBrightEdge: { borderWidth: 1, borderColor: colors.gold },
   hwatuHidden: { backgroundColor: '#1A2233', borderWidth:2, borderColor: '#D12B32' },
   hwatuDeckStack: { alignItems:'center', justifyContent:'center', width:64, minHeight:86 },
   hwatuDeckLayer: { position:'absolute', width:50, height:75, borderRadius:4, backgroundColor:'#171C29', borderWidth:2, borderColor:'#D42C35' },

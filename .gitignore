@@ -9,3 +9,7 @@ web-build/
 *.log
 
 dist*/
+
+# 로컬 전용 (저장소에 올리지 않음)
+.gitconfig-codex
+art-archive/
