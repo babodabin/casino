@@ -170,7 +170,7 @@ const gameCategories: GameCategory[] = [
     { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 마작', status: 'playable' },
     { name: '사천 마작', icon: '川', description: '자패 없이 세 종류 숫자패로 승부', status: 'playable' },
   ]},
-  { name: '레이싱', icon: '⚑', detail: '경마 · 경륜 · 자동차', eyebrow: 'RACING', games: [
+  { name: '스포츠/아케이드', icon: '⚑', detail: '경마 · 경륜 · 아케이드', eyebrow: 'SPORTS & ARCADE', games: [
     { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
     { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
     { name: '경정', icon: '艇', description: '6대 보트의 스타트와 1마크 선회를 예측', status: 'playable' },
