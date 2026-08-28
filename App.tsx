@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -1093,7 +1093,7 @@ function CasinoApp() {
         {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
         {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
         {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
-        {appScreen === 'tabs' && renderTab({
+        {appScreen === 'tabs' && <BottomInsetContext.Provider value={insets.bottom}>{renderTab({
           tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
           onRefillCoins: refillTestCoins, coins, records, totalPlays, lastGame,
@@ -1114,7 +1114,7 @@ function CasinoApp() {
             if (game.status === 'playable') setLastGame(game.name as GameRecord['game']);
             setAppScreen(screenForGame(game.name));
           },
-        })}
+        })}</BottomInsetContext.Provider>}
       </View>
       {appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
         {tabs.map((item) => {
@@ -1247,8 +1247,16 @@ function useScrollMemory(key: string) {
   };
 }
 
+/**
+ * 탭바가 차지하는 높이. 홈·게임·지갑·기록·설정 다섯 탭이 쓰는 Page가 아래 여백을 이만큼 둡니다.
+ * 탭바는 화면 위에 떠 있어서(웹에서는 position:fixed) 여백이 모자라면 마지막 줄이 그 밑에 가립니다.
+ */
+const tabBarHeight = 72;
+const BottomInsetContext = createContext(0);
+
 function Page({ children }: { children: React.ReactNode }) {
-  return <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
+  const bottom = useContext(BottomInsetContext);
+  return <ScrollView contentContainerStyle={[styles.page, { paddingBottom: tabBarHeight + bottom + 28 }]} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
 }
 
 function resultLabel(result: RoundResult) {
