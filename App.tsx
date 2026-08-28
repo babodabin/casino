@@ -81,6 +81,7 @@ import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCatego
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import { arrangeChinesePoker, dealChinesePoker, evaluateChineseArrangement, resolveChinesePoker, type ChineseArrangement, type ChineseResult } from './src/chinesepoker';
 import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
+import { bestJokerPlay, discardJokerCards, isJokerRoundOver, jokerDiscards, jokerLadder, jokerMultiplier, jokerPlays, jokerTarget, jokers, playJokerHand, scoreWithJokers, startJokerRound, type JokerId, type JokerRound } from './src/jokerpoker';
 import { predictFavourite, predictGroupOf, predictMultiplier, predictPercent, pickPredictQuestion, settlePredict, type PredictGroup, type PredictQuestion, type PredictSide } from './src/predict';
 import { predictQuestions } from './src/predictdata';
 import { createPusherField, dropPusherCoin, pusherBallPayout, pusherBarPayout, pusherCenterColumn, pusherChuteStart, pusherColumns, pusherGoldPayout, pusherPayout, type PusherCoin, type PusherField } from './src/coinpusher';
@@ -111,14 +112,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSetup' | 'predictGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSetup' | 'predictGame' | 'jokerSetup' | 'jokerGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓' | '조커 포커';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -189,7 +190,7 @@ const gameCategories: GameCategory[] = [
     { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
     { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
     { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
-    { name: '즉석 복권', icon: '票', description: '바로 결과를 확인하는 가상 복권', status: 'playable' },
+    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
     { name: '공 어디에?', icon: '●', description: '빠르게 섞이는 컵 속 공의 위치를 찾는 게임', status: 'playable' },
   ]},
 ];
@@ -216,6 +217,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '그레이하운드':'greyhoundSetup',
   '코인 푸셔':'pusherSetup',
   '예측 마켓':'predictSetup',
+  '조커 포커':'jokerSetup',
   '자동차 레이스':'carSetup',
   '소싸움':'bullSetup',
   '피시 레이스':'fishRaceSetup',
@@ -730,7 +732,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓'|'조커 포커',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1076,6 +1078,8 @@ function CasinoApp() {
         {appScreen === 'bigTwoSetup' && <SimpleSetupScreen title="빅투 준비" hero="♦3 · · · 2♠" lead="열세 장을 먼저 다 내려놓으면 이깁니다" rules={['1. 네 명이 열세 장씩 나눠 갖습니다. ♦3을 가진 사람이 먼저 내고 첫 장에는 ♦3이 들어가야 합니다.','2. 숫자는 3이 가장 약하고 2가 가장 셉니다. 같은 숫자면 ♦ ♣ ♥ ♠ 순으로 세집니다.','3. 한 장·두 장(페어)·세 장(트리플)·다섯 장(스트레이트 이상)만 낼 수 있습니다.','4. 앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다. 낼 게 없으면 넘깁니다.','5. 먼저 다 내면 '+bigTwoWinPayout[4]+'배입니다. 져도 세 장 이하로 털었으면 절반을 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bigTwoGame')}/>}
         {appScreen === 'bigTwoGame' && <BigTwoGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
         {appScreen === 'pusherSetup' && <SimpleSetupScreen title="코인 푸셔 준비" hero="◉ ◉ ◉" lead="밀판이 밀어낸 동전이 내 몫입니다" rules={['1. 동전을 한 개 넣으면 밀판이 한 번 앞으로 밉니다.','2. 앞턱을 넘어간 동전이 내 몫입니다. 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아집니다.','3. 금화는 '+pusherGoldPayout+'배로 쳐줍니다.','4. 앞쪽 양옆에는 빠지는 홈이 있어 그리로 밀린 동전은 사라집니다.','5. 판은 실제 기계처럼 그대로 남아 다음에 이어서 합니다.']} startLabel="기계 앞에 서기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('pusherGame')}/>}
+        {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['1. 여덟 장을 들고 시작합니다. 그중 다섯 장까지 골라 내면 그 족보로 점수가 붙습니다.','2. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리는 새 카드로 채워집니다.','3. 점수는 (족보 칩 + 낸 카드의 칩) × 배수입니다.','4. 판마다 조커 셋을 무작위로 받습니다. 조커가 칩과 배수를 올려 주니 조커에 맞는 족보를 노리세요.','5. 세 번 다 내고 목표 '+jokerTarget.toLocaleString()+'점을 넘기면 배당이 나옵니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
+        {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
         {appScreen === 'predictSetup' && <SimpleSetupScreen title="예측 마켓 준비" hero="YES · NO" lead="이미 결과가 나온 실제 사건을 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 사건입니다.','2. 스포츠와 사회문제 두 갈래가 있습니다. 예인지 아니오인지 고르세요.','3. 배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictGame')}/>}
         {appScreen === 'predictGame' && <PredictGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓',stake,multiplier,detail)}/>}
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
@@ -1962,6 +1966,81 @@ function ChinesePokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
         <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
       </>}
     </>}
+  </ScrollView></View>;
+}
+
+function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [round,setRound]=useState<JokerRound|null>(null);
+  const [picked,setPicked]=useState<string[]>([]);
+  const settledRef=useRef(false);
+
+  const start=()=>{
+    if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    settledRef.current=false;setPicked([]);setRound(startJokerRound());
+  };
+
+  const done=!!round&&isJokerRoundOver(round);
+  useEffect(()=>{
+    if(!round||!isJokerRoundOver(round)||settledRef.current)return;
+    settledRef.current=true;
+    const multiplier=jokerMultiplier(round.score);
+    onSettle(selectedBet,multiplier,`${round.score.toLocaleString()}점 / 목표 ${jokerTarget.toLocaleString()} · ${round.log.map((item)=>item.type).join(' → ')}`);
+  },[round]);
+
+  const chosen=round?round.hand.filter((card)=>picked.includes(card.id)):[];
+  const preview=chosen.length>0&&chosen.length<=5&&round?scoreWithJokers(chosen,round.held):null;
+  const toggle=(id:string)=>{
+    if(!round||done)return;
+    setPicked((current)=>current.includes(id)?current.filter((item)=>item!==id):current.length<5?[...current,id]:current);
+  };
+  const suggest=()=>{if(!round||done)return;setPicked(bestJokerPlay(round.hand,round.held).cards.map((card)=>card.id));};
+  const play=()=>{if(!round||!preview||done)return;setRound(playJokerHand(round,chosen));setPicked([]);};
+  const discard=()=>{if(!round||chosen.length===0||round.discardsLeft<=0||done)return;setRound(discardJokerCards(round,chosen));setPicked([]);};
+
+  const jokerText=(id:JokerId)=>jokers.find((joker)=>joker.id===id);
+  const ratio=round?round.score/jokerTarget:0;
+  const summary=!round||!done?'':round.score>=jokerTarget
+    ?`목표를 넘겼습니다 · ${jokerMultiplier(round.score)}배 ${Math.round(selectedBet*jokerMultiplier(round.score)).toLocaleString()} WC`
+    :`목표 ${jokerTarget.toLocaleString()}점에 ${(jokerTarget-round.score).toLocaleString()}점 모자랍니다`;
+
+  return <View style={styles.jokerScreen}><ScreenHeader title="조커 포커(발라트로)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>JOKER POKER · 목표 {jokerTarget.toLocaleString()}점</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
+
+    {!round?<>
+      <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>여덟 장을 들고 시작합니다</Text><Text style={styles.slotRuleText}>다섯 장까지 골라 내면 그 족보로 점수가 붙습니다. 낼 기회 {jokerPlays}번, 버릴 기회 {jokerDiscards}번.</Text><Text style={styles.slotRuleText}>점수는 (족보 칩 + 카드 칩) × 배수입니다. 판마다 조커 셋을 받고, 조커가 칩과 배수를 올려 줍니다.</Text></View>
+      <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'판 시작'}</Text></Pressable>
+    </>:<>
+      <View style={styles.jokerScoreRow}>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>점수</Text><Text style={styles.jokerScoreValue}>{round.score.toLocaleString()}</Text></View>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>낼 기회</Text><Text style={styles.jokerScoreValue}>{round.playsLeft}</Text></View>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>버릴 기회</Text><Text style={styles.jokerScoreValue}>{round.discardsLeft}</Text></View>
+      </View>
+      <View style={styles.jokerBar}><View style={[styles.jokerBarFill,{width:`${Math.min(100,ratio*100)}%`}]}/></View>
+
+      <View style={styles.jokerRow}>{round.held.map((id)=>{
+        const joker=jokerText(id);
+        return <View key={id} style={styles.jokerCard}><Text style={styles.jokerName}>{joker?.name??id}</Text><Text style={styles.jokerEffect}>{joker?.text??''}</Text></View>;
+      })}</View>
+
+      <Text style={styles.sectionTitle}>{done?'낸 패':`내 패 — ${picked.length}/5장 선택`}</Text>
+      <View style={styles.chineseHandRow}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+
+      {!done?<>
+        <Text style={styles.jokerPreview}>{preview?`${preview.hand.type} · 칩 ${preview.chips} × 배수 ${preview.mult} = ${preview.score.toLocaleString()}점`:'낼 카드를 고르세요'}</Text>
+        <View style={styles.pokerActionRow}>
+          <Pressable style={styles.secondaryButton} onPress={suggest}><Text style={styles.secondaryButtonText}>골라주기</Text></Pressable>
+          <Pressable disabled={chosen.length===0||round.discardsLeft<=0} style={[styles.secondaryButton,(chosen.length===0||round.discardsLeft<=0)&&styles.disabledCard]} onPress={discard}><Text style={styles.secondaryButtonText}>버리기</Text></Pressable>
+          <Pressable disabled={!preview} style={[styles.primaryButton,styles.paiGowShowdownButton,!preview&&styles.disabledCard]} onPress={play}><Text style={styles.primaryButtonText}>내기</Text></Pressable>
+        </View>
+      </>:<>
+        <Text style={styles.sicboResult}>{summary}</Text>
+        <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
+      </>}
+
+      {round.log.length>0&&<View style={styles.bigTwoLog}>{round.log.map((item,index)=><Text key={index} style={styles.bigTwoLogLine}>{index+1}번째 · {item.type} {item.score.toLocaleString()}점</Text>)}</View>}
+    </>}
+
+    <View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>배당</Text>{jokerLadder.map((step)=><Text key={step.at} style={styles.slotRuleText}>목표의 {step.at}배({(jokerTarget*step.at).toLocaleString()}점) 이상 → {step.payout}배</Text>)}<Text style={styles.slotRuleText}>목표에 못 미치면 배당이 없습니다.</Text></View>
   </ScrollView></View>;
 }
 
@@ -5405,6 +5484,18 @@ const styles = StyleSheet.create({
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
   chineseHandRow: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  jokerScreen: { flex: 1, backgroundColor: '#0B0F17' },
+  jokerScoreRow: { width: '100%', flexDirection: 'row', gap: 8 },
+  jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  jokerScoreLabel: { color: '#8E9AAC', fontSize: 11, fontWeight: '800' },
+  jokerScoreValue: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  jokerBar: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#1B2434' },
+  jokerBarFill: { height: '100%', backgroundColor: colors.gold },
+  jokerRow: { width: '100%', flexDirection: 'row', gap: 7 },
+  jokerCard: { flex: 1, gap: 3, padding: 9, borderRadius: 11, backgroundColor: 'rgba(42,34,14,0.6)', borderWidth: 1, borderColor: colors.gold },
+  jokerName: { color: colors.gold, fontSize: 13, fontWeight: '900' },
+  jokerEffect: { color: '#C3CBD8', fontSize: 10, fontWeight: '700', lineHeight: 14 },
+  jokerPreview: { color: colors.gold, fontSize: 15, fontWeight: '900' },
   predictScreen: { flex: 1, backgroundColor: '#0B0F17' },
   predictTabs: { width: '100%', flexDirection: 'row', gap: 8 },
   predictTab: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
