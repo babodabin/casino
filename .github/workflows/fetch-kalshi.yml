@@ -1,0 +1,48 @@
+name: Refresh prediction questions
+
+# 스포츠 / 사회문제 게임이 쓰는 문제를 kalshi.com에서 하루 한 번 받아옵니다.
+#
+# 앱은 서버가 없는 정적 사이트이고 kalshi는 CORS를 열어 두지 않아서 브라우저에서 직접 못 부릅니다.
+# 그래서 여기서 받아 src/predictdata.ts로 저장소에 넣고, 앱은 그 파일만 읽습니다.
+# 이 워크플로가 푸시하면 배포 워크플로가 이어서 돌아 앱에 반영됩니다.
+
+on:
+  schedule:
+    # 매일 21:00 UTC = 한국 시간 아침 6시
+    - cron: '0 21 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-questions
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch settled markets
+        run: node scripts/fetch-kalshi.mjs
+
+      - name: Commit when the questions changed
+        shell: bash
+        run: |
+          if git diff --quiet -- src/predictdata.ts; then
+            echo "바뀐 문제가 없어 커밋하지 않습니다."
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/predictdata.ts
+          git commit -m 'Refresh prediction questions from kalshi'
+          git push
