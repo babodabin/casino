@@ -4654,18 +4654,44 @@ function BaccaratGameScreen({
   const [bet, setBet] = useState<BaccaratBet>('player');
   const [round, setRound] = useState<ReturnType<typeof dealBaccaratRound> | null>(null);
   const [showRules, setShowRules] = useState(false);
+  // 베팅하면 바로 결과가 나오는 게 아니라, 한 번 누를 때마다 카드가 한 장씩 열립니다.
+  const [flipped, setFlipped] = useState(0);
+  const settledRef = useRef(false);
   const difficultyOption = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const labels = { player: '플레이어', banker: '뱅커', tie: '타이' } as const;
   const odds = { player: '1:1', banker: '0.95:1', tie: '8:1' } as const;
 
+  // 실제 바카라가 카드를 놓는 순서입니다. 플레이어·뱅커 두 장씩 번갈아 놓고, 세 번째 장은 플레이어 먼저입니다.
+  const dealOrder: ('player' | 'banker')[] = round
+    ? [
+        'player', 'banker', 'player', 'banker',
+        ...(round.player.length > 2 ? ['player' as const] : []),
+        ...(round.banker.length > 2 ? ['banker' as const] : []),
+      ]
+    : [];
+  const openCount = { player: 0, banker: 0 };
+  for (let index = 0; index < flipped && index < dealOrder.length; index += 1) openCount[dealOrder[index]] += 1;
+  const allOpen = !!round && flipped >= dealOrder.length;
+
   const deal = () => {
     if (!onPlaceBet(selectedBet)) return;
-    const nextRound = dealBaccaratRound();
-    setRound(nextRound);
-    onSettle(bet, selectedBet, nextRound.winner);
+    settledRef.current = false;
+    setFlipped(0);
+    setRound(dealBaccaratRound());
   };
+  const flipNext = () => setFlipped((value) => Math.min(dealOrder.length, value + 1));
+  const restart = () => { setRound(null); setFlipped(0); settledRef.current = false; };
 
-  const net = round ? baccaratNet(bet, selectedBet, round.winner) : 0;
+  // 마지막 장까지 열린 뒤에 정산합니다.
+  useEffect(() => {
+    if (!round || !allOpen || settledRef.current) return;
+    settledRef.current = true;
+    onSettle(bet, selectedBet, round.winner);
+  }, [round, allOpen]);
+
+  const net = round && allOpen ? baccaratNet(bet, selectedBet, round.winner) : 0;
+  const shownEmphasis = (side: 'player' | 'banker') =>
+    !allOpen || !round ? undefined : round.winner === side ? 'winner' : round.winner === 'tie' ? 'selected' : 'dim';
   return (
     <View style={styles.baccaratScreen}>
       <ScreenHeader title="바카라(Baccarat)" onBack={onBack} />
@@ -4678,19 +4704,22 @@ function BaccaratGameScreen({
 
         <View style={styles.baccaratTable}>
           <View style={styles.baccaratHandSection}>
-            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>PLAYER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.player) : '–'}</Text></View>
-            <View style={styles.baccaratCards}>{round ? round.player.map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} emphasis={round.winner==='player'?'winner':round.winner==='tie'?'selected':'dim'} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>PLAYER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
+            <View style={styles.baccaratCards}>{round ? round.player.map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} hidden={index >= openCount.player} emphasis={shownEmphasis('player')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
           </View>
-          <View style={styles.baccaratDivider} />
           <View style={styles.baccaratHandSection}>
-            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>BANKER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.banker) : '–'}</Text></View>
-            <View style={styles.baccaratCards}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} emphasis={round.winner==='banker'?'winner':round.winner==='tie'?'selected':'dim'} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>BANKER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
+            <View style={styles.baccaratCards}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
           </View>
         </View>
 
-        {round && <View style={[styles.baccaratResult, net > 0 ? styles.rouletteWinCard : net < 0 ? styles.rouletteLossCard : styles.baccaratPushCard]}><Text style={styles.rouletteResultTitle}>{labels[round.winner]} 승리</Text><Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text></View>}
+        {round && allOpen && <View style={[styles.baccaratResult, net > 0 ? styles.rouletteWinCard : net < 0 ? styles.rouletteLossCard : styles.baccaratPushCard]}><Text style={styles.rouletteResultTitle}>{labels[round.winner]} 승리</Text><Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text></View>}
 
-        {round ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={() => setRound(null)}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable> : <Pressable disabled={selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction, selectedBet > coins && styles.disabledCard]} onPress={deal}><Text style={styles.primaryButtonText}>{labels[bet]}에 {selectedBet.toLocaleString()} WC 베팅</Text></Pressable>}
+        {!round
+          ? <Pressable disabled={selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction, selectedBet > coins && styles.disabledCard]} onPress={deal}><Text style={styles.primaryButtonText}>{labels[bet]}에 {selectedBet.toLocaleString()} WC 베팅</Text></Pressable>
+          : !allOpen
+            ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={flipNext}><Text style={styles.primaryButtonText}>{flipped === 0 ? '카드 열기' : `다음 장 열기 · ${flipped}/${dealOrder.length}`}</Text></Pressable>
+            : <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={restart}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
 
         <Text style={styles.sectionTitle}>베팅 위치</Text>
         <View style={styles.baccaratBetRow}>
@@ -6249,7 +6278,6 @@ const styles = StyleSheet.create({
   baccaratScore: { minWidth: 32, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 15, fontWeight: '900' },
   baccaratCards: { minHeight: 110, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' },
   baccaratWaiting: { color: '#82A69E', fontSize: 13, fontWeight: '700' },
-  baccaratDivider: { height: 1, backgroundColor: '#6D8057', marginVertical: 12 },
   baccaratResult: { marginTop: 16, padding: 16, alignItems: 'center', borderRadius: 18, borderWidth: 1 },
   baccaratPushCard: { backgroundColor: '#202D35', borderColor: '#70808A' },
   baccaratBetRow: { flexDirection: 'row', gap: 8 },
