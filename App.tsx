@@ -80,7 +80,7 @@ import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type Si
 import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCategoryLabels, yahtzeePayoutMultiplier, yahtzeeTotal, yahtzeeUpperBonus, yahtzeeUpperSubtotal, type YahtzeeCategory, type YahtzeeDie, type YahtzeeScoreCard } from './src/yahtzee';
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import { arrangeChinesePoker, dealChinesePoker, evaluateChineseArrangement, resolveChinesePoker, type ChineseArrangement, type ChineseResult } from './src/chinesepoker';
-import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
+import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonHandSize, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
 import { bestJokerPlay, discardJokerCards, isJokerRoundOver, jokerDiscards, jokerLadder, jokerMultiplier, jokerPlays, jokerTarget, jokers, playJokerHand, scoreWithJokers, startJokerRound, type JokerId, type JokerRound } from './src/jokerpoker';
 import { predictFavourite, predictGroupOf, predictMultiplier, predictPercent, pickPredictQuestion, settlePredict, type PredictGroup, type PredictQuestion, type PredictSide } from './src/predict';
 import { predictQuestions } from './src/predictdata';
@@ -2343,23 +2343,34 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   const [round,setRound]=useState<{player:TujeonCard[];opponent:TujeonCard[]}|null>(null);
   const [outcome,setOutcome]=useState<ReturnType<typeof resolveTujeon>|null>(null);
   const [folded,setFolded]=useState(false);
+  // 승부를 누르면 상대 패가 한 장씩 열립니다. 다 열려야 결과와 정산이 나옵니다.
+  const [opened,setOpened]=useState(0);
+  const settledRef=useRef(false);
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
-    setRound(dealTujeon());setOutcome(null);setFolded(false);
+    settledRef.current=false;
+    setRound(dealTujeon());setOutcome(null);setFolded(false);setOpened(0);
   };
   const myHand:TujeonHand|null=round?evaluateTujeon(round.player):null;
-  const done=!!outcome||folded;
+  /** 판을 더 이상 만질 수 없는 상태. 죽었거나, 상대 패가 다 열려 결과가 나온 뒤입니다. */
+  const done=folded||(!!outcome&&opened>=tujeonHandSize);
   const fold=()=>{
-    if(!round||!myHand||done)return;
+    if(!round||!myHand||outcome||folded)return;
     setFolded(true);
     onSettle(selectedBet,tujeonFoldRefund,`${myHand.label}로 죽음 · ${Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC 회수`);
   };
   const showdown=()=>{
-    if(!round||!myHand||done)return;
-    const resolved=resolveTujeon(round.player,round.opponent);
-    setOutcome(resolved);
-    onSettle(selectedBet,tujeonMultiplier(resolved.result),`${resolved.playerHand.label} 대 ${resolved.opponentHand.label} · ${resolved.result==='win'?'승':resolved.result==='push'?'무승부':'패'}`);
+    if(!round||!myHand||outcome||folded)return;
+    setOutcome(resolveTujeon(round.player,round.opponent));
+    setOpened(0);
   };
+  const openNext=()=>setOpened((value)=>Math.min(tujeonHandSize,value+1));
+  const allOpen=!!outcome&&opened>=tujeonHandSize;
+  useEffect(()=>{
+    if(!outcome||!allOpen||settledRef.current)return;
+    settledRef.current=true;
+    onSettle(selectedBet,tujeonMultiplier(outcome.result),`${outcome.playerHand.label} 대 ${outcome.opponentHand.label} · ${outcome.result==='win'?'승':outcome.result==='push'?'무승부':'패'}`);
+  },[outcome,allOpen]);
   const summary=folded?`${myHand?.label}로 죽어 ${Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC를 회수했습니다`
     :outcome?outcome.result==='win'?`${outcome.playerHand.label}로 이겨 ${Math.round(selectedBet*tujeonWinPayout).toLocaleString()} WC`
       :outcome.result==='push'?'같은 패라 베팅금을 돌려받았습니다'
@@ -2371,16 +2382,16 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
       <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>여든 장 투전목에서 다섯 장</Text><Text style={styles.slotRuleText}>같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.</Text><Text style={styles.slotRuleText}>짝이 없으면 다섯 장을 더한 끝자리가 끗이고 9가 가보, 0이 망통입니다.</Text></View>
       <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'5장 받기'}</Text></Pressable>
     </>:<>
-      <Text style={styles.pokerSeat}>상대 · {outcome?outcome.opponentHand.label:folded?'보지 않고 물러남':'승부 전 비공개'}</Text>
-      <View style={styles.tujeonRow}>{round.opponent.map(card=><TujeonCardView key={card.id} card={card} hidden={!outcome} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <Text style={styles.pokerSeat}>상대 · {allOpen?outcome!.opponentHand.label:folded?'보지 않고 물러남':outcome?`${opened}장 공개`:'승부 전 비공개'}</Text>
+      <View style={styles.tujeonRow}>{round.opponent.map((card,index)=><TujeonCardView key={card.id} card={card} hidden={!outcome||index>=opened} emphasis={allOpen?(outcome!.result==='loss'?'winner':'dim'):undefined}/>)}</View>
       <Text style={styles.sectionTitle}>내 패</Text>
-      <View style={styles.tujeonRow}>{round.player.map(card=><TujeonCardView key={card.id} card={card} emphasis={outcome?(outcome.result==='win'?'winner':'dim'):undefined}/>)}</View>
+      <View style={styles.tujeonRow}>{round.player.map(card=><TujeonCardView key={card.id} card={card} emphasis={allOpen?(outcome!.result==='win'?'winner':'dim'):undefined}/>)}</View>
       <Text style={styles.tujeonHandLabel}>{myHand?.label}</Text>
-      {!done&&<Text style={styles.tujeonAdvice}>{myHand&&shouldFoldTujeon(myHand)?'끗이 낮습니다. 죽는 편이 나을 수 있습니다.':'해볼 만한 패입니다.'}</Text>}
-      {!done?<View style={styles.pokerActionRow}>
+      {!outcome&&!folded&&<Text style={styles.tujeonAdvice}>{myHand&&shouldFoldTujeon(myHand)?'끗이 낮습니다. 죽는 편이 나을 수 있습니다.':'해볼 만한 패입니다.'}</Text>}
+      {!outcome&&!folded?<View style={styles.pokerActionRow}>
         <Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>죽기 · {Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC 회수</Text></Pressable>
         <Pressable style={[styles.primaryButton,styles.paiGowShowdownButton]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable>
-      </View>:<>
+      </View>:outcome&&!allOpen?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={openNext}><Text style={styles.primaryButtonText}>{opened===0?'상대 패 열기':`다음 장 열기 · ${opened}/${tujeonHandSize}`}</Text></Pressable>:<>
         <Text style={styles.sicboResult}>{summary}</Text>
         <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
       </>}
@@ -4226,19 +4237,35 @@ function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet
 
 function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;rules:SeotdaRules;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealSeotda>|null>(null);
-  const [phase,setPhase]=useState<'ready'|'bet'|'result'>('ready');
+  // 'reveal'은 승부가 정해진 뒤 상대 패를 한 장씩 여는 동안입니다. 다 열려야 정산합니다.
+  const [phase,setPhase]=useState<'ready'|'bet'|'reveal'|'result'>('ready');
+  const [opened,setOpened]=useState(0);
+  const pendingRef=useRef<{mine:number;theirs:number;resolved:ReturnType<typeof resolveSeotda>}|null>(null);
   const [betting,setBetting]=useState<PokerBetting>({mine:0,theirs:0,raises:0});
   const [outcome,setOutcome]=useState('');
   const [opponentNote,setOpponentNote]=useState('');
   const [showdown,setShowdown]=useState<ReturnType<typeof resolveSeotda>|null>(null);
 
-  const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealSeotda());setBetting({mine:selectedBet,theirs:selectedBet,raises:0});setOutcome('두 장을 받았습니다');setOpponentNote('컴퓨터도 같은 금액을 냈습니다');setShowdown(null);setPhase('bet');};
+  const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealSeotda());setBetting({mine:selectedBet,theirs:selectedBet,raises:0});setOutcome('두 장을 받았습니다');setOpponentNote('컴퓨터도 같은 금액을 냈습니다');setShowdown(null);setOpened(0);pendingRef.current=null;setPhase('bet');};
 
   const settle=(current:PokerBetting,active:ReturnType<typeof dealSeotda>)=>{
     const resolved=resolveSeotda(active.player,active.opponent,rules);
     setShowdown(resolved);
+    setOpened(0);
+    pendingRef.current={mine:current.mine,theirs:current.theirs,resolved};
+    setOutcome('상대 패를 엽니다');
+    setPhase('reveal');
+  };
+
+  /** 상대 패를 한 장씩 엽니다. 마지막 장이 열리면 그때 승패와 정산이 나옵니다. */
+  const openNextCard=()=>{
+    const next=Math.min(2,opened+1);
+    setOpened(next);
+    if(next<2||!pendingRef.current)return;
+    const {mine,theirs,resolved}=pendingRef.current;
+    pendingRef.current=null;
     setOutcome(resolved.voided?'멍텅구리구사 · 판이 무효가 되어 낸 돈을 돌려받습니다':resolved.result==='win'?'내가 이겼습니다':resolved.result==='loss'?'컴퓨터가 이겼습니다':'같은 족보 · 비겼습니다');
-    onSettle(current.mine,current.theirs,resolved.result,`${resolved.playerHand.name} vs ${resolved.opponentHand.name}`);
+    onSettle(mine,theirs,resolved.result,`${resolved.playerHand.name} vs ${resolved.opponentHand.name}`);
     setPhase('result');
   };
 
@@ -4267,15 +4294,16 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
   const raise=()=>{const need=toCall+selectedBet;if(!onPlaceBet(need))return;const next={mine:betting.mine+need,theirs:betting.theirs,raises:betting.raises+1};setBetting(next);computerTurn(next);};
 
   const emphasis=(side:'player'|'opponent'):'winner'|'dim'|undefined=>{
-    if(!showdown||showdown.voided||showdown.result==='push')return undefined;
+    // 상대 패가 다 열리기 전에는 이겼는지 졌는지 티가 나면 안 됩니다.
+    if(!showdown||opened<2||showdown.voided||showdown.result==='push')return undefined;
     return (side==='player')===(showdown.result==='win')?'winner':'dim';
   };
 
   return <View style={styles.detailScreen}><ScreenHeader title="섰다" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
     <View style={[styles.holdemTable,styles.fiveDrawTable]}>
       <Text style={styles.holdemSeat}>컴퓨터</Text>
-      <View style={styles.hwatuHand}>{round?round.opponent.map((card)=><HwatuCardView key={card.id} card={card} hidden={!showdown} emphasis={emphasis('opponent')} showMonth/>):null}</View>
-      {showdown?<Text style={styles.pokerInlineResult}>{showdown.opponentHand.name} · {showdown.opponentHand.detail}</Text>:null}
+      <View style={styles.hwatuHand}>{round?round.opponent.map((card,index)=><HwatuCardView key={card.id} card={card} hidden={!showdown||index>=opened} emphasis={emphasis('opponent')} showMonth/>):null}</View>
+      {showdown&&opened>=2?<Text style={styles.pokerInlineResult}>{showdown.opponentHand.name} · {showdown.opponentHand.detail}</Text>:null}
       <Text style={styles.holdemPot}>POT {(betting.mine+betting.theirs).toLocaleString()} WC</Text>
       <Text style={styles.pokerContribution}>내가 낸 돈 {betting.mine.toLocaleString()} · 컴퓨터 {betting.theirs.toLocaleString()} WC</Text>
       <Text style={styles.holdemSeat}>나</Text>
@@ -4284,7 +4312,9 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
       {opponentNote?<Text style={styles.pokerOpponentNote}>{opponentNote}</Text>:null}
       <Text style={styles.holdemOutcome}>{outcome||'두 장을 받아 시작하세요'}</Text>
     </View>
-    {phase!=='bet'
+    {phase==='reveal'
+      ?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={openNextCard}><Text style={styles.primaryButtonText}>{opened===0?'상대 패 열기':`다음 장 열기 · ${opened}/2`}</Text></Pressable>
+      :phase!=='bet'
       ?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 하기':'두 장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>
       :<View style={styles.holdemActions}>
         <Pressable style={styles.holdemFold} onPress={fold}><Text style={styles.holdemActionText}>죽기</Text></Pressable>
@@ -5727,7 +5757,9 @@ const styles = StyleSheet.create({
   horseLaneNumberText: { color: '#161616', fontSize: 15, fontWeight: '900' },
   horseLaneCourse: { flex: 1, height: 48, justifyContent: 'center', position: 'relative' },
   horseDistance: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
-  horseRunner: { fontSize: 28 },
+  // 🏇와 🐟는 왼쪽을 보고 있는데 트랙은 오른쪽으로 달립니다. 뒤집어야 앞으로 가는 것처럼 보입니다.
+  // (그레이하운드 🐕는 이미 뒤집어 두었습니다.)
+  horseRunner: { fontSize: 28, transform: [{ scaleX: -1 }] },
   horseFinishLine: { position: 'absolute', right: 8, width: 4, height: 48, backgroundColor: '#F7F1E3', borderLeftWidth: 2, borderLeftColor: '#161616' },
   horsePlace: { width: 38, color: '#FFF4CE', fontSize: 12, fontWeight: '900' },
   horseBetTypeRow: { flexDirection: 'row', gap: 6 },
@@ -6143,7 +6175,7 @@ const styles = StyleSheet.create({
   fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
   fishWeedText: { fontSize: 15, opacity: .5 },
   fishSwim: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
-  fishRunner: { fontSize: 25 },
+  fishRunner: { fontSize: 25, transform: [{ scaleX: -1 }] },
   fishFinish: { position: 'absolute', right: 6, width: 5, height: 44, backgroundColor: '#F2A0A0', borderRadius: 2 },
   fishPlace: { width: 40, color: '#FFE28A', fontSize: 12, fontWeight: '900', textAlign: 'center' },
   fishEventPanel: { padding: 12, borderRadius: 14, backgroundColor: '#0B2E3D', borderWidth: 1, borderColor: '#1D7FA1' },
