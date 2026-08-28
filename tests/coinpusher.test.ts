@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {aimCenter,aimEdge,aimFullest,aimRandom,clampColumn,columnAdvance,createPusherField,dropPusherCoin,pusherCenterColumn,pusherChuteStart,pusherCoinPayout,pusherColumns,pusherGoldPayout,pusherPackedAt,pusherPayout,pusherStartingCoins,pusherStartingGold,pusherStroke,runPusherSession,type PusherCoin,type PusherField} from '../src/coinpusher.ts';
+import {aimCenter,aimEdge,aimFullest,aimRandom,clampColumn,columnAdvance,createPusherField,dropPusherCoin,pusherCenterColumn,pusherChuteStart,pusherCoinPayout,pusherColumns,pusherGoldPayout,pusherPackedAt,pusherPayout,pusherStartingCoins,pusherStartingPrizes,pusherStroke,runPusherSession,type PusherCoin,type PusherField} from '../src/coinpusher.ts';
 
 const seeded=(seed:number)=>{let value=seed;return()=>{value=(value*1103515245+12345)%2147483648;return value/2147483648;};};
 // 0.5를 계속 돌려주면 밀판은 정확히 한 걸음만 밀고, 옆으로 밀리지도 구멍에 빠지지도 않습니다.
@@ -7,10 +7,10 @@ const steady=()=>0.5;
 const field=(...coins:PusherCoin[]):PusherField=>({coins,nextId:100});
 const coin=(column:number,depth:number,kind:PusherCoin['kind']='코인',id=1):PusherCoin=>({id,depth,column,kind});
 
-test('기계에는 동전 열두 개와 금화 한 개가 미리 깔려 있다',()=>{
+test('기계에는 동전 마흔다섯 개와 경품 네 개가 미리 깔려 있다',()=>{
   const start=createPusherField(seeded(5));
-  assert.equal(start.coins.length,pusherStartingCoins+pusherStartingGold);
-  assert.equal(start.coins.filter(item=>item.kind==='금화').length,pusherStartingGold);
+  assert.equal(start.coins.length,pusherStartingCoins+pusherStartingPrizes.length);
+  assert.deepEqual(start.coins.filter(item=>item.kind!=='코인').map(item=>item.kind).sort(),[...pusherStartingPrizes].sort());
   for(const item of start.coins){
     assert.ok(item.depth>0&&item.depth<1,`깊이 ${item.depth}`);
     assert.ok(item.column>=0&&item.column<pusherColumns,`줄 ${item.column}`);
@@ -36,21 +36,21 @@ test('동전이 뭉친 줄이 더 세게 밀린다',()=>{
 });
 
 test('앞턱을 넘은 것만 내 몫이 된다',()=>{
-  const push=dropPusherCoin(field(coin(2,0.98),coin(4,0.5,'코인',2)),3,steady);
+  const push=dropPusherCoin(field(coin(2,0.995),coin(4,0.5,'코인',2)),3,steady);
   assert.equal(push.won.length,1);
   assert.equal(push.won[0].id,1);
   assert.equal(push.multiplier,pusherCoinPayout);
   assert.ok(push.field.coins.every(item=>item.id!==1));
 });
 
-test('금화는 여러 배로 쳐준다',()=>{
-  assert.equal(dropPusherCoin(field(coin(3,0.98,'금화')),3,steady).multiplier,pusherGoldPayout);
+test('경품은 여러 배로 쳐준다',()=>{
+  assert.equal(dropPusherCoin(field(coin(3,0.995,'금화')),3,steady).multiplier,pusherGoldPayout);
   assert.equal(pusherPayout('금화'),pusherGoldPayout);
   assert.equal(pusherPayout('코인'),pusherCoinPayout);
 });
 
 test('여러 개가 한꺼번에 넘어가면 그만큼 더 받는다',()=>{
-  const push=dropPusherCoin(field(coin(1,0.98),coin(3,0.99,'코인',2),coin(5,0.97,'금화',3)),3,steady);
+  const push=dropPusherCoin(field(coin(1,0.995),coin(3,0.996,'코인',2),coin(5,0.997,'금화',3)),3,steady);
   assert.equal(push.won.length,3);
   assert.equal(push.multiplier,pusherCoinPayout*2+pusherGoldPayout);
 });
