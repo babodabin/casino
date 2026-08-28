@@ -80,6 +80,7 @@ import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type Si
 import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCategoryLabels, yahtzeePayoutMultiplier, yahtzeeTotal, yahtzeeUpperBonus, yahtzeeUpperSubtotal, type YahtzeeCategory, type YahtzeeDie, type YahtzeeScoreCard } from './src/yahtzee';
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
 import { arrangeChinesePoker, dealChinesePoker, evaluateChineseArrangement, resolveChinesePoker, type ChineseArrangement, type ChineseResult } from './src/chinesepoker';
+import { dealTujeon, evaluateTujeon, resolveTujeon, shouldFoldTujeon, tujeonFoldRefund, tujeonMultiplier, tujeonSuitMarks, tujeonWinPayout, type TujeonCard, type TujeonHand, type TujeonSuit } from './src/tujeon';
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
@@ -106,14 +107,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -137,7 +138,7 @@ const englishGameNames: Record<string, string> = {
   '텍사스 홀덤': 'Texas Hold’em', '오마하': 'Omaha', '세븐 포커': 'Seven-card Poker',
   '파이브 카드 드로우': 'Five-card Draw', '비디오 포커': 'Video Poker', '하이로우': 'High–Low',
 };
-const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '파이 고우': '牌九, Pai Gow', '차이니즈 포커': '十三水, Chinese Poker' };
+const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '파이 고우': '牌九, Pai Gow', '차이니즈 포커': '十三水, Chinese Poker', '투전': '鬪箋' };
 const gameDisplayName = (name: string) => chineseGameNames[name] ? `${name}(${chineseGameNames[name]})` : englishGameNames[name] ? `${name}(${englishGameNames[name]})` : name;
 
 const gameCategories: GameCategory[] = [
@@ -146,7 +147,7 @@ const gameCategories: GameCategory[] = [
     { name: '맞고', icon: '二', description: '두 명이 열 장씩 받아 빠르게 겨루는 고스톱', status: 'playable' },
     { name: '섰다', icon: '光', description: '두 장의 화투 조합으로 승부', status: 'playable' },
     { name: '도리짓고땡', icon: '十', description: '다섯 장 중 셋으로 짓고 남은 둘로 승부', status: 'playable' },
-    { name: '민화투', icon: '月', description: '광·열끗·띠와 약을 모아 점수를 겨루는 전통 화투', status: 'playable' },
+    { name: '투전', icon: '箋', description: '여든 장 종이패로 같은 숫자를 짝지어 겨루는 노름', status: 'playable' },
     { name: '윷 베팅', icon: '윷', description: '도·개·걸·윷·모 중 던진 결과를 예측', status: 'playable' },
   ]},
   { name: '카지노', icon: '◆', detail: '블랙잭 · 룰렛 · 바카라', eyebrow: 'CASINO GAMES', games: [
@@ -227,6 +228,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '고스톱': 'gostopSetup',
   '맞고': 'matgoSetup',
   '민화투': 'minhwatuSetup',
+  '투전': 'tujeonSetup',
   '육백': 'yukbaekSetup',
   '윷 베팅': 'yutSetup',
   '섰다': 'seotdaSetup',
@@ -718,7 +720,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1059,6 +1061,8 @@ function CasinoApp() {
         {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('fiveDrawSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('파이브 카드 드로우',mine,theirs,result,detail)} />}
         {appScreen === 'chinesePokerSetup' && <SimpleSetupScreen title="차이니즈 포커 준비" hero="十三水 · 5 · 5 · 3" lead="열세 장을 세 줄로 나눠 줄마다 겨룹니다" rules={['1. 카드 열세 장을 받아 뒷줄 5장, 가운뎃줄 5장, 앞줄 3장으로 나눕니다.','2. 뒷줄이 가운뎃줄보다, 가운뎃줄이 앞줄보다 세야 합니다. 어기면 파울로 세 줄을 모두 내줍니다.','3. 앞줄 세 장은 스트레이트와 플러시를 세지 않아 트리플·원 페어·하이 카드만 있습니다.','4. 줄마다 이기면 베팅금의 6분의 1을 받고, 세 줄을 모두 이기면 스쿱이라 두 배가 됩니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('chinesePokerGame')}/>}
         {appScreen === 'chinesePokerGame' && <ChinesePokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('chinesePokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('차이니즈 포커',stake,multiplier,detail)}/>}
+        {appScreen === 'tujeonSetup' && <SimpleSetupScreen title="투전 준비" hero="鬪箋 · 여든 장" lead="같은 숫자를 짝지어 상대와 겨룹니다" rules={['1. 여덟 무리(사람·물고기·새·꿩·별·말·노루·토끼)에 1부터 10까지, 모두 여든 장입니다.','2. 다섯 장을 받아 같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.','3. 짝이 하나도 없으면 다섯 장을 더한 끝자리가 끗이고, 9가 가보 0이 망통입니다.','4. 패를 보고 나쁘면 죽을 수 있습니다. 죽으면 베팅금의 0.35배만 돌려받습니다.','5. 승부해서 이기면 1.9배, 비기면 그대로 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('tujeonGame')}/>}
+        {appScreen === 'tujeonGame' && <TujeonGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('tujeonSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('투전',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
@@ -1938,6 +1942,66 @@ function ChinesePokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
         </View>
       </>}
       {result&&<>
+        <Text style={styles.sicboResult}>{summary}</Text>
+        <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
+      </>}
+    </>}
+  </ScrollView></View>;
+}
+
+const tujeonSuitColors:Record<TujeonSuit,string>={사람:'#B4413F',물고기:'#2F6D8C',새:'#3E7F5C',꿩:'#8C5A2B',별:'#8A6BA8',말:'#A8722E',노루:'#5C6E3E',토끼:'#96566E'};
+
+function TujeonCardView({card,hidden=false,emphasis}:{card:TujeonCard;hidden?:boolean;emphasis?:'winner'|'dim'}){
+  if(hidden)return <View style={[styles.tujeonCard,styles.tujeonCardBack]}><Text style={styles.tujeonCardBackMark}>箋</Text></View>;
+  return <View style={[styles.tujeonCard,emphasis==='winner'&&styles.cardWinner,emphasis==='dim'&&styles.cardDim]}>
+    <View style={[styles.tujeonCardBand,{backgroundColor:tujeonSuitColors[card.suit]}]}><Text style={styles.tujeonCardMark}>{tujeonSuitMarks[card.suit]}</Text></View>
+    <Text style={styles.tujeonCardNumber}>{card.number}</Text>
+    <Text style={styles.tujeonCardSuit}>{card.suit}</Text>
+  </View>;
+}
+
+function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [round,setRound]=useState<{player:TujeonCard[];opponent:TujeonCard[]}|null>(null);
+  const [outcome,setOutcome]=useState<ReturnType<typeof resolveTujeon>|null>(null);
+  const [folded,setFolded]=useState(false);
+  const start=()=>{
+    if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    setRound(dealTujeon());setOutcome(null);setFolded(false);
+  };
+  const myHand:TujeonHand|null=round?evaluateTujeon(round.player):null;
+  const done=!!outcome||folded;
+  const fold=()=>{
+    if(!round||!myHand||done)return;
+    setFolded(true);
+    onSettle(selectedBet,tujeonFoldRefund,`${myHand.label}로 죽음 · ${Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC 회수`);
+  };
+  const showdown=()=>{
+    if(!round||!myHand||done)return;
+    const resolved=resolveTujeon(round.player,round.opponent);
+    setOutcome(resolved);
+    onSettle(selectedBet,tujeonMultiplier(resolved.result),`${resolved.playerHand.label} 대 ${resolved.opponentHand.label} · ${resolved.result==='win'?'승':resolved.result==='push'?'무승부':'패'}`);
+  };
+  const summary=folded?`${myHand?.label}로 죽어 ${Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC를 회수했습니다`
+    :outcome?outcome.result==='win'?`${outcome.playerHand.label}로 이겨 ${Math.round(selectedBet*tujeonWinPayout).toLocaleString()} WC`
+      :outcome.result==='push'?'같은 패라 베팅금을 돌려받았습니다'
+      :`${outcome.opponentHand.label}에 졌습니다`
+    :'';
+  return <View style={styles.pokerTable}><ScreenHeader title={gameDisplayName('투전')} onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View>
+    {!round?<>
+      <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>여든 장 투전목에서 다섯 장</Text><Text style={styles.slotRuleText}>같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.</Text><Text style={styles.slotRuleText}>짝이 없으면 다섯 장을 더한 끝자리가 끗이고 9가 가보, 0이 망통입니다.</Text></View>
+      <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'5장 받기'}</Text></Pressable>
+    </>:<>
+      <Text style={styles.pokerSeat}>상대 · {outcome?outcome.opponentHand.label:folded?'보지 않고 물러남':'승부 전 비공개'}</Text>
+      <View style={styles.tujeonRow}>{round.opponent.map(card=><TujeonCardView key={card.id} card={card} hidden={!outcome} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <Text style={styles.sectionTitle}>내 패</Text>
+      <View style={styles.tujeonRow}>{round.player.map(card=><TujeonCardView key={card.id} card={card} emphasis={outcome?(outcome.result==='win'?'winner':'dim'):undefined}/>)}</View>
+      <Text style={styles.tujeonHandLabel}>{myHand?.label}</Text>
+      {!done&&<Text style={styles.tujeonAdvice}>{myHand&&shouldFoldTujeon(myHand)?'끗이 낮습니다. 죽는 편이 나을 수 있습니다.':'해볼 만한 패입니다.'}</Text>}
+      {!done?<View style={styles.pokerActionRow}>
+        <Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>죽기 · {Math.round(selectedBet*tujeonFoldRefund).toLocaleString()} WC 회수</Text></Pressable>
+        <Pressable style={[styles.primaryButton,styles.paiGowShowdownButton]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable>
+      </View>:<>
         <Text style={styles.sicboResult}>{summary}</Text>
         <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':'다시 하기'}</Text></Pressable>
       </>}
@@ -5052,6 +5116,17 @@ const styles = StyleSheet.create({
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
   chineseHandRow: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  tujeonRow: { width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
+  // 투전목은 길고 좁은 종이패라 서양 카드보다 홀쭉하게 그립니다.
+  tujeonCard: { width: 52, height: 96, borderRadius: 7, backgroundColor: '#F3E7CE', borderWidth: 1, borderColor: '#C6B189', alignItems: 'center', paddingVertical: 6, gap: 2 },
+  tujeonCardBand: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  tujeonCardMark: { color: '#FBF3E2', fontSize: 17, fontWeight: '900' },
+  tujeonCardNumber: { color: '#2A2118', fontSize: 24, fontWeight: '900', lineHeight: 28 },
+  tujeonCardSuit: { color: '#6B5B45', fontSize: 10, fontWeight: '800' },
+  tujeonCardBack: { backgroundColor: '#2A1C1C', borderColor: '#7A3B36', justifyContent: 'center' },
+  tujeonCardBackMark: { color: '#C8A06A', fontSize: 24, fontWeight: '900' },
+  tujeonHandLabel: { color: colors.gold, fontSize: 20, fontWeight: '900' },
+  tujeonAdvice: { color: '#9AA6B8', fontSize: 13, fontWeight: '700' },
   paiGowWarning: { color: '#FFB39D', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   racingPickBanner: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 16, backgroundColor: '#332A12', borderWidth: 2, borderColor: '#E4BB4D' },
   racingPickCopy: { flex: 1 },
