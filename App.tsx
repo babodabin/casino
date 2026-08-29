@@ -4353,7 +4353,7 @@ function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:nu
   };
   const label=(r:ReturnType<typeof evaluateDori>)=>r.kind==='hand'?`${r.hand.name} · ${r.hand.detail}`:'못 지음 · 세 장으로 10의 배수를 만들 수 없습니다';
 
-  return <View style={styles.detailScreen}><ScreenHeader title="도리짓고땡" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
+  return <View style={styles.detailScreen}><ScreenHeader title="도리짓고땡" onBack={onBack}/><View style={styles.fixedTableArea}>
     <View style={[styles.holdemTable,styles.fiveDrawTable]}>
       <Text style={styles.holdemSeat}>컴퓨터</Text>
       {round?handRow(round.opponent,showdown&&!pending?evaluateDori(round.opponent):null,!showdown,winnerSide('opponent'),pending?reveal.opened:undefined):null}
@@ -4376,8 +4376,8 @@ function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:nu
         <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={callOrCheck}><Text style={styles.primaryButtonText}>{toCall>0?`받기 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
         <Pressable disabled={toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={raise}><Text style={styles.primaryButtonText}>더 걸기 +{selectedBet.toLocaleString()}</Text></Pressable>
       </View>}
-    <Text style={styles.disclaimer}>세 장으로 10의 배수를 못 만들면 집니다 · 상대 패는 끝까지 갔을 때만 공개됩니다</Text>
-  </ScrollView></View>;
+    <Text style={styles.sevenPokerLegend}>세 장으로 10의 배수를 못 만들면 집니다 · 상대 패는 끝까지 갔을 때만 공개됩니다</Text>
+  </View></View>;
 }
 
 function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; rules:SeotdaRules; onRulesChange:(v:SeotdaRules)=>void; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
@@ -4515,7 +4515,7 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
     return (side==='player')===(showdown.result==='win')?'winner':'dim';
   };
 
-  return <View style={styles.detailScreen}><ScreenHeader title="섰다" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
+  return <View style={styles.detailScreen}><ScreenHeader title="섰다" onBack={onBack}/><View style={styles.fixedTableArea}>
     <View style={[styles.holdemTable,styles.fiveDrawTable]}>
       <Text style={styles.holdemSeat}>컴퓨터</Text>
       <View style={styles.hwatuHand}>{round?round.opponent.map((card,index)=><HwatuCardView key={card.id} card={card} hidden={!showdown||index>=opened} emphasis={emphasis('opponent')} showMonth/>):null}</View>
@@ -4537,8 +4537,8 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
         <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={callOrCheck}><Text style={styles.primaryButtonText}>{toCall>0?`받기 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
         <Pressable disabled={toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={raise}><Text style={styles.primaryButtonText}>더 걸기 +{selectedBet.toLocaleString()}</Text></Pressable>
       </View>}
-    <Text style={styles.disclaimer}>같은 족보면 비깁니다 · 상대 패는 끝까지 갔을 때만 공개됩니다{betting.raises>=MAX_RAISES_PER_STREET&&phase==='bet'?' · 더 걸기 한도 도달':''}</Text>
-  </ScrollView></View>;
+    <Text style={styles.sevenPokerLegend}>같은 족보면 비깁니다 · 상대 패는 끝까지 갔을 때만 공개됩니다{betting.raises>=MAX_RAISES_PER_STREET&&phase==='bet'?' · 더 걸기 한도':''}</Text>
+  </View></View>;
 }
 
 function PlayingCard({ card, hidden = false, compact = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
@@ -6326,7 +6326,7 @@ const styles = StyleSheet.create({
   sevenPokerVisibility: { overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, fontSize: 8, fontWeight: '900' },
   sevenPokerPrivate: { color: '#FFF1B8', backgroundColor: '#694C18' },
   sevenPokerPublic: { color: '#DDF5E8', backgroundColor: '#17613E' },
-  fiveDrawTable: { minHeight: 520 },
+  fiveDrawTable: { flex: 1, justifyContent: 'center', minHeight: 0 },
   fiveDrawHand: { width: '100%', minHeight: 105, flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 4 },
   holdemCommunity: { minHeight: 90, flexDirection: 'row', justifyContent: 'center', gap: 4 },
   holdemPot: { color: '#FFE080', fontSize: 16, fontWeight: '900', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
