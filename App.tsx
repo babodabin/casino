@@ -4808,7 +4808,6 @@ function BlackjackGameScreen(props: {
             <Pressable disabled={props.coins < props.bet} style={[styles.primaryButton, styles.fullWidthButton, props.coins < props.bet && styles.disabledCard]} onPress={props.onPlayAgain}>
               <Text style={styles.primaryButtonText}>새 게임 시작</Text>
             </Pressable>
-            <Pressable style={styles.exitButton} onPress={props.onExit}><Text style={styles.exitButtonText}>카지노 목록으로</Text></Pressable>
           </View>
         )}
 
@@ -4820,7 +4819,6 @@ function BlackjackGameScreen(props: {
             <Pressable disabled={props.coins < props.bet} style={[styles.primaryButton, styles.fullWidthButton, props.coins < props.bet && styles.disabledCard]} onPress={props.onPlayAgain}>
               <Text style={styles.primaryButtonText}>같은 금액으로 다시 하기</Text>
             </Pressable>
-            <Pressable style={styles.exitButton} onPress={props.onExit}><Text style={styles.exitButtonText}>카지노 목록으로</Text></Pressable>
           </View>
         )}
 
@@ -5823,7 +5821,7 @@ const styles = StyleSheet.create({
   gameActionsTight: { marginTop: 10 },
   gameActionButtonTight: { minHeight: 56 },
   stakeButtonTight: { minHeight: 42, marginTop: 8 },
-  resultPanelTight: { marginTop: 10, paddingVertical: 12 },
+  resultPanelTight: { marginTop: 6, paddingVertical: 8, gap: 2 },
   handHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 },
   handTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
   scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
