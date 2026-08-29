@@ -1258,7 +1258,7 @@ function useScrollMemory(key: string) {
  * 탭바가 차지하는 높이. 홈·게임·지갑·기록·설정 다섯 탭이 쓰는 Page가 아래 여백을 이만큼 둡니다.
  * 탭바는 화면 위에 떠 있어서(웹에서는 position:fixed) 여백이 모자라면 마지막 줄이 그 밑에 가립니다.
  */
-const tabBarHeight = 64;
+const tabBarHeight = 52;
 /** 홈 인디케이터에서 띄울 높이. 기기가 여백을 0으로 알려 줘도 최소 22는 띄웁니다. */
 const tabBarLift = (bottom: number) => Math.max(bottom, 22);
 const BottomInsetContext = createContext(0);
@@ -5810,7 +5810,7 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#171107', fontSize: 17, fontWeight: '800' },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
   disclaimer: { color: colors.muted, fontSize: 12, marginTop: 18 },
-  header: { height: 68, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#171D28' },
+  header: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#171D28' },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
   avatarText: { color: colors.goldLight, fontWeight: '800' },
@@ -7005,7 +7005,7 @@ const styles = StyleSheet.create({
   difficultyActiveText: { color: '#171107' },
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
   disclaimerBlock: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 22, padding: 14, borderRadius: 12, backgroundColor: '#0D1119' },
-  tabBar: { height: 64, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
+  tabBar: { height: 52, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
   // 누르는 자리가 막대를 꽉 채웁니다. 남는 자리를 두면 누를 곳은 좁은데 막대만 두꺼워집니다.
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   tabIcon: { color: '#707988', fontSize: 24, lineHeight: 26 },
