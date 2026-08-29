@@ -1909,9 +1909,14 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
-    <><Text style={styles.pokerSeat}>딜러 · {outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text><View style={styles.cardRow}>{round.dealer.map((card,index)=><PlayingCard key={card.id} card={card} hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View><FaceDownCardDeck label="남은 카드"/>
-    <View style={styles.paiGowDivider}><Text style={styles.paiGowDividerTitle}>내 카드 — 로우로 보낼 2장을 선택</Text><Text style={styles.slotRuleText}>{lowIds.length}/2장 선택 · 선택한 카드는 위로 올라갑니다</Text></View>
-    <View style={styles.cardRow}>{round.player.map(card=><Pressable key={card.id} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+    <><DealerTable>
+      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
+      <View style={styles.dealerCardRow}>{round.dealer.map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <Text style={styles.dealerFeltRule}>하이 5장과 로우 2장을 모두 이겨야 승리 · 한 패씩 나누면 무승부</Text>
+      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
+      <View style={styles.dealerCardRow}>{round.player.map(card=><Pressable key={card.id} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+      <DealerBetSpot amount={selectedBet}/>
+    </DealerTable>
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
     {pending?<RevealButton opened={reveal.opened} total={7} onPress={openNext} label="딜러 패 열기"/>:!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
     <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
@@ -4690,40 +4695,30 @@ function BlackjackGameScreen(props: {
       </View>
 
       <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
-        {/* 실제 블랙잭 테이블 모양입니다. 딜러가 서는 쪽이 곧은 변이고 손님 쪽이 둥급니다.
-            슈(카드 통)는 딜러의 왼손 쪽에 놓이므로, 마주 본 우리 눈에는 오른쪽에 옵니다.
-            버림 카드 통은 그 반대쪽, 칩 트레이는 딜러 바로 앞 가운데입니다. */}
-        <View style={styles.bjTable}>
-          <View style={styles.bjDealerEdge}>
-            <View style={styles.bjEdgeSlot}><View style={styles.bjDiscardBox}/><Text style={styles.bjEdgeLabel}>버림</Text></View>
-            <View style={styles.bjEdgeSlot}><View style={styles.bjChipTray}>{['#E4E4E4','#C8402F','#2F6BC8','#2F9B5A','#171107'].map((color)=><View key={color} style={[styles.bjChip,{backgroundColor:color}]}/>)}</View><Text style={styles.bjEdgeLabel}>칩 트레이</Text></View>
-            <View style={styles.bjEdgeSlot}><FaceDownCardDeck label="슈"/></View>
-          </View>
-
-          <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>딜러</Text><Text style={styles.bjScore}>{dealerScore}</Text></View>
-          <View style={styles.bjCardRow}>
+        <DealerTable>
+          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
+          <View style={styles.dealerCardRow}>
             {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
           </View>
 
-          <Text style={styles.bjFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
+          <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
 
-          <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text><Text style={styles.bjScore}>{handValue(player)}</Text></View>
-          <View style={styles.bjCardRow}>
+          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
+          <View style={styles.dealerCardRow}>
             {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} />)}
           </View>
 
           {splitHand && (
             <>
-              <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.bjScore}>{handValue(splitHand)}</Text></View>
-              <View style={styles.bjCardRow}>
+              <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
+              <View style={styles.dealerCardRow}>
                 {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} compact />)}
               </View>
             </>
           )}
 
-          {/* 베팅 서클. 실제로 내 카드는 이 동그라미 바로 위에 깔립니다. */}
-          <View style={styles.bjBetSpot}><CoinStack amount={totalBet} compact /><Text style={styles.bjBetSpotText}>내 자리</Text></View>
-        </View>
+          <DealerBetSpot amount={totalBet} />
+        </DealerTable>
 
         {insuranceOpen && (
           <View style={styles.insurancePanel}>
@@ -4819,6 +4814,29 @@ function Die({ value, rolling=false, index=0 }: { value: number; rolling?:boolea
 
 function FaceDownCardDeck({label='DECK'}:{label?:string}){
   return <View style={styles.tableDeckArea}><View style={styles.tableDeckShadow}/><View style={[styles.playingCard,styles.compactPlayingCard,styles.hiddenCard,styles.tableDeckCard]}><Text style={styles.hiddenCardMark}>◆</Text></View><Text style={styles.tableDeckLabel}>{label}</Text></View>;
+}
+
+/** 딜러가 서는 쪽이 곧은 변, 손님이 앉는 쪽이 둥근 변인 반원형 테이블입니다.
+    실제 카지노에서 이 모양을 쓰는 게임(블랙잭·바카라·파이 고우)에만 씁니다.
+    슈는 딜러의 왼손 쪽에 놓이므로 마주 본 화면에서는 오른쪽에 옵니다.
+    버림 카드 통은 그 반대쪽, 칩 트레이는 딜러 바로 앞 가운데입니다. */
+const dealerTrayChips = ['#E4E4E4', '#C8402F', '#2F6BC8', '#2F9B5A', '#171107'];
+function DealerTable({ shoe = '슈', children }: { shoe?: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.dealerFelt}>
+      <View style={styles.dealerEdge}>
+        <View style={styles.dealerEdgeSlot}><View style={styles.dealerDiscardBox} /><Text style={styles.dealerEdgeLabel}>버림</Text></View>
+        <View style={styles.dealerEdgeSlot}><View style={styles.dealerChipTray}>{dealerTrayChips.map((color) => <View key={color} style={[styles.dealerChip, { backgroundColor: color }]} />)}</View><Text style={styles.dealerEdgeLabel}>칩 트레이</Text></View>
+        <View style={styles.dealerEdgeSlot}><FaceDownCardDeck label={shoe} /></View>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+/** 반원 아래쪽 베팅 서클. 실제로 손님 카드는 이 동그라미 바로 위에 깔립니다. */
+function DealerBetSpot({ amount, label = '내 자리' }: { amount: number; label?: string }) {
+  return <View style={styles.dealerBetSpot}><CoinStack amount={amount} compact /><Text style={styles.dealerBetSpotText}>{label}</Text></View>;
 }
 
 function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
@@ -4940,16 +4958,14 @@ function BaccaratGameScreen({
         </View>
         {showRules && <BaccaratRules compact />}
 
-        <View style={styles.baccaratTable}>
-          <View style={styles.baccaratHandSection}>
-            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>PLAYER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
-            <View style={styles.baccaratCards}>{round ? round.player.map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} hidden={index >= openCount.player} emphasis={shownEmphasis('player')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
-          </View>
-          <View style={styles.baccaratHandSection}>
-            <View style={styles.baccaratHandTitleRow}><Text style={styles.baccaratHandTitle}>BANKER</Text><Text style={styles.baccaratScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
-            <View style={styles.baccaratCards}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
-          </View>
-        </View>
+        <DealerTable>
+          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>PLAYER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
+          <View style={styles.dealerCardRow}>{round ? round.player.map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} compact hidden={index >= openCount.player} emphasis={shownEmphasis('player')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+          <Text style={styles.dealerFeltRule}>PLAYER 1 TO 1 · BANKER 0.95 TO 1 · TIE 8 TO 1</Text>
+          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>BANKER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
+          <View style={styles.dealerCardRow}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} compact hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+          <DealerBetSpot amount={selectedBet} label={`${labels[bet]}에 베팅`} />
+        </DealerTable>
 
         {round && allOpen && <View style={[styles.baccaratResult, net > 0 ? styles.rouletteWinCard : net < 0 ? styles.rouletteLossCard : styles.baccaratPushCard]}><Text style={styles.rouletteResultTitle}>{labels[round.winner]} 승리</Text><Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text></View>}
 
@@ -5737,20 +5753,21 @@ const styles = StyleSheet.create({
   blackjackTable: { flex: 1, backgroundColor: '#07251D' },
   // 반원형 블랙잭 테이블. 위쪽 곧은 변이 딜러 자리, 아래쪽 둥근 변이 손님 자리입니다.
   // 아래 모서리 반경을 크게 줘서 반원처럼 보이게 합니다.
-  bjTable: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 10, paddingHorizontal: 14, paddingBottom: 20, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14 },
-  bjDealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  bjEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
-  bjChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
-  bjChip: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
-  bjDiscardBox: { width: 34, height: 26, borderRadius: 4, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
-  bjEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
-  bjSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
-  bjSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
-  bjScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
-  bjCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 92, flexWrap: 'wrap' },
-  bjFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 6, textAlign: 'center' },
-  bjBetSpot: { marginTop: 8, width: 98, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  bjBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
+  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 10, paddingHorizontal: 14, paddingBottom: 20, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14 },
+  dealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  dealerEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
+  dealerChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
+  dealerChip: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
+  dealerDiscardBox: { width: 34, height: 26, borderRadius: 4, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
+  dealerEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
+  dealerSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
+  dealerSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
+  dealerSeatNote: { color: '#8FBFA8', fontSize: 11, fontWeight: '700' },
+  dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
+  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 92, flexWrap: 'wrap' },
+  dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 6, textAlign: 'center' },
+  dealerBetSpot: { marginTop: 8, width: 98, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
   gameTopActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
