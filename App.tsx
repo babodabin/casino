@@ -2867,7 +2867,7 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
   const deal = () => { if (!onPlaceBet(selectedBet)) return; const next = dealVideoPoker(); setHand(next.hand); setDeck(next.deck); setHeld([false, false, false, false, false]); setPhase('hold'); };
   const draw = () => { const next = exchangeVideoPoker(hand, deck, held); setHand(next.hand); setDeck(next.deck); setPhase('result'); onSettle(selectedBet, next.hand); };
   const reset = () => { setHand([]); setDeck([]); setHeld([false, false, false, false, false]); setPhase('ready'); };
-  return <View style={styles.videoPokerScreen}><ScreenHeader title="비디오 포커(Video Poker)" onBack={onBack} /><ScrollView contentContainerStyle={styles.videoPokerPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.videoPokerScreen}><ScreenHeader title="비디오 포커(Video Poker)" onBack={onBack} /><View style={styles.fixedTableArea}>
     <View style={styles.videoPokerCabinet}>
       <View style={styles.videoPokerMarquee}><View style={styles.marqueeBulb} /><View><Text style={styles.videoPokerMarqueeSmall}>WORLD CASINO</Text><Text style={styles.videoPokerMarqueeTitle}>JACKS OR BETTER</Text></View><View style={styles.marqueeBulb} /></View>
       <View style={styles.videoPokerGlass}>
@@ -2878,9 +2878,10 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
       <View style={styles.videoPokerControlDeck}><View style={styles.videoPokerCoinSlot}><Text style={styles.videoPokerCoinSlotText}>WC</Text></View>{phase === 'ready' && <Pressable disabled={selectedBet > coins} onPress={deal} style={[styles.videoPokerDealButton, selectedBet > coins && styles.disabledCard]}><Text style={styles.videoPokerDealText}>DEAL</Text><Text style={styles.videoPokerDealSub}>카드 받기</Text></Pressable>}{phase === 'hold' && <Pressable onPress={draw} style={styles.videoPokerDealButton}><Text style={styles.videoPokerDealText}>DRAW</Text><Text style={styles.videoPokerDealSub}>카드 교환</Text></Pressable>}{phase === 'result' && <Pressable onPress={reset} style={styles.videoPokerDealButton}><Text style={styles.videoPokerDealText}>NEW GAME</Text><Text style={styles.videoPokerDealSub}>다시 베팅</Text></Pressable>}<View style={styles.videoPokerSpeaker}><Text style={styles.videoPokerSpeakerText}>••••</Text></View></View>
       <View style={styles.videoPokerBase}><Text style={styles.videoPokerBaseText}>INSERT WORLD COIN · TOUCH SCREEN</Text></View>
     </View>
-    <View style={styles.videoPokerPaytable}><Text style={styles.slotRulesTitle}>게임 방법</Text><Text style={styles.slotRuleText}>실제 비디오 포커 기계처럼 카드 화면을 눌러 HOLD할 카드를 고릅니다.</Text><Text style={styles.slotRuleText}>DEAL로 시작하고 DRAW를 누르면 선택하지 않은 카드만 한 번 교환됩니다.</Text></View>
-    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>첫 5장을 받은 뒤 한 번만 교환합니다 · 게임 전용 가상 코인</Text>
-  </ScrollView></View>;
+
+    <View style={styles.betChipRow}>{option.bets.map((amount) => <Pressable key={amount} disabled={phase !== 'ready'} onPress={() => onBetChange(amount)} style={[styles.betChipButton, selectedBet === amount && styles.betChipActive, phase !== 'ready' && styles.disabledCard]}><Text style={styles.betChipText}>{amount.toLocaleString()}</Text></Pressable>)}</View>
+    <Text style={styles.sevenPokerLegend}>DEAL로 시작 · 남길 카드를 눌러 HOLD · DRAW로 나머지만 한 번 교환</Text>
+  </View></View>;
 }
 
 function FiveDrawSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
@@ -5018,8 +5019,8 @@ function BaccaratGameScreen({
             ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={flipNext}><Text style={styles.primaryButtonText}>{flipped === 0 ? '카드 열기' : `다음 장 열기 · ${flipped}/${dealOrder.length}`}</Text></Pressable>
             : <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={restart}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
 
-        <View style={styles.baccaratAmountRow}>
-          {difficultyOption.bets.map((amount) => <Pressable key={amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} style={[styles.baccaratAmount, selectedBet === amount && styles.baccaratAmountActive, Boolean(round) && styles.disabledCard]}><Text style={styles.baccaratAmountText}>{amount.toLocaleString()}</Text></Pressable>)}
+        <View style={styles.chipRow}>
+          {difficultyOption.bets.map((amount) => <Pressable key={amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} style={[styles.betChipButton, selectedBet === amount && styles.betChipActive, Boolean(round) && styles.disabledCard]}><Text style={styles.betChipText}>{amount.toLocaleString()}</Text></Pressable>)}
         </View>
 
         <Text style={styles.sevenPokerLegend}>테이블 위 자리를 눌러 베팅합니다 · 뱅커는 5% 수수료 · 타이 8:1</Text>
@@ -6553,7 +6554,7 @@ const styles = StyleSheet.create({
   sicboOdds: { color: '#C9BDC2', fontSize: 8, marginTop: 4 },
   videoPokerScreen: { flex: 1, backgroundColor: '#071A2A' },
   videoPokerPage: { padding: 18, paddingBottom: 48 },
-  videoPokerCabinet: { borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
+  videoPokerCabinet: { flex: 1, justifyContent: 'center', borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
   videoPokerMarquee: { minHeight: 84, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#A6202D', borderBottomWidth: 4, borderBottomColor: '#F0C35A' },
   marqueeBulb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFF3A3', borderWidth: 2, borderColor: '#F8D24E', shadowColor: '#FFF0A0', shadowOpacity: 1, shadowRadius: 8 },
   videoPokerMarqueeSmall: { color: '#FFD767', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 3 },
@@ -6619,10 +6620,10 @@ const styles = StyleSheet.create({
   baccaratSpotActive: { borderColor: colors.gold, backgroundColor: 'rgba(90,70,20,0.45)' },
   baccaratSpotName: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
   baccaratSpotOdds: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
-  baccaratAmountRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
-  baccaratAmount: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#132A25', borderWidth: 1, borderColor: '#2E594C' },
-  baccaratAmountActive: { borderColor: colors.gold, backgroundColor: '#2A3518' },
-  baccaratAmountText: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
+  betChipRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
+  betChipButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#132A25', borderWidth: 1, borderColor: '#2E594C' },
+  betChipActive: { borderColor: colors.gold, backgroundColor: '#2A3518' },
+  betChipText: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
   baccaratTable: { marginTop: 20, padding: 16, borderRadius: 70, backgroundColor: '#0A3A36', borderWidth: 3, borderColor: '#B88A30' },
   baccaratHandSection: { minHeight: 158 },
   baccaratHandTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
