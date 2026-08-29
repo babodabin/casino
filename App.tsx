@@ -4090,6 +4090,9 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   // 아래가 내 자리와 손패입니다. 스크롤이 없어 판 전체가 한눈에 들어옵니다.
   const takenRow=(cards:HwatuCard[],fresh?:Set<string>)=><View style={styles.goStopTakenRow}>{cards.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
   const freshIds=new Set(lastOpponentCapture.map((card)=>card.id));
+  // 손패 한 줄에 다 들어오도록 장수에 맞춰 겹치는 정도를 정합니다. 적을 때는 겹치지 않습니다.
+  const handCount=round?round.players[0].hand.length:0;
+  const handStep=Math.min(55,handCount>1?(335-52)/(handCount-1):55);
 
   return <View style={styles.detailScreen}><ScreenHeader title={title} onBack={onBack}/>
     {!round?<ScrollView contentContainerStyle={styles.holdemPage}>
@@ -4115,7 +4118,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       {takenRow(round.players[0].captured)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
-      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?styles.goStopHandOverlap:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
+      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?{marginLeft:handStep-52}:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
 
       <View style={styles.goStopActionArea}>
         {pendingPlay?<>
@@ -6721,9 +6724,9 @@ const styles = StyleSheet.create({
   // 화투도 마찬가지로 담요 위에서 하지 초록 펠트가 아닙니다.
   hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
   // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
-  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4 },
+  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0E5636' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
-  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(6,32,22,0.66)', borderWidth: 1, borderColor: '#2C5644', gap: 3 },
+  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 3 },
   goStopSeatActive: { borderColor: colors.gold },
   goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
@@ -6736,7 +6739,6 @@ const styles = StyleSheet.create({
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 80, alignItems: 'center' },
-  goStopHandOverlap: { marginLeft: -18 },
   goStopActionArea: { gap: 4 },
   goStopButtonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   goStopButton: { flex: 1, minWidth: 120, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#1D6B45', borderWidth: 1, borderColor: colors.gold },
@@ -6747,7 +6749,7 @@ const styles = StyleSheet.create({
   // 바닥에 깔 작은 패와, 모은 패를 겹쳐 쌓을 때 쓰는 아주 작은 패입니다.
   hwatuCardSmall: { width: 40, height: 60, borderRadius: 3 },
   hwatuCardTiny: { width: 20, height: 30, borderRadius: 2 },
-  hwatuFloorBoardCompact: { minHeight: 150, borderRadius: 44, paddingVertical: 4, marginVertical: 0 },
+  hwatuFloorBoardCompact: { minHeight: 150, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0, paddingVertical: 4, marginVertical: 0 },
   hwatuFloorRowCompact: { minHeight: 61, gap: 2 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
