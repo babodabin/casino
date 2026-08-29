@@ -473,9 +473,12 @@ function CasinoApp() {
   // 노치와 홈 인디케이터가 차지하는 높이. 웹에서는 CSS env()를 재서 가져옵니다.
   // (네이티브에서는 0으로 두고 화면이 알아서 처리하게 합니다.)
   const [insets, setInsets] = useState({ top: 0, bottom: 0 });
-  // 기기가 알려 주는 시계 자리에서 되찾는 높이. 시계는 그 자리 가운데에 그려지므로
-  // 아래쪽 얼마간은 비어 있습니다. 글자가 시계에 닿으면 이 값을 줄이면 됩니다.
-  const topInsetTrim = 10;
+  // 기기가 알려 주는 시계 자리에서 되찾는 높이.
+  // 시계는 그 자리 가운데에 그려져서 아래쪽이 비는데, 그 빈 높이가 기기마다 다릅니다.
+  // 다이내믹 아일랜드 폰은 59쯤, 노치 폰은 47쯤을 알려 주므로 고정값으로 깎으면
+  // 큰 폰에서는 빈자리가 그대로 남습니다. 그래서 알려 준 값의 30%를 깎습니다.
+  // (59 → 17, 47 → 14, 44 → 13). 글자가 시계에 닿으면 0.3을 낮추면 됩니다.
+  const topInsetTrim = Math.round(insets.top * 0.3);
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     // 아이폰에서 env(safe-area-inset-*)이 실제 값을 주려면 뷰포트에 viewport-fit=cover가 있어야 합니다.
