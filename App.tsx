@@ -1878,14 +1878,14 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
   const showdown=(raised=false)=>{if(!round||result||pending)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';reveal.reset();setPending({mine:myBet,theirs:opponentBet,result:next,detail:`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`});};
   const openNext=()=>{if(!pending)return;const next=Math.min(3,reveal.opened+1);reveal.open(3);if(next<3)return;setResult(pending.result);onSettle(pending.mine,pending.theirs,pending.result,pending.detail);setPending(null);};
   const fold=()=>{if(!round||result)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
-  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
+  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>컴퓨터</Text><Text style={styles.dealerSeatNote}>{folded?'비공개':result?evaluateTeenPatti(round.opponent).label:`${reveal.opened}/3 공개`}</Text></View>
       <View style={styles.dealerCardRow}>{round.opponent.map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View>
       <Text style={styles.dealerFeltRule}>트레일 · 스트레이트 플러시 · 스트레이트 · 플러시 · 페어 순으로 셉니다</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>나</Text><Text style={styles.dealerSeatNote}>{evaluateTeenPatti(round.player).label}</Text></View>
       <View style={styles.dealerCardRow}>{round.player.map(card=><PlayingCard key={card.id} card={card} compact emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>
       <DealerBetSpot amount={mine}/>
-    </DealerTable>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:revealing?<RevealButton opened={reveal.opened} total={3} onPress={openNext} label="컴퓨터 패 열기"/>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</ScrollView></View>;
+    </DealerTable>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:revealing?<RevealButton opened={reveal.opened} total={3} onPress={openNext} label="컴퓨터 패 열기"/>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</View></View>;
 }
 
 function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}){
@@ -1913,21 +1913,21 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     onSettle(selectedBet,pending.result,`하이 ${playerSplit.highRank.label} ${pending.high==='win'?'승':'패'} · 로우 ${playerSplit.lowRank.label} ${pending.low==='win'?'승':'패'}`);
     setPending(null);
   };
-  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><View style={styles.fixedTableArea}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
-      <View style={styles.dealerCardRow}>{round.dealer.map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <View style={styles.dealerCardRow}>{round.dealer.map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
       <Text style={styles.dealerFeltRule}>하이 5장과 로우 2장을 모두 이겨야 승리 · 한 패씩 나누면 무승부</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
-      <View style={styles.dealerCardRow}>{round.player.map(card=><Pressable key={card.id} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+      <View style={styles.dealerCardRow}>{round.player.map((card,index)=><Pressable key={card.id} style={index?styles.dealerCardFan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
       <DealerBetSpot amount={selectedBet}/>
     </DealerTable>
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
     {pending?<RevealButton opened={reveal.opened} total={7} onPress={openNext} label="딜러 패 열기"/>:!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
     <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
-  </ScrollView></View>;
+  </View></View>;
 }
 
 
@@ -4987,7 +4987,7 @@ function BaccaratGameScreen({
   return (
     <View style={styles.baccaratScreen}>
       <ScreenHeader title="바카라(Baccarat)" onBack={onBack} />
-      <ScrollView contentContainerStyle={styles.baccaratPage} showsVerticalScrollIndicator={false}>
+      <View style={styles.fixedTableArea}>
         <View style={styles.rouletteStatusRow}>
           <View><Text style={styles.eyebrow}>BACCARAT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
           <View style={styles.baccaratStatusActions}><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View><Pressable style={styles.rulesButton} onPress={() => setShowRules((value) => !value)}><Text style={styles.rulesButtonText}>? 규칙</Text></Pressable></View>
@@ -5000,7 +5000,14 @@ function BaccaratGameScreen({
           <Text style={styles.dealerFeltRule}>PLAYER 1 TO 1 · BANKER 0.95 TO 1 · TIE 8 TO 1</Text>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>BANKER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
           <View style={styles.dealerCardRow}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} compact hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
-          <DealerBetSpot amount={selectedBet} label={`${labels[bet]}에 베팅`} />
+          <View style={styles.baccaratSpotRow}>{(['player', 'tie', 'banker'] as BaccaratBet[]).map((option) => {
+            const active = bet === option;
+            return <Pressable key={option} disabled={Boolean(round)} onPress={() => setBet(option)} style={[styles.baccaratSpot, active && styles.baccaratSpotActive]}>
+              <Text style={styles.baccaratSpotName}>{labels[option]}</Text>
+              <Text style={styles.baccaratSpotOdds}>{odds[option]}</Text>
+              {active && <CoinStack amount={selectedBet} compact />}
+            </Pressable>;
+          })}</View>
         </DealerTable>
 
         {round && allOpen && <View style={[styles.baccaratResult, net > 0 ? styles.rouletteWinCard : net < 0 ? styles.rouletteLossCard : styles.baccaratPushCard]}><Text style={styles.rouletteResultTitle}>{labels[round.winner]} 승리</Text><Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text></View>}
@@ -5011,21 +5018,12 @@ function BaccaratGameScreen({
             ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={flipNext}><Text style={styles.primaryButtonText}>{flipped === 0 ? '카드 열기' : `다음 장 열기 · ${flipped}/${dealOrder.length}`}</Text></Pressable>
             : <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={restart}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
 
-        <Text style={styles.sectionTitle}>베팅 위치</Text>
-        <View style={styles.baccaratBetRow}>
-          {(['player', 'tie', 'banker'] as BaccaratBet[]).map((option) => {
-            const active = bet === option;
-            return <Pressable key={option} disabled={Boolean(round)} onPress={() => setBet(option)} style={[styles.baccaratBetArea, option === 'player' && styles.playerBetArea, option === 'banker' && styles.bankerBetArea, active && styles.baccaratBetActive]}>{active && !round && <CoinStack amount={selectedBet} compact />}<Text style={styles.baccaratBetTitle}>{labels[option]}</Text><Text style={styles.baccaratOdds}>{odds[option]}</Text></Pressable>;
-          })}
+        <View style={styles.baccaratAmountRow}>
+          {difficultyOption.bets.map((amount) => <Pressable key={amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} style={[styles.baccaratAmount, selectedBet === amount && styles.baccaratAmountActive, Boolean(round) && styles.disabledCard]}><Text style={styles.baccaratAmountText}>{amount.toLocaleString()}</Text></Pressable>)}
         </View>
 
-        <Text style={styles.sectionTitle}>베팅 금액</Text>
-        <View style={styles.setupOptions}>
-          {difficultyOption.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={Boolean(round)} onPress={() => onBetChange(amount)} />)}
-        </View>
-
-        <Text style={styles.disclaimer}>뱅커 적중 수익은 5% 수수료 적용 · 타이 8:1</Text>
-      </ScrollView>
+        <Text style={styles.sevenPokerLegend}>테이블 위 자리를 눌러 베팅합니다 · 뱅커는 5% 수수료 · 타이 8:1</Text>
+      </View>
     </View>
   );
 }
@@ -5805,6 +5803,8 @@ const styles = StyleSheet.create({
   // 이긴 카드는 cardWinner가 위로 16 들어 올립니다. 그만큼 위쪽 자리를 비워 두지 않으면
   // 들린 카드가 바로 위 이름줄을 덮습니다.
   dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 104, paddingTop: 16, flexWrap: 'wrap' },
+  // 일곱 장처럼 많을 때 부채처럼 겹쳐 한 줄에 담습니다.
+  dealerCardFan: { marginLeft: -22 },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
   dealerBetSpot: { marginTop: 6, width: 98, height: 46, borderRadius: 23, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
   dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
@@ -6613,6 +6613,16 @@ const styles = StyleSheet.create({
   rulesButtonText: { color: colors.text, fontSize: 11, fontWeight: '800' },
   baccaratScreen: { flex: 1, backgroundColor: '#071D25' },
   baccaratPage: { padding: 18, paddingBottom: 44 },
+  // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
+  baccaratSpotRow: { flexDirection: 'row', gap: 8, marginTop: 6, width: '100%', justifyContent: 'center' },
+  baccaratSpot: { flex: 1, maxWidth: 110, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 12, borderWidth: 2, borderColor: '#3E9A75', backgroundColor: 'rgba(4,40,26,0.35)' },
+  baccaratSpotActive: { borderColor: colors.gold, backgroundColor: 'rgba(90,70,20,0.45)' },
+  baccaratSpotName: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
+  baccaratSpotOdds: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
+  baccaratAmountRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
+  baccaratAmount: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#132A25', borderWidth: 1, borderColor: '#2E594C' },
+  baccaratAmountActive: { borderColor: colors.gold, backgroundColor: '#2A3518' },
+  baccaratAmountText: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
   baccaratTable: { marginTop: 20, padding: 16, borderRadius: 70, backgroundColor: '#0A3A36', borderWidth: 3, borderColor: '#B88A30' },
   baccaratHandSection: { minHeight: 158 },
   baccaratHandTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
