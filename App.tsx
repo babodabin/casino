@@ -6146,7 +6146,7 @@ const styles = StyleSheet.create({
   greyhoundTicket: { padding: 14, borderRadius: 16, backgroundColor: '#32243A', borderWidth: 2, borderColor: '#A478B8' },
   greyhoundTicketText: { color: '#F9EFFF', fontSize: 12, lineHeight: 18, fontWeight: '700' },
   greyhoundResult: { padding: 16, borderRadius: 18, backgroundColor: '#302338', borderWidth: 1, borderColor: '#AD7DC2' },
-  sevenPokerTable: { minHeight: 0, paddingVertical: 12, gap: 2 },
+  sevenPokerTable: { minHeight: 0, flex: 1, justifyContent: 'center', paddingVertical: 12, gap: 2 },
   highLowResultRow: { width: '100%', flexDirection: 'row', gap: 7 },
   highLowResult: { flex: 1, padding: 10, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.34)', borderWidth: 1, borderColor: '#B8933B' },
   highLowResultTitle: { color: '#FFE080', fontSize: 12, fontWeight: '900', marginBottom: 4 },
@@ -6315,7 +6315,7 @@ const styles = StyleSheet.create({
   mahjongKanButton: { minHeight: 44, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#8C6A2A', backgroundColor: '#2A2113' },
   mahjongSortButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#244B63' },
   mahjongTsumoButton: { flex: 1.2, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#B3232C', borderWidth: 2, borderColor: '#F0C75B' },
-  sevenPokerCards: { minHeight: 96, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  sevenPokerCards: { minHeight: 112, paddingTop: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   sevenPokerHint: { color: '#BBD7C8', fontSize: 10, fontWeight: '700' },
   // 테두리 색이 곧 공개 여부입니다. 금색은 비공개, 초록은 모두가 보는 카드입니다.
   sevenPokerCardSlot: { alignItems: 'center', padding: 2, borderRadius: 11 },
