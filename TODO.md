@@ -27,26 +27,33 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 
 ## 어디를 고치면 되는지
 
-`App.tsx`가 6,400줄이라 매번 찾아 헤매면 시간이 많이 듭니다. 줄 번호는 금방 어긋나므로
+`App.tsx`가 6,800줄이 넘어 매번 찾아 헤매면 시간이 많이 듭니다. 줄 번호는 금방 어긋나므로
 **함수 이름과 스타일 이름**으로 적어 둡니다. 이 이름으로 검색하면 바로 나옵니다.
+위 목록의 번호와 같은 번호입니다.
 
 | 할 일 | 화면 함수 | 손댈 스타일 · 값 |
 | --- | --- | --- |
-| 1. 경륜 원형 트랙 | `CycleRacingGameScreen` | `cycleTrack` · `cycleLane` · `cycleRider` · `cycleJersey` |
-| 2. 홀덤·오마하 나눠 열기 | `PokerGameScreen` (`mode`로 홀덤/오마하 겸용) | 안에 있는 `stage` 상태, `holdemCommunity` · `holdemCards` |
-| 3. 테이블 모양 | 카드 게임 전반 | `holdemTable`(이미 둥근 테이블, 반경 110) · `feltLook`(공용 펠트) · `cardRow` |
-| 4. 카드 크기 | `PlayingCard`(공용 카드 컴포넌트) | `playingCard` 72×108 · `compactPlayingCard` 58×88 · `hwatuCard` 52×78(**건드리지 말 것**) · `tujeonCard` 52×96 |
-| 5. 스크린낚시 | 새로 만들기 | 아래 "새 게임 붙이는 자리" 참고 |
-| 6. 배경 사진 | 화면별 바탕 | `app`(앱 전체) · `detailScreen` · `pokerTable` `#052E22` · `baccaratScreen` `#071D25` |
-| 7. 윷 던지는 느낌 | `YutBetGameScreen`, `YutStickView` | `yutStick` · `yutStickTumbling` · `yutMat` |
-| 7. 비디오포커 회전 | `VideoPokerGameScreen` | `videoPokerHand` · `videoPokerCardWrap` |
-| 7. 피시 레이스 멈칫 | `FishRaceGameScreen` | `fishSwim` · `fishLane` · `fishRunner`, 사건은 `src/fishrace.ts`의 `events` |
+| 1. 남은 화면 한 화면 고정 | 마작 4종 · `ChinesePokerGameScreen` · `BigTwoGameScreen` · `JokerPokerGameScreen` | 바깥을 `fixedTableArea`로 · 판의 `minHeight` 풀고 `flex: 1` · 패가 많으면 `dealerCardFan` |
+| 2. 1대 다수 | `BaccaratGameScreen` → `BlackjackGameScreen` → `PaiGowGameScreen` → `PokerGameScreen` 순서 | `DealerTable`(지금은 자리 개념 없이 세로로 쌓기만 함) |
+| 3. 스크린낚시 | 새로 만들기 | 아래 "새 게임 붙이는 자리" 참고 |
+| 4. 배경 사진 | 화면별 바탕 | `app`(앱 전체) · `detailScreen` · `pokerTable` `#052E22` · `baccaratScreen` `#071D25` · `goStopBoard` `#0E5636` |
+| 5. 윷 던지는 느낌 | `YutBetGameScreen`, `YutStickView` | `yutStick` · `yutStickTumbling` · `yutMat` |
+| 5. 비디오포커 회전 | `VideoPokerGameScreen` | `videoPokerHand` · `videoPokerCardWrap` |
+| 5. 피시 레이스 멈칫 | `FishRaceGameScreen` | `fishSwim` · `fishLane` · `fishRunner`, 사건은 `src/fishrace.ts`의 `events` |
 
-⚠️ **카드 크기는 값만 줄이면 안 됩니다.** `playingCard`와 `compactPlayingCard`는 **공용**이라
-블랙잭 · 바카라 · 홀덤 · 오마하 · 세븐 포커 · 하이로우 · 파이 고우 · 틴 파티 · 비디오 포커 ·
-빅투 · 차이니즈 포커 · 조커 포커가 전부 같이 바뀝니다. 카드가 작아지면 그 줄들의 높이와
-간격(`cardRow`의 `minHeight: 126` 등)도 같이 손봐야 하고, 안 그러면 카드 아래에 빈 공간이 남습니다.
-줄인 뒤 이 화면들을 한 번씩 열어 확인해야 합니다.
+⚠️ **1대 다수는 화면과 로직을 둘 다 고쳐야 합니다.** `DealerTable`은 안에 넣은 것을 세로로
+쌓기만 하므로 손님을 더 넣으면 원 둘레에 앉는 게 아니라 줄만 늘어납니다. 로직도 손님 한 명
+기준입니다 — `dealInitialRound`는 `player` 하나와 `dealer` 하나만 돌리고, `dealPaiGow`는
+덱에서 7장씩 딱 두 몫만 뗍니다. 손님 수를 인자로 받아 몫을 나누도록 바꿔야 합니다.
+바카라만 예외로 쉽습니다. 손님이 몇 명이든 PLAYER·BANKER 패 한 벌을 같이 보므로
+카드 로직은 그대로 두고 베팅만 늘리면 됩니다.
+
+⚠️ **카드 크기는 값만 줄이면 안 됩니다.** `playingCard`(72×108)와 `compactPlayingCard`(58×88)는
+**공용**이라 카드 게임이 전부 같이 바뀝니다. 지금은 한 화면 고정 작업 때문에 대부분의 화면이
+이미 `compact`를 쓰고, 패가 많은 화면은 부채처럼 겹칩니다. 크기를 더 줄이면 겹치는 값
+(`dealerCardFan` −30 · `sevenPokerCardOverlap` −22 · 고스톱 손패는 장수로 계산)도 같이 봐야 합니다.
+`hwatuCard`(52×78)는 건드리지 말 것. 작은 화투패는 `hwatuCardSmall`(40×60)과
+`hwatuCardTiny`(20×30)가 따로 있습니다.
 
 **한 장씩 공개를 다른 게임에 더 넣을 때** — 공용 도구가 이미 있습니다.
 `useReveal()`(연 장수 세기)와 `<RevealButton opened total onPress label/>`. 쓰는 방법은
