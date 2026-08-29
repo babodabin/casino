@@ -6765,7 +6765,7 @@ const styles = StyleSheet.create({
   // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
   goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0E5636' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
-  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 3 },
+  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 3, overflow: 'hidden' },
   goStopSeatActive: { borderColor: colors.gold },
   goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
