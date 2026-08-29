@@ -6638,8 +6638,8 @@ const styles = StyleSheet.create({
   baccaratScreen: { flex: 1, backgroundColor: '#071D25' },
   baccaratPage: { padding: 18, paddingBottom: 44 },
   // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
-  baccaratSpotRow: { flexDirection: 'row', gap: 6, marginTop: 6, width: '100%', maxWidth: 256, justifyContent: 'center' },
-  baccaratSpot: { flex: 1, maxWidth: 82, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 11, borderWidth: 2, borderColor: '#3E9A75', backgroundColor: 'rgba(4,40,26,0.35)' },
+  baccaratSpotRow: { flexDirection: 'row', gap: 6, marginTop: 6, width: '100%', maxWidth: 214, marginBottom: 14, justifyContent: 'center' },
+  baccaratSpot: { flex: 1, maxWidth: 68, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 11, borderWidth: 2, borderColor: '#3E9A75', backgroundColor: 'rgba(4,40,26,0.35)' },
   baccaratSpotActive: { borderColor: colors.gold, backgroundColor: 'rgba(90,70,20,0.45)' },
   baccaratSpotName: { color: '#E8F3EC', fontSize: 11, fontWeight: '900' },
   baccaratSpotOdds: { color: '#8FBFA8', fontSize: 9, fontWeight: '800' },
