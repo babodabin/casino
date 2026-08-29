@@ -1258,6 +1258,13 @@ function useScrollMemory(key: string) {
  * 탭바가 차지하는 높이. 홈·게임·지갑·기록·설정 다섯 탭이 쓰는 Page가 아래 여백을 이만큼 둡니다.
  * 탭바는 화면 위에 떠 있어서(웹에서는 position:fixed) 여백이 모자라면 마지막 줄이 그 밑에 가립니다.
  */
+/**
+ * 지금 열려 있는 화면이 언제 만들어진 것인지. 배포할 때 값이 박힙니다.
+ * 아이폰 홈 화면 앱이 옛 파일을 들고 있으면 여기 적힌 값이 안 바뀝니다.
+ * 그럴 때는 앱을 완전히 닫았다 열거나 사파리에서 한 번 새로 받으면 됩니다.
+ */
+const buildStamp = process.env.EXPO_PUBLIC_BUILD ?? '개발 중';
+
 const tabBarHeight = 52;
 /** 홈 인디케이터에서 띄울 높이. 기기가 여백을 0으로 알려 줘도 최소 22는 띄웁니다. */
 const tabBarLift = (bottom: number) => Math.max(bottom, 22);
@@ -5734,6 +5741,7 @@ function SettingsScreen(props: {
         <Pressable accessibilityRole="button" onPress={() => setDetail('accessibility')}><Row title="접근성" subtitle={accessibilitySummary(props.accessibility)} value="설정  ›" /></Pressable>
       </View>
       <Text style={styles.disclaimerBlock}>이 앱의 WC는 게임 전용 가상 코인이며 실제 현금으로 구매하거나 환전할 수 없습니다.</Text>
+      <Text style={styles.buildStamp}>화면 판번호 {buildStamp}</Text>
     </Page>
   );
 }
@@ -7004,6 +7012,7 @@ const styles = StyleSheet.create({
   difficultyText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   difficultyActiveText: { color: '#171107' },
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  buildStamp: { color: '#4A5364', fontSize: 10, textAlign: 'center', marginTop: 10 },
   disclaimerBlock: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 22, padding: 14, borderRadius: 12, backgroundColor: '#0D1119' },
   tabBar: { height: 52, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
   // 누르는 자리가 막대를 꽉 채웁니다. 남는 자리를 두면 누를 곳은 좁은데 막대만 두꺼워집니다.
