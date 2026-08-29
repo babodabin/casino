@@ -23,24 +23,6 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-
-      - name: Pin web tab bar to physical bottom and lower icons
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          path = Path('App.tsx')
-          text = path.read_text()
-          old = "{appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]} >"
-          if old not in text:
-              old = "{appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>"
-          new = "{appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingTop: insets.bottom, paddingBottom: 0 }, Platform.OS === 'web' && ({ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 100 } as any)]}>"
-          if text.count(old) != 1:
-              raise SystemExit(f'Expected one tab bar marker, found {text.count(old)}')
-          path.write_text(text.replace(old, new, 1))
-          PY
-
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:

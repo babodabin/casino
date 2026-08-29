@@ -1116,7 +1116,10 @@ function CasinoApp() {
           },
         })}</BottomInsetContext.Provider>}
       </View>
-      {appScreen === 'tabs' && <View style={[styles.tabBar, { height: tabBarHeight + tabBarLift(insets.bottom), paddingBottom: tabBarLift(insets.bottom) }]}>
+      {/* 웹(아이폰 홈 화면 앱 포함)에서는 화면 진짜 아래에 붙입니다. 그러지 않으면 주소창이
+          사라질 때 탭바가 화면 밖으로 밀립니다. 예전에는 이 줄을 배포할 때 문자열로 바꿔
+          끼웠는데, 줄을 조금만 고쳐도 빌드가 멈춰서 소스로 옮겼습니다. */}
+      {appScreen === 'tabs' && <View style={[styles.tabBar, { height: tabBarHeight + tabBarLift(insets.bottom), paddingBottom: tabBarLift(insets.bottom) }, Platform.OS === 'web' && ({ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 100 } as any)]}>
         {tabs.map((item) => {
           const selected = item.name === tab;
           return (
