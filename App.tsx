@@ -488,9 +488,6 @@ function CasinoApp() {
       const content = viewport.getAttribute('content') ?? '';
       if (!content.includes('viewport-fit')) viewport.setAttribute('content', `${content}, viewport-fit=cover`);
     }
-    // 홈 화면에 추가해서 전체화면으로 열었는지. 이때만 상태바 자리를 앱이 직접 비워야 합니다.
-    const standalone = window.matchMedia?.('(display-mode: standalone)').matches
-      || (window.navigator as { standalone?: boolean }).standalone === true;
     const measure = () => {
       const probe = document.createElement('div');
       probe.style.cssText = 'position:fixed;top:0;left:0;visibility:hidden;pointer-events:none;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);';
@@ -499,8 +496,10 @@ function CasinoApp() {
       let top = parseFloat(style.paddingTop) || 0;
       const bottom = parseFloat(style.paddingBottom) || 0;
       probe.remove();
-      // 전체화면인데 값을 못 읽으면 헤더가 시계와 겹칩니다. 그럴 때만 최소값을 둡니다.
-      if (standalone && top === 0) top = 44;
+      // 여기서 0이 나오는 것은 값을 못 읽은 게 아니라 진짜 0입니다.
+      // public/index.html이 상태바를 black(불투명)으로 두어서, iOS가 이미 시계 아래에서부터
+      // 화면을 시작해 줍니다. 그래서 앱이 따로 비워 줄 자리가 없습니다.
+      // 예전에는 여기서 44를 강제로 넣어 시계 아래에 빈 띠가 하나 더 깔렸습니다.
       const next = { top, bottom };
       setInsets((current) => (current.top === next.top && current.bottom === next.bottom ? current : next));
     };
