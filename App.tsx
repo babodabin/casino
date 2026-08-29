@@ -88,6 +88,7 @@ import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canB
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
+import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,isHooked,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
 import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
 import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
@@ -111,14 +112,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSetup' | 'predictGame' | 'jokerSetup' | 'jokerGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSetup' | 'predictGame' | 'jokerSetup' | 'jokerGame' | 'fishingSetup' | 'fishingGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓' | '조커 포커';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓' | '조커 포커' | '스크린낚시';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -182,7 +183,7 @@ const gameCategories: GameCategory[] = [
     { name: '예측 마켓', icon: '?!', description: '실제로 일어난 일을 예·아니오로 맞히는 게임', status: 'playable' },
     { name: '그레이하운드', icon: '犬', description: '6마리의 출발과 첫 코너, 막판 질주를 예측', status: 'playable' },
     { name: '피시 레이스', icon: '魚', description: '여섯 물고기의 수중 장애물 경주 우승자를 예측', status: 'playable' },
-    { name: '행운의 물고기', icon: '🐠', description: '갈림길을 헤엄친 물고기가 들어갈 동굴을 예측', status: 'playable' },
+    { name: '스크린낚시', icon: '🎣', description: '던지고 입질을 기다렸다 챔질하고 릴 싸움으로 건져 올리기', status: 'playable' },
   ]},
   { name: '세계 게임', icon: '◎', detail: '세계 전통 · 주사위 · 복권', eyebrow: 'WORLD GAMES', games: [
     { name: '야찌', icon: '⚄', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
@@ -216,6 +217,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '그레이하운드':'greyhoundSetup',
   '코인 푸셔':'pusherSetup',
   '예측 마켓':'predictSetup',
+  '스크린낚시':'fishingSetup',
   '조커 포커':'jokerSetup',
   '자동차 레이스':'carSetup',
   '소싸움':'bullSetup',
@@ -731,7 +733,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓'|'조커 포커',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓'|'조커 포커'|'스크린낚시',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1080,6 +1082,8 @@ function CasinoApp() {
         {appScreen === 'pusherSetup' && <SimpleSetupScreen title="코인 푸셔 준비" hero="◉ ◉ ◉" lead="밀판이 밀어낸 동전이 내 몫입니다" rules={['1. 동전을 한 개 넣으면 밀판이 한 번 앞으로 밉니다.','2. 앞턱을 넘어간 동전이 내 몫입니다. 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아집니다.','3. 금화는 '+pusherGoldPayout+'배로 쳐줍니다.','4. 앞쪽 양옆에는 빠지는 홈이 있어 그리로 밀린 동전은 사라집니다.','5. 판은 실제 기계처럼 그대로 남아 다음에 이어서 합니다.']} startLabel="기계 앞에 서기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('pusherGame')}/>}
         {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['1. 여덟 장을 들고 시작합니다. 그중 다섯 장까지 골라 내면 그 족보로 점수가 붙습니다.','2. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리는 새 카드로 채워집니다.','3. 점수는 (족보 칩 + 낸 카드의 칩) × 배수입니다.','4. 판마다 조커 셋을 무작위로 받습니다. 조커가 칩과 배수를 올려 주니 조커에 맞는 족보를 노리세요.','5. 세 번 다 내고 목표 '+jokerTarget.toLocaleString()+'점을 넘기면 배당이 나옵니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
         {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
+        {appScreen === 'fishingSetup' && <SimpleSetupScreen title="스크린낚시 준비" hero="🎣 바다" lead="던지고 · 기다리고 · 챔질하고 · 건져 올리기" rules={['1. 갯바위 · 방파제 · 먼바다 중 한 곳을 고릅니다. 깊을수록 큰 고기가 나오지만 어렵습니다.','2. 던진 뒤 찌를 보다가 입질이 오면 곧바로 챔질을 누릅니다. 너무 이르거나 늦으면 놓칩니다.','3. 챔질에 성공하면 릴 싸움입니다. 감기로 당겨 오고, 줄이 팽팽하면 버티기로 늦춥니다.','4. 장력이 끝까지 차면 줄이 끊어져 한 푼도 못 받습니다.','5. 불가사리 · 복어 · 해파리도 뭅니다. 잡아도 값이 안 나갑니다.']} startLabel="바다로 나가기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishingGame')}/>}
+        {appScreen === 'fishingGame' && <ScreenFishingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishingSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('스크린낚시',stake,multiplier,detail)}/>}
         {appScreen === 'predictSetup' && <SimpleSetupScreen title="예측 마켓 준비" hero="YES · NO" lead="이미 결과가 나온 실제 사건을 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 사건입니다.','2. 스포츠와 사회문제 두 갈래가 있습니다. 예인지 아니오인지 고르세요.','3. 배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictGame')}/>}
         {appScreen === 'predictGame' && <PredictGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓',stake,multiplier,detail)}/>}
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
@@ -4898,6 +4902,99 @@ function DealerBetSpot({ amount, label = '내 자리' }: { amount: number; label
   return <View style={styles.dealerBetSpot}><CoinStack amount={amount} compact /><Text style={styles.dealerBetSpotText}>{label}</Text></View>;
 }
 
+// 스크린낚시. 오락실 낚시 기계처럼 던지기 → 입질 → 챔질 → 릴 싸움으로 이어집니다.
+// 판정은 전부 src/screenfishing.ts에 있고 이 화면은 누른 시각과 상태만 다룹니다.
+function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(value:number)=>boolean;onSettle:(stake:number,multiplier:number,detail:string)=>void}){
+  const [spotId,setSpotId]=useState<FishingSpotId>('shore');
+  const [phase,setPhase]=useState<'idle'|'waiting'|'bite'|'fight'|'result'>('idle');
+  const [fish,setFish]=useState<Fish|null>(null);
+  const [fight,setFight]=useState<FightState|null>(null);
+  const [message,setMessage]=useState('자리를 고르고 던지세요');
+  const [prize,setPrize]=useState(0);
+  const biteAt=useRef(0);
+  const timers=useRef<ReturnType<typeof setTimeout>[]>([]);
+  const spot=findFishingSpot(spotId);
+
+  const clearTimers=()=>{timers.current.forEach((timer)=>clearTimeout(timer));timers.current=[];};
+  useEffect(()=>clearTimers,[]);
+
+  /** 놓쳤을 때. 어떤 이유든 한 푼도 못 받습니다. */
+  const lose=(why:string,detail:string)=>{clearTimers();setPhase('result');setPrize(0);setMessage(why);onSettle(selectedBet,0,`${spot.name} · ${detail}`);};
+
+  const cast=()=>{
+    if(!onPlaceBet(selectedBet))return;
+    clearTimers();
+    const next=pickFish(spot);
+    setFish(next);setFight(null);setPrize(0);
+    setPhase('waiting');setMessage('찌를 보세요…');
+    timers.current.push(setTimeout(()=>{
+      biteAt.current=Date.now();
+      setPhase('bite');setMessage('입질! 지금 챔질하세요');
+      // 챔질 시간이 지나면 놓칩니다.
+      timers.current.push(setTimeout(()=>lose('늦었습니다 · 미끼만 뺏겼습니다','챔질 놓침'),next.hookWindow));
+    },biteDelay()));
+  };
+
+  const hook=()=>{
+    if(phase==='waiting'){lose('너무 일렀습니다 · 물고기가 달아났습니다','성급한 챔질');return;}
+    if(phase!=='bite'||!fish)return;
+    const reaction=Date.now()-biteAt.current;
+    clearTimers();
+    if(!isHooked(fish,reaction)){lose('늦었습니다 · 미끼만 뺏겼습니다','챔질 놓침');return;}
+    setFight(startFight(fish));setPhase('fight');
+    setMessage(`${fish.name}입니다 · 줄이 끊기지 않게 감으세요`);
+  };
+
+  const act=(action:FightAction)=>{
+    if(phase!=='fight'||!fight||!fish)return;
+    const next=fightStep(fight,action);
+    setFight(next);
+    if(next.snapped){lose('줄이 끊어졌습니다',`${fish.name} 놓침`);return;}
+    if(next.landed){
+      const multiplier=fishingPayout(fish,true);
+      setPhase('result');setPrize(multiplier);
+      setMessage(multiplier>0?`${fish.name}을(를) 건졌습니다!`:`${fish.name}… 값이 안 나갑니다`);
+      onSettle(selectedBet,multiplier,`${spot.name} · ${fish.name}`);
+    }
+  };
+
+  const reset=()=>{clearTimers();setPhase('idle');setFish(null);setFight(null);setPrize(0);setMessage('자리를 고르고 던지세요');};
+  const biggest=spot.fish[spot.fish.length-1];
+
+  return <View style={styles.fishingScreen}><ScreenHeader title="스크린낚시" onBack={onBack}/><View style={styles.fixedTableArea}>
+    <View style={styles.fishingSea}>
+      <View style={styles.fishingSeaTop}>
+        <Text style={styles.fishingSpotName}>{spot.name}</Text>
+        <Text style={styles.fishingSpotDetail}>{spot.detail}</Text>
+      </View>
+      <Text style={styles.fishingFloat}>{phase==='waiting'?'🎣':phase==='bite'?'❗':phase==='fight'?'🐟':phase==='result'?(prize>0?'🎉':'💧'):'🌊'}</Text>
+      <Text style={styles.fishingMessage}>{message}</Text>
+      {phase==='fight'&&fight?<View style={styles.fishingGauges}>
+        <Text style={styles.fishingGaugeLabel}>당겨 온 정도 {Math.round(fight.progress)}%</Text>
+        <View style={styles.fishingGaugeTrack}><View style={[styles.fishingGaugeFill,{width:`${Math.min(100,fight.progress)}%`}]}/></View>
+        <Text style={styles.fishingGaugeLabel}>줄 장력 {Math.round(fight.tension)}%</Text>
+        <View style={styles.fishingGaugeTrack}><View style={[styles.fishingGaugeFill,styles.fishingTension,{width:`${Math.min(100,fight.tension)}%`},fight.tension>72&&styles.fishingTensionHigh]}/></View>
+      </View>:null}
+      {phase==='result'?<Text style={styles.fishingPrize}>{prize>0?`+${Math.round(selectedBet*prize).toLocaleString()} WC · ${prize}배`:`-${selectedBet.toLocaleString()} WC`}</Text>:null}
+      {phase==='idle'?<Text style={styles.fishingHint}>가장 큰 고기: {biggest.name} {biggest.payout}배</Text>:null}
+    </View>
+
+    <View style={styles.fishingActionArea}>
+      {phase==='idle'?<>
+        <View style={styles.betChipRow}>{fishingSpots.map((item)=><Pressable key={item.id} onPress={()=>setSpotId(item.id)} style={[styles.betChipButton,spotId===item.id&&styles.betChipActive]}><Text style={styles.betChipText}>{item.name}</Text></Pressable>)}</View>
+        <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={cast}><Text style={styles.primaryButtonText}>던지기 · {selectedBet.toLocaleString()} WC</Text></Pressable>
+      </>:phase==='waiting'||phase==='bite'?
+        <Pressable style={[styles.primaryButton,styles.fullWidthButton,phase==='bite'&&styles.fishingHookReady]} onPress={hook}><Text style={styles.primaryButtonText}>챔질!</Text></Pressable>
+      :phase==='fight'?<View style={styles.goStopButtonRow}>
+        <Pressable style={styles.goStopButton} onPress={()=>act('감기')}><Text style={styles.primaryButtonText}>감기</Text></Pressable>
+        <Pressable style={styles.goStopButtonQuiet} onPress={()=>act('버티기')}><Text style={styles.holdemActionText}>버티기</Text></Pressable>
+      </View>:
+        <Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다시 던지기</Text></Pressable>}
+      <Text style={styles.sevenPokerLegend}>{spot.fish.filter((item)=>item.payout>0).map((item)=>`${item.name} ${item.payout}배`).join(' · ')}</Text>
+    </View>
+  </View></View>;
+}
+
 function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
   const [bet, setBet] = useState<CrapsBet>('pass'); const [point, setPoint] = useState<number | null>(null); const [last, setLast] = useState<CrapsRollResult | null>(null); const [active, setActive] = useState(false); const [rolling,setRolling]=useState(false); const [rollingDice,setRollingDice]=useState<[number,number]>([1,6]); const option = difficultyOptions.find((item) => item.name === savedTier) ?? difficultyOptions[2]; const difficulty = betTierName(savedTier);
   const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
@@ -6508,6 +6605,24 @@ const styles = StyleSheet.create({
   fishCourse: { flex: 1, height: 46, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(6,40,55,.35)' },
   fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
   fishWeedText: { fontSize: 15, opacity: .5 },
+  fishingScreen: { flex: 1, backgroundColor: '#06202E' },
+  fishingSea: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#0A3247', borderWidth: 2, borderColor: '#1D5875' },
+  fishingSeaTop: { alignItems: 'center', gap: 2 },
+  fishingSpotName: { color: '#EAF4FA', fontSize: 18, fontWeight: '900' },
+  fishingSpotDetail: { color: '#8FB6CC', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  fishingFloat: { fontSize: 52, lineHeight: 60 },
+  fishingMessage: { color: '#FFE9A8', fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  fishingHint: { color: '#7FA6BC', fontSize: 11, fontWeight: '700' },
+  fishingPrize: { color: '#FFD35F', fontSize: 18, fontWeight: '900' },
+  fishingGauges: { width: '100%', gap: 4 },
+  fishingGaugeLabel: { color: '#9FC4DC', fontSize: 11, fontWeight: '800' },
+  fishingGaugeTrack: { height: 14, borderRadius: 7, backgroundColor: '#062432', borderWidth: 1, borderColor: '#1D5875', overflow: 'hidden' },
+  fishingGaugeFill: { height: '100%', backgroundColor: '#3E9A75' },
+  fishingTension: { backgroundColor: '#C9A33B' },
+  // 장력이 여기까지 오면 곧 끊어집니다. 색으로 먼저 알려 줍니다.
+  fishingTensionHigh: { backgroundColor: '#C8402F' },
+  fishingHookReady: { backgroundColor: '#C8402F' },
+  fishingActionArea: { width: '100%', gap: 8, marginTop: 10 },
   fishSwim: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
   fishRunner: { fontSize: 25, transform: [{ scaleX: -1 }] },
   fishFinish: { position: 'absolute', right: 6, width: 5, height: 44, backgroundColor: '#F2A0A0', borderRadius: 2 },
