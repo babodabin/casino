@@ -473,6 +473,9 @@ function CasinoApp() {
   // 노치와 홈 인디케이터가 차지하는 높이. 웹에서는 CSS env()를 재서 가져옵니다.
   // (네이티브에서는 0으로 두고 화면이 알아서 처리하게 합니다.)
   const [insets, setInsets] = useState({ top: 0, bottom: 0 });
+  // 기기가 알려 주는 시계 자리에서 되찾는 높이. 시계는 그 자리 가운데에 그려지므로
+  // 아래쪽 얼마간은 비어 있습니다. 글자가 시계에 닿으면 이 값을 줄이면 됩니다.
+  const topInsetTrim = 10;
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
     // 아이폰에서 env(safe-area-inset-*)이 실제 값을 주려면 뷰포트에 viewport-fit=cover가 있어야 합니다.
@@ -839,7 +842,7 @@ function CasinoApp() {
     // 그 자리에 앱 배경(거의 검정)이 드러나 화면 아래에 검은 띠가 생깁니다.
     // 위쪽은 헤더가 시계와 겹치지 않게 여기서 한 번만 띄우고, 아래쪽은 탭바가
     // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
-    <View style={[styles.app, { paddingTop: insets.top }]}>
+    <View style={[styles.app, { paddingTop: Math.max(0, insets.top - topInsetTrim) }]}>
       <StatusBar style="light" />
       {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} />}
       <View style={styles.screen}>
@@ -5818,15 +5821,15 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#171107', fontSize: 17, fontWeight: '800' },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
   disclaimer: { color: colors.muted, fontSize: 12, marginTop: 18 },
-  header: { height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#171D28' },
+  header: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#171D28' },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
-  avatarText: { color: colors.goldLight, fontWeight: '800' },
-  profileName: { color: colors.text, fontSize: 14, fontWeight: '700' },
-  level: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  walletPill: { minHeight: 40, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: '#745B22', borderRadius: 20, backgroundColor: '#11151D' },
-  coin: { color: colors.gold, fontSize: 17 },
-  walletText: { color: colors.text, fontSize: 15, fontWeight: '800' },
+  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
+  avatarText: { color: colors.goldLight, fontSize: 13, fontWeight: '800' },
+  profileName: { color: colors.text, fontSize: 13, fontWeight: '700' },
+  level: { color: colors.muted, fontSize: 10, marginTop: 1 },
+  walletPill: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#745B22', borderRadius: 16, backgroundColor: '#11151D' },
+  coin: { color: colors.gold, fontSize: 14 },
+  walletText: { color: colors.text, fontSize: 14, fontWeight: '800' },
   page: { padding: 18, paddingBottom: 30 },
   eyebrow: { color: colors.gold, fontSize: 12, fontWeight: '700', marginBottom: 5 },
   pageTitle: { color: colors.text, fontSize: 29, fontWeight: '800', marginBottom: 20 },
