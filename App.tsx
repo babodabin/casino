@@ -2747,9 +2747,12 @@ function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
 // 선수마다 반지름을 조금씩 다르게 줘서 서로 붙어 있어도 가려지지 않게 했습니다.
 const velodromeSize = 268;
 const velodromeCenter = velodromeSize / 2;
+/** 선수가 달리는 레인의 바깥·안쪽 반지름. 트랙 띠(인필드 75 ~ 바깥 134) 안에 들어갑니다. */
+const velodromeLaneOuter = 112;
+const velodromeLaneInner = 84;
 
-function Velodrome({riders,race,progress,maxTime,chosen,phase}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;maxTime:number;chosen:number[];phase:'betting'|'racing'|'finished'}){
-  const lap=(rider:Cyclist)=>race?Math.min(1,progress*maxTime/race.times[rider.id]):0;
+function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished'}){
+  const lap=(rider:Cyclist)=>race?Math.min(1,progress*winnerTime/race.times[rider.id]):0;
   // 지금 앞선 순서. 경주 전에는 등번호 순으로 둡니다.
   const standing=[...riders].sort((a,b)=>lap(b)-lap(a));
   return <View style={styles.velodromeWrap}>
@@ -2761,7 +2764,8 @@ function Velodrome({riders,race,progress,maxTime,chosen,phase}:{riders:Cyclist[]
       <View style={styles.velodromeFinish}/>
       {riders.map((rider,index)=>{
         const angle=(-90+lap(rider)*360)*Math.PI/180;
-        const radius=velodromeCenter-26-index*7;
+        // 트랙 폭 안에 선수 수만큼 레인을 나눠 넣습니다. 안쪽 인필드를 넘지 않게 합니다.
+        const radius=velodromeLaneOuter-(riders.length>1?index*(velodromeLaneOuter-velodromeLaneInner)/(riders.length-1):0);
         const left=velodromeCenter+Math.cos(angle)*radius-15;
         const top=velodromeCenter+Math.sin(angle)*radius-15;
         return <View key={rider.id} style={[styles.velodromeRider,{left,top,backgroundColor:rider.color},chosen.includes(rider.id)&&styles.velodromeRiderMine]}>
@@ -2788,10 +2792,12 @@ function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
   const choose=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
   const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateCycleRace(riders);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
   const reset=()=>{setRiders(createCycleField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
-  const maxTime=race?Math.max(...Object.values(race.times)):1;
+  // 1등이 결승선을 끊는 순간 경주가 끝납니다. 그래야 뒤 선수들이 뒤처진 자리에 그대로 멈춰
+  // 원 위의 위치가 곧 순위가 됩니다. 가장 느린 선수를 기준으로 하면 전부 결승선에 겹칩니다.
+  const winnerTime=race?Math.min(...Object.values(race.times)):1;
   return <View style={styles.cycleScreen}><ScreenHeader title="월드 벨로드롬" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>GWANGMYEONG · 7 RIDERS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'경주권 판매 중':phase==='racing'?(progress>.68?'🔔 마지막 바퀴':'대열 주행 중'):'순위 확정'}</Text></View></View>
-    <Velodrome riders={riders} race={race} progress={progress} maxTime={maxTime} chosen={ticket?.selections??selections} phase={phase}/>
+    <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase}/>
     {phase==='racing'&&race&&progress>.68&&<View style={styles.cycleBell}><Text style={styles.cycleBellTitle}>🔔 마지막 바퀴 진입</Text><Text style={styles.slotRuleText}>현재 대열 {race.lastLapOrder.slice(0,4).join(' → ')} · 막판 추입이 시작됩니다</Text></View>}
     {phase==='betting'?<><RacingPickBanner label={`${cycleBetLabels[betType]} · ${selections.length?selections.join(' → '):'선택 대기'} · ${selectedBet.toLocaleString()} WC`} disabled={selections.length!==needed||selectedBet>coins} onStart={start} startLabel="출발"/><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as CycleBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{cycleBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>선수 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{riders.map(rider=><Pressable key={rider.id} onPress={()=>choose(rider.id)} style={[styles.horseCard,selections.includes(rider.id)&&styles.horseCardActive]}><View style={[styles.cycleJerseyLarge,{backgroundColor:rider.color}]}><Text style={[styles.horseNumberText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View><View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.horseName}>{rider.name}</Text><Text style={styles.cycleStyle}>{rider.style}</Text></View><Text style={styles.horseStats}>스프린트 {rider.sprint} · 지구력 {rider.endurance} · 전술 {rider.tactics}</Text></View><View><Text style={styles.horseOdds}>{betType==='place'?rider.placeOdds.toFixed(1):rider.winOdds.toFixed(1)}배</Text>{selections.includes(rider.id)&&<Text style={styles.horsePickOrder}>{selections.indexOf(rider.id)+1}번째</Text>}</View></Pressable>)}</View>
@@ -5964,7 +5970,7 @@ const styles = StyleSheet.create({
   velodromeInfieldTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeInfieldSub: { color: '#9FC4DC', fontSize: 12, fontWeight: '700' },
   // 결승선은 12시 방향입니다. 선수도 여기서 출발해 한 바퀴 돌아 여기로 돌아옵니다.
-  velodromeFinish: { position: 'absolute', top: 2, left: 130, width: 8, height: 34, borderRadius: 2, backgroundColor: '#F3F6F8' },
+  velodromeFinish: { position: 'absolute', top: 2, left: 130, width: 8, height: 52, borderRadius: 2, backgroundColor: '#F3F6F8' },
   velodromeRider: { position: 'absolute', width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: '#D7E2E9', alignItems: 'center', justifyContent: 'center' },
   velodromeRiderMine: { borderColor: colors.gold, borderWidth: 3 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
