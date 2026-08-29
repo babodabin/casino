@@ -839,7 +839,7 @@ function CasinoApp() {
     // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
     <View style={[styles.app, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
-      {!appScreen.endsWith('Game') && <Header coins={coins} totalPlays={totalPlays} />}
+      {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} />}
       <View style={styles.screen}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
@@ -6169,8 +6169,8 @@ const styles = StyleSheet.create({
   greyhoundTicket: { padding: 14, borderRadius: 16, backgroundColor: '#32243A', borderWidth: 2, borderColor: '#A478B8' },
   greyhoundTicketText: { color: '#F9EFFF', fontSize: 12, lineHeight: 18, fontWeight: '700' },
   greyhoundResult: { padding: 16, borderRadius: 18, backgroundColor: '#302338', borderWidth: 1, borderColor: '#AD7DC2' },
-  sevenPokerTable: { minHeight: 0, flex: 1, justifyContent: 'center', paddingVertical: 12, gap: 2 },
-  pokerFixedTable: { minHeight: 0, flex: 1, justifyContent: 'center', paddingVertical: 12 },
+  sevenPokerTable: { minHeight: 0, justifyContent: 'center', paddingVertical: 12, gap: 2 },
+  pokerFixedTable: { minHeight: 0, justifyContent: 'center', paddingVertical: 12 },
   highLowResultRow: { width: '100%', flexDirection: 'row', gap: 7 },
   highLowResult: { flex: 1, padding: 10, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.34)', borderWidth: 1, borderColor: '#B8933B' },
   highLowResultTitle: { color: '#FFE080', fontSize: 12, fontWeight: '900', marginBottom: 4 },
@@ -6350,7 +6350,7 @@ const styles = StyleSheet.create({
   sevenPokerVisibility: { overflow: 'hidden', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, fontSize: 8, fontWeight: '900' },
   sevenPokerPrivate: { color: '#FFF1B8', backgroundColor: '#694C18' },
   sevenPokerPublic: { color: '#DDF5E8', backgroundColor: '#17613E' },
-  fiveDrawTable: { flex: 1, justifyContent: 'center', minHeight: 0 },
+  fiveDrawTable: { justifyContent: 'center', minHeight: 0 },
   fiveDrawHand: { width: '100%', minHeight: 105, flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-start', gap: 4 },
   holdemCommunity: { minHeight: 106, paddingTop: 16, flexDirection: 'row', justifyContent: 'center', gap: 4 },
   holdemPot: { color: '#FFE080', fontSize: 16, fontWeight: '900', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
@@ -6577,7 +6577,7 @@ const styles = StyleSheet.create({
   sicboOdds: { color: '#C9BDC2', fontSize: 8, marginTop: 4 },
   videoPokerScreen: { flex: 1, backgroundColor: '#071A2A' },
   videoPokerPage: { padding: 18, paddingBottom: 48 },
-  videoPokerCabinet: { flex: 1, justifyContent: 'center', borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
+  videoPokerCabinet: { justifyContent: 'center', borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
   videoPokerMarquee: { minHeight: 84, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#A6202D', borderBottomWidth: 4, borderBottomColor: '#F0C35A' },
   marqueeBulb: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFF3A3', borderWidth: 2, borderColor: '#F8D24E', shadowColor: '#FFF0A0', shadowOpacity: 1, shadowRadius: 8 },
   videoPokerMarqueeSmall: { color: '#FFD767', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 3 },
@@ -6638,11 +6638,11 @@ const styles = StyleSheet.create({
   baccaratScreen: { flex: 1, backgroundColor: '#071D25' },
   baccaratPage: { padding: 18, paddingBottom: 44 },
   // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
-  baccaratSpotRow: { flexDirection: 'row', gap: 8, marginTop: 6, width: '100%', justifyContent: 'center' },
-  baccaratSpot: { flex: 1, maxWidth: 110, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 12, borderWidth: 2, borderColor: '#3E9A75', backgroundColor: 'rgba(4,40,26,0.35)' },
+  baccaratSpotRow: { flexDirection: 'row', gap: 6, marginTop: 6, width: '100%', maxWidth: 256, justifyContent: 'center' },
+  baccaratSpot: { flex: 1, maxWidth: 82, minHeight: 48, alignItems: 'center', justifyContent: 'center', gap: 1, borderRadius: 11, borderWidth: 2, borderColor: '#3E9A75', backgroundColor: 'rgba(4,40,26,0.35)' },
   baccaratSpotActive: { borderColor: colors.gold, backgroundColor: 'rgba(90,70,20,0.45)' },
-  baccaratSpotName: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
-  baccaratSpotOdds: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
+  baccaratSpotName: { color: '#E8F3EC', fontSize: 11, fontWeight: '900' },
+  baccaratSpotOdds: { color: '#8FBFA8', fontSize: 9, fontWeight: '800' },
   betChipRow: { flexDirection: 'row', gap: 6, justifyContent: 'center', marginTop: 8 },
   betChipButton: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#132A25', borderWidth: 1, borderColor: '#2E594C' },
   betChipActive: { borderColor: colors.gold, backgroundColor: '#2A3518' },
