@@ -839,7 +839,7 @@ function CasinoApp() {
     // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
     <View style={[styles.app, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
-      <Header coins={coins} totalPlays={totalPlays} />
+      {!appScreen.endsWith('Game') && <Header coins={coins} totalPlays={totalPlays} />}
       <View style={styles.screen}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
@@ -1116,7 +1116,7 @@ function CasinoApp() {
           },
         })}</BottomInsetContext.Provider>}
       </View>
-      {appScreen === 'tabs' && <View style={[styles.tabBar, { height: 72 + insets.bottom, paddingBottom: insets.bottom }]}>
+      {appScreen === 'tabs' && <View style={[styles.tabBar, { height: tabBarHeight + tabBarLift(insets.bottom), paddingBottom: tabBarLift(insets.bottom) }]}>
         {tabs.map((item) => {
           const selected = item.name === tab;
           return (
@@ -1251,7 +1251,9 @@ function useScrollMemory(key: string) {
  * 탭바가 차지하는 높이. 홈·게임·지갑·기록·설정 다섯 탭이 쓰는 Page가 아래 여백을 이만큼 둡니다.
  * 탭바는 화면 위에 떠 있어서(웹에서는 position:fixed) 여백이 모자라면 마지막 줄이 그 밑에 가립니다.
  */
-const tabBarHeight = 72;
+const tabBarHeight = 64;
+/** 홈 인디케이터에서 띄울 높이. 기기가 여백을 0으로 알려 줘도 최소 22는 띄웁니다. */
+const tabBarLift = (bottom: number) => Math.max(bottom, 22);
 const BottomInsetContext = createContext(0);
 
 /**
@@ -1281,7 +1283,7 @@ function RevealButton({ opened, total, onPress, label = '상대 패 열기' }: {
 
 function Page({ children }: { children: React.ReactNode }) {
   const bottom = useContext(BottomInsetContext);
-  return <ScrollView contentContainerStyle={[styles.page, { paddingBottom: tabBarHeight + bottom + 28 }]} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
+  return <ScrollView contentContainerStyle={[styles.page, { paddingBottom: tabBarHeight + tabBarLift(bottom) + 28 }]} showsVerticalScrollIndicator={false}>{children}</ScrollView>;
 }
 
 function resultLabel(result: RoundResult) {
@@ -3966,6 +3968,15 @@ function HwatuFloor({cards,deckCount,compact=false}:{cards:HwatuCard[];deckCount
   return <View style={[styles.hwatuFloorBoard,compact&&styles.hwatuFloorBoardCompact]}><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(0,split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View><FaceDownHwatuDeck count={deckCount}/><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View></View>;
 }
 
+/** 모은 패를 늘어놓는 순서. 왼쪽이 값이 큰 쪽입니다. */
+const goStopTakenOrder=['광','열끗','띠','피'] as const;
+function goStopTakenKind(card:HwatuCard){
+  if(card.kind==='광')return '광';
+  if(card.kind==='열끗')return '열끗';
+  if(card.kind==='띠')return '띠';
+  return '피';
+}
+
 function hwatuScoreGroup(card:HwatuCard){
   if(card.kind==='광')return '광';if(card.kind==='열끗')return '열끗';if(card.kind==='띠')return card.ribbon??'띠';return '피';
 }
@@ -4035,24 +4046,32 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     setSettled(true);
   };
 
-  /** 컴퓨터들은 첫 번째 가능한 패를 내며, 기준 점수가 되면 스톱합니다. */
-  const runComputers=(initial:GoStopRound)=>{
-    let next=initial;
-    let safety=0;
-    while(!next.finished&&next.turn!==0&&safety<8){
-      if(next.pendingDecision===next.turn){ next=chooseGoOrStop(next,'stop'); break; }
-      const hand=next.players[next.turn].hand;
-      if(!hand.length)break;
-      const bombMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&next.floor.filter((card)=>card.month===month).length===1);
-      if(bombMonth!==undefined){next=playGoStopBomb(next,bombMonth);safety+=1;continue;}
-      const shakeMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&!(next.players[next.turn].shakenMonths??[]).includes(month));
-      if(shakeMonth!==undefined)next=declareGoStopShake(next,shakeMonth);
-      const played=chooseComputerGoStopCard(next);
-      next=playGoStopTurn(next,played.id,automaticGoStopChoice(next,played));
-      safety+=1;
-    }
-    return next;
+  /** 컴퓨터 한 명이 한 번 두는 것까지만 합니다. 한꺼번에 돌리면 뭘 냈는지 보이지 않습니다. */
+  const stepComputer=(current:GoStopRound):GoStopRound=>{
+    if(current.pendingDecision===current.turn)return chooseGoOrStop(current,'stop');
+    const hand=current.players[current.turn].hand;
+    if(!hand.length)return current;
+    const bombMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&current.floor.filter((card)=>card.month===month).length===1);
+    if(bombMonth!==undefined)return playGoStopBomb(current,bombMonth);
+    const shakeMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&!(current.players[current.turn].shakenMonths??[]).includes(month));
+    const shaken=shakeMonth!==undefined?declareGoStopShake(current,shakeMonth):current;
+    const played=chooseComputerGoStopCard(shaken);
+    return playGoStopTurn(shaken,played.id,automaticGoStopChoice(shaken,played));
   };
+
+  // 컴퓨터 차례면 잠깐 쉬었다 한 명만 둡니다. 그다음 차례는 이 효과가 다시 돌면서 이어집니다.
+  useEffect(()=>{
+    if(!round||round.finished||round.turn===0)return;
+    const timer=setTimeout(()=>{
+      const before=new Set(round.players.slice(1).flatMap((player)=>player.captured.map((card)=>card.id)));
+      const next=stepComputer(round);
+      if(next===round)return;
+      setLastOpponentCapture(next.players.slice(1).flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
+      setRound(next);
+      if(next.finished)finish(next);
+    },800);
+    return ()=>clearTimeout(timer);
+  },[round]);
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
@@ -4063,24 +4082,20 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(!round||round.turn!==0||round.pendingDecision!==null&&round.pendingDecision!==undefined)return;
     const matches=round.floor.filter((item)=>item.month===card.month);
     if(matches.length===2&&!selectedMatchId){setPendingPlay(card);return;}
-    const before=new Set(round.players.slice(1).flatMap(player=>player.captured.map(item=>item.id)));
-    let next=playGoStopTurn(round,card.id,automaticGoStopChoice(round,card,selectedMatchId));
+    const next=playGoStopTurn(round,card.id,automaticGoStopChoice(round,card,selectedMatchId));
     setPendingPlay(null);
-    if(next.pendingDecision!==0)next=runComputers(next);
-    setLastOpponentCapture(next.players.slice(1).flatMap(player=>player.captured).filter(item=>!before.has(item.id)));
+    setLastOpponentCapture([]);
     setRound(next);if(next.finished)finish(next);
   };
   const bomb=(month:number)=>{
     if(!round||round.turn!==0||round.pendingDecision===0)return;
-    let next=playGoStopBomb(round,month);
-    if(next.pendingDecision!==0)next=runComputers(next);
+    const next=playGoStopBomb(round,month);
     setRound(next);if(next.finished)finish(next);
   };
   const shake=(month:number)=>{if(round)setRound(declareGoStopShake(round,month));};
   const decide=(action:'go'|'stop')=>{
     if(!round||round.pendingDecision!==0)return;
-    let next=chooseGoOrStop(round,action);
-    if(action==='go')next=runComputers(next);
+    const next=chooseGoOrStop(round,action);
     setRound(next);if(next.finished)finish(next);
   };
   const myScore=round?scoreGoStop(round.players[0].captured):null;
@@ -4089,7 +4104,13 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   // 실제 고스톱 판처럼 한 화면에 고정합니다. 위가 상대 자리, 가운데가 바닥,
   // 아래가 내 자리와 손패입니다. 스크롤이 없어 판 전체가 한눈에 들어옵니다.
-  const takenRow=(cards:HwatuCard[],fresh?:Set<string>)=><View style={styles.goStopTakenRow}>{cards.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
+  const takenRow=(cards:HwatuCard[],fresh?:Set<string>)=><View style={styles.goStopTakenRow}>{goStopTakenOrder.map((kind)=>{
+    const group=cards.filter((card)=>goStopTakenKind(card)===kind);
+    if(!group.length)return null;
+    // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
+    if(kind==='띠')group.sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣'));
+    return <View key={kind} style={styles.goStopTakenGroup}>{group.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
+  })}</View>;
   const freshIds=new Set(lastOpponentCapture.map((card)=>card.id));
   // 손패 한 줄에 다 들어오도록 장수에 맞춰 겹치는 정도를 정합니다. 적을 때는 겹치지 않습니다.
   const handCount=round?round.players[0].hand.length:0;
@@ -5716,7 +5737,7 @@ const styles = StyleSheet.create({
   detailHeader: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   detailHeaderTitle: { color: colors.text, fontSize: 16, fontWeight: '800', flex: 1, textAlign: 'center', marginHorizontal: 6 },
   // 밀어서 뒤로 가기를 쓰지 않으므로, 뒤로 버튼은 손가락으로 누르기 쉽게 크고 뚜렷하게 둡니다.
-  backButton: { minWidth: 84, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  backButton: { minWidth: 92, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
   backButtonPressed: { backgroundColor: '#232B39', borderColor: colors.gold },
   backButtonSpacer: { minWidth: 84, height: 48 },
   backButtonArrow: { color: colors.goldLight, fontSize: 28, lineHeight: 30, fontWeight: '400', marginTop: -2 },
@@ -5810,7 +5831,7 @@ const styles = StyleSheet.create({
   gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
   gameTopActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  gameExitButton: { minWidth: 84, height: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#A58145', backgroundColor: '#24180E' },
+  gameExitButton: { minWidth: 92, height: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14, borderRadius: 14, borderWidth: 1, borderColor: '#A58145', backgroundColor: '#24180E' },
   gameExitButtonText: { color: '#F9D985', fontSize: 15, fontWeight: '900' },
   gameBetPill: { minWidth: 82, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, borderRadius: 24, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
   gameBetText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
@@ -6749,7 +6770,8 @@ const styles = StyleSheet.create({
   // 상대 손패는 뒷면 장수만 보여 줍니다. 무슨 패인지는 알 수 없으니까요.
   goStopBackRow: { flexDirection: 'row', gap: 2, minHeight: 22 },
   goStopBack: { width: 13, height: 21, borderRadius: 2, backgroundColor: '#1A2233', borderWidth: 1, borderColor: '#D12B32' },
-  goStopTakenRow: { flexDirection: 'row', minHeight: 30, alignItems: 'center' },
+  goStopTakenRow: { flexDirection: 'row', minHeight: 30, alignItems: 'center', gap: 8 },
+  goStopTakenGroup: { flexDirection: 'row' },
   goStopTakenOverlap: { marginLeft: -12 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
@@ -6831,10 +6853,11 @@ const styles = StyleSheet.create({
   difficultyActiveText: { color: '#171107' },
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
   disclaimerBlock: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 22, padding: 14, borderRadius: 12, backgroundColor: '#0D1119' },
-  tabBar: { height: 72, flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
-  tabItem: { flex: 1, minHeight: 56, alignItems: 'center', justifyContent: 'center', gap: 3 },
-  tabIcon: { color: '#707988', fontSize: 22, lineHeight: 24 },
-  tabLabel: { color: '#707988', fontSize: 11, fontWeight: '700' },
+  tabBar: { height: 64, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
+  // 누르는 자리가 막대를 꽉 채웁니다. 남는 자리를 두면 누를 곳은 좁은데 막대만 두꺼워집니다.
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tabIcon: { color: '#707988', fontSize: 24, lineHeight: 26 },
+  tabLabel: { color: '#707988', fontSize: 12, fontWeight: '700' },
   tabSelected: { color: colors.gold },
   loadingCover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
 });
