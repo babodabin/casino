@@ -3939,15 +3939,16 @@ function HwatuMonthPicture({month}:{month:number}){
   const picture=hwatuPicture[month];
   return <View style={[styles.hwatuPicture,{backgroundColor:picture.dark}]}><View style={[styles.hwatuBranch,{backgroundColor:picture.color}]}/><View style={[styles.hwatuBranch,styles.hwatuBranchSecond,{backgroundColor:picture.color}]}/>{[0,1,2,3].map((index)=><View key={index} style={[styles.hwatuBlossom,{backgroundColor:picture.color,left:5+(index%2)*17,top:5+Math.floor(index/2)*15}]}/>)}{month===8&&<View style={styles.hwatuMoon}/>}<Text style={styles.hwatuPlant}>{picture.plant}</Text><View style={styles.hwatuFigureBadge}><Text style={styles.hwatuFigure}>{picture.figure}</Text></View></View>;
 }
-function HwatuCardView({ card, hidden = false, emphasis, showMonth=false }: { card: HwatuCard; hidden?: boolean; emphasis?: 'winner' | 'dim'; showMonth?:boolean }) {
-  if (hidden) return <View style={[styles.hwatuCard, styles.hwatuHidden]}><Text style={styles.hwatuHiddenMark}>花</Text></View>;
-  if(card.bonus)return <View style={[styles.hwatuCard,styles.hwatuBright,emphasis==='winner'&&styles.cardWinner]}><Text style={styles.hwatuMonth}>BONUS</Text><View style={[styles.hwatuPicture,{backgroundColor:'#7A1E3A'}]}><Text style={styles.hwatuHiddenMark}>＋</Text></View><Text style={styles.hwatuKind}>{card.bonus}피</Text><Text style={styles.hwatuName}>보너스</Text></View>;
+function HwatuCardView({ card, hidden = false, emphasis, showMonth=false, size='normal' }: { card: HwatuCard; hidden?: boolean; emphasis?: 'winner' | 'dim'; showMonth?:boolean; size?:'normal'|'small'|'tiny' }) {
+  const sizeStyle = size==='small' ? styles.hwatuCardSmall : size==='tiny' ? styles.hwatuCardTiny : null;
+  if (hidden) return <View style={[styles.hwatuCard, sizeStyle, styles.hwatuHidden]}><Text style={styles.hwatuHiddenMark}>花</Text></View>;
+  if(card.bonus)return <View style={[styles.hwatuCard,sizeStyle,styles.hwatuBright,emphasis==='winner'&&styles.cardWinner]}><Text style={styles.hwatuMonth}>BONUS</Text><View style={[styles.hwatuPicture,{backgroundColor:'#7A1E3A'}]}><Text style={styles.hwatuHiddenMark}>＋</Text></View><Text style={styles.hwatuKind}>{card.bonus}피</Text><Text style={styles.hwatuName}>보너스</Text></View>;
   const label = card.kind === '광' ? '光' : card.kind === '열끗' ? '十' : card.kind === '띠' ? (card.ribbon ?? '띠') : card.double ? '쌍피' : '피';
   const source=hwatuCardImages[card.id];
   const webImageUri=source&&typeof source==='object'&&'uri' in source?String(source.uri):'';
   const webImageStyle=webImageUri&&Platform.OS==='web'?({backgroundImage:`url("${webImageUri}")`,backgroundSize:'contain',backgroundPosition:'center',backgroundRepeat:'no-repeat'} as any):null;
   return (
-    <View style={[styles.hwatuCard, card.kind === '광' && (source ? styles.hwatuBrightEdge : styles.hwatuBright), emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
+    <View style={[styles.hwatuCard, sizeStyle, card.kind === '광' && (source ? styles.hwatuBrightEdge : styles.hwatuBright), emphasis === 'winner' && styles.cardWinner, emphasis === 'dim' && styles.cardDim]}>
       {source?(Platform.OS==='web'?<View style={[styles.hwatuCardImage,webImageStyle]}/>:<Image source={source} resizeMode="contain" style={styles.hwatuCardImage}/>):<HwatuMonthPicture month={card.month}/>}
       {showMonth&&<View style={styles.hwatuCardCaption}><Text style={styles.hwatuMonth}>{card.month}월</Text><Text style={styles.hwatuKind}>{label}</Text></View>}
     </View>
@@ -3958,9 +3959,10 @@ function FaceDownHwatuDeck({count}:{count:number}){
   return <View style={styles.hwatuDeckStack}><View style={[styles.hwatuDeckLayer,{transform:[{translateX:-3},{translateY:3}]}]}/><View style={styles.hwatuDeckLayer}><Text style={styles.hwatuDeckMark}>花</Text></View><Text style={styles.hwatuDeckCount}>{count}장</Text></View>;
 }
 
-function HwatuFloor({cards,deckCount}:{cards:HwatuCard[];deckCount:number}){
+function HwatuFloor({cards,deckCount,compact=false}:{cards:HwatuCard[];deckCount:number;compact?:boolean}){
   const split=Math.ceil(cards.length/2);
-  return <View style={styles.hwatuFloorBoard}><View style={styles.hwatuFloorRow}>{cards.slice(0,split).map(card=><HwatuCardView key={card.id} card={card}/>)}</View><FaceDownHwatuDeck count={deckCount}/><View style={styles.hwatuFloorRow}>{cards.slice(split).map(card=><HwatuCardView key={card.id} card={card}/>)}</View></View>;
+  const size=compact?'small':'normal';
+  return <View style={[styles.hwatuFloorBoard,compact&&styles.hwatuFloorBoardCompact]}><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(0,split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View><FaceDownHwatuDeck count={deckCount}/><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View></View>;
 }
 
 function hwatuScoreGroup(card:HwatuCard){
@@ -4084,36 +4086,54 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const bombMonths=round?Array.from(new Set(round.players[0].hand.map((card)=>card.month))).filter((month)=>round.players[0].hand.filter((card)=>card.month===month).length===3&&round.floor.filter((card)=>card.month===month).length===1):[];
   const shakeMonths=round?Array.from(new Set(round.players[0].hand.map((card)=>card.month))).filter((month)=>round.players[0].hand.filter((card)=>card.month===month).length===3&&!(round.players[0].shakenMonths??[]).includes(month)):[];
 
-  return <View style={styles.detailScreen}><ScreenHeader title={title} onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
-    {!round?<>
+  // 실제 고스톱 판처럼 한 화면에 고정합니다. 위가 상대 자리, 가운데가 바닥,
+  // 아래가 내 자리와 손패입니다. 스크롤이 없어 판 전체가 한눈에 들어옵니다.
+  const takenRow=(cards:HwatuCard[],fresh?:Set<string>)=><View style={styles.goStopTakenRow}>{cards.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
+  const freshIds=new Set(lastOpponentCapture.map((card)=>card.id));
+
+  return <View style={styles.detailScreen}><ScreenHeader title={title} onBack={onBack}/>
+    {!round?<ScrollView contentContainerStyle={styles.holdemPage}>
       <View style={styles.sicboHero}><Text style={styles.sicboHeroDice}>{mode==='matgo'?'二 花':'花 GO'}</Text><Text style={styles.detailLead}>{mode==='matgo'?'두 명이 7점부터 고·스톱':'세 명이 3점부터 고·스톱'}</Text></View>
       <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>패 돌리기 · {selectedBet.toLocaleString()} WC</Text></Pressable>
-    </>:<>
-      <View style={styles.panel}>
-        <Row title="차례" value={round.finished?'경기 종료':round.turn===0?'내 차례':`컴퓨터 ${round.turn}`}/><View style={styles.separator}/>
-        <Row title="더미" value={`${round.deck.length}장`}/><View style={styles.separator}/>
-        <Row title="내 점수" value={`${myScore?.total??0}점 · ${round.players[0].goCount}고`}/>
-        {carryMultiplier>1?<><View style={styles.separator}/><Row title="나가리 누적" value={`이번 판 ${carryMultiplier}배`}/></>:null}
+    </ScrollView>:<View style={styles.goStopBoard}>
+
+      {/* 상대 자리. 손패는 뒷면 장수만, 모은 패는 아주 작게 겹쳐 쌓습니다. */}
+      <View style={styles.goStopOpponentRow}>{round.players.slice(1).map((player,index)=>{
+        const score=scoreGoStop(player.captured);
+        return <View key={index} style={[styles.goStopSeat,round.turn===index+1&&!round.finished&&styles.goStopSeatActive]}>
+          <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
+          <View style={styles.goStopBackRow}>{player.hand.map((card)=><View key={card.id} style={styles.goStopBack}/>)}</View>
+          {takenRow(player.captured,freshIds)}
+        </View>;
+      })}</View>
+
+      {/* 바닥과 뒤집을 더미 */}
+      <View style={styles.goStopFloorArea}><HwatuFloor cards={round.floor} deckCount={round.deck.length} compact/></View>
+
+      {/* 내 자리 */}
+      <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
+      {takenRow(round.players[0].captured)}
+
+      {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
+      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?styles.goStopHandOverlap:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
+
+      <View style={styles.goStopActionArea}>
+        {pendingPlay?<>
+          <Text style={styles.goStopMessage}>{pendingPlay.month}월 바닥 패가 두 장입니다 · 가져갈 패를 고르세요</Text>
+          <View style={styles.goStopChoiceRow}>{round.floor.filter((item)=>item.month===pendingPlay.month).map((card)=><Pressable key={card.id} onPress={()=>play(pendingPlay,card.id)}><HwatuCardView card={card} size="small"/></Pressable>)}
+            <Pressable style={styles.goStopCancel} onPress={()=>setPendingPlay(null)}><Text style={styles.holdemActionText}>취소</Text></Pressable></View>
+        </>:round.pendingDecision===0&&!round.finished?<View style={styles.goStopButtonRow}>
+          <Pressable style={styles.goStopButton} onPress={()=>decide('go')}><Text style={styles.primaryButtonText}>고 · 계속하기</Text></Pressable>
+          <Pressable style={styles.goStopButtonQuiet} onPress={()=>decide('stop')}><Text style={styles.holdemActionText}>스톱 · 끝내기</Text></Pressable>
+        </View>:round.finished?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable>:
+        (bombMonths.length||shakeMonths.length)&&round.turn===0?<View style={styles.goStopButtonRow}>
+          {bombMonths.map((month)=><Pressable key={`b${month}`} style={styles.goStopButton} onPress={()=>bomb(month)}><Text style={styles.primaryButtonText}>{month}월 폭탄</Text></Pressable>)}
+          {shakeMonths.map((month)=><Pressable key={`s${month}`} style={styles.goStopButtonQuiet} onPress={()=>shake(month)}><Text style={styles.holdemActionText}>{month}월 흔들기</Text></Pressable>)}
+        </View>:null}
+        <Text style={styles.goStopMessage} numberOfLines={2}>{round.lastEvents?.length?`${round.lastEvents.join(' · ')} — `:''}{round.message}</Text>
       </View>
-      <Text style={styles.sectionTitle}>컴퓨터 상황</Text>
-      <View style={styles.panel}>{round.players.slice(1).map((player,index)=><View key={index} style={styles.row}><Text style={styles.rowTitle}>컴퓨터 {index+1}</Text><Text style={styles.rowValue}>손 {player.hand.length}장 · 획득 {player.captured.length}장 · {scoreGoStop(player.captured).total}점</Text></View>)}</View>
-      {lastOpponentCapture.length?<View style={styles.hwatuLastCapture}><Text style={styles.hwatuLastCaptureTitle}>상대가 이번에 가져간 패</Text><View style={styles.hwatuCompactRow}>{lastOpponentCapture.map(card=><HwatuCardView key={card.id} card={card}/>)}</View></View>:null}
-      <Text style={styles.sectionTitle}>바닥 패 · 가운데는 뒤집을 더미</Text>
-      <HwatuFloor cards={round.floor} deckCount={round.deck.length}/>
-      <Text style={styles.sectionTitle}>내가 모은 패 · 점수 종류별 정리</Text>
-      <Text style={styles.helperText}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{myScore?.bonuses.length?` · ${myScore.bonuses.join(' · ')}`:''}</Text>
-      <HwatuCapturedGroups cards={round.players[0].captured}/>
-      <Text style={styles.sectionTitle}>내 손패 — 낼 패를 누르세요</Text>
-      <View style={styles.hwatuHand}>{round.players[0].hand.map((card)=><Pressable key={card.id} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card} emphasis={round.turn===0&&!round.finished?'winner':undefined}/></Pressable>)}</View>
-      {pendingPlay?<View style={styles.panel}><Text style={styles.rowTitle}>{pendingPlay.month}월 바닥 패가 두 장입니다 · 가져갈 패를 고르세요</Text><View style={styles.hwatuHand}>{round.floor.filter((item)=>item.month===pendingPlay.month).map((card)=><Pressable key={card.id} onPress={()=>play(pendingPlay,card.id)}><HwatuCardView card={card} emphasis="winner"/></Pressable>)}</View><Pressable style={styles.holdemFold} onPress={()=>setPendingPlay(null)}><Text style={styles.holdemActionText}>선택 취소</Text></Pressable></View>:null}
-      {bombMonths.length?<View style={styles.holdemActions}>{bombMonths.map((month)=><Pressable key={month} style={styles.holdemAction} onPress={()=>bomb(month)}><Text style={styles.primaryButtonText}>{month}월 폭탄</Text></Pressable>)}</View>:null}
-      {shakeMonths.length&&round.turn===0&&!round.finished?<View style={styles.holdemActions}>{shakeMonths.map((month)=><Pressable key={month} style={styles.holdemAction} onPress={()=>shake(month)}><Text style={styles.primaryButtonText}>{month}월 흔들기</Text></Pressable>)}</View>:null}
-      {round.lastEvents?.length?<Text style={styles.pokerOpponentNote}>이번 차례: {round.lastEvents.join(' · ')}</Text>:null}
-      <Text style={styles.holdemOutcome}>{round.message}</Text>
-      {round.pendingDecision===0&&!round.finished?<View style={styles.holdemActions}><Pressable style={styles.holdemAction} onPress={()=>decide('go')}><Text style={styles.primaryButtonText}>고 · 계속하기</Text></Pressable><Pressable style={styles.holdemFold} onPress={()=>decide('stop')}><Text style={styles.holdemActionText}>스톱 · 끝내기</Text></Pressable></View>:null}
-      {round.finished?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable>:null}
-    </>}
-  </ScrollView></View>;
+    </View>}
+  </View>;
 }
 
 function automaticMinhwaChoice(round:MinhwaRound,played:HwatuCard,selectedId?:string){
@@ -6700,6 +6720,35 @@ const styles = StyleSheet.create({
   tableDeckLabel: { color:'#D8CC9B', fontSize:8, fontWeight:'900', letterSpacing:1, marginTop:4 },
   // 화투도 마찬가지로 담요 위에서 하지 초록 펠트가 아닙니다.
   hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
+  // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
+  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4 },
+  goStopOpponentRow: { flexDirection: 'row', gap: 6 },
+  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(6,32,22,0.66)', borderWidth: 1, borderColor: '#2C5644', gap: 3 },
+  goStopSeatActive: { borderColor: colors.gold },
+  goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
+  goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
+  goStopSeatScore: { color: '#9FBBAE', fontSize: 10, fontWeight: '700' },
+  // 상대 손패는 뒷면 장수만 보여 줍니다. 무슨 패인지는 알 수 없으니까요.
+  goStopBackRow: { flexDirection: 'row', gap: 2, minHeight: 22 },
+  goStopBack: { width: 13, height: 21, borderRadius: 2, backgroundColor: '#1A2233', borderWidth: 1, borderColor: '#D12B32' },
+  goStopTakenRow: { flexDirection: 'row', minHeight: 30, alignItems: 'center' },
+  goStopTakenOverlap: { marginLeft: -12 },
+  goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
+  goStopFloorArea: { flex: 1, justifyContent: 'center' },
+  goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 80, alignItems: 'center' },
+  goStopHandOverlap: { marginLeft: -18 },
+  goStopActionArea: { gap: 4 },
+  goStopButtonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  goStopButton: { flex: 1, minWidth: 120, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#1D6B45', borderWidth: 1, borderColor: colors.gold },
+  goStopButtonQuiet: { flex: 1, minWidth: 120, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#22303F', borderWidth: 1, borderColor: '#3E5163' },
+  goStopChoiceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  goStopCancel: { paddingHorizontal: 12, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#22303F' },
+  goStopMessage: { color: '#CFE0D6', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  // 바닥에 깔 작은 패와, 모은 패를 겹쳐 쌓을 때 쓰는 아주 작은 패입니다.
+  hwatuCardSmall: { width: 40, height: 60, borderRadius: 3 },
+  hwatuCardTiny: { width: 20, height: 30, borderRadius: 2 },
+  hwatuFloorBoardCompact: { minHeight: 150, borderRadius: 44, paddingVertical: 4, marginVertical: 0 },
+  hwatuFloorRowCompact: { minHeight: 61, gap: 2 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
   hwatuCardCaption: { position:'absolute', left:2, right:2, bottom:1, height:15, borderRadius:4, backgroundColor:'rgba(18,24,20,0.88)', flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:4 },
