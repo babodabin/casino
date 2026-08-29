@@ -4902,6 +4902,13 @@ function DealerBetSpot({ amount, label = '내 자리' }: { amount: number; label
   return <View style={styles.dealerBetSpot}><CoinStack amount={amount} compact /><Text style={styles.dealerBetSpotText}>{label}</Text></View>;
 }
 
+/** 받침이 있으면 을, 없으면 를. '망둑어을(를)' 같은 말이 안 나오게 합니다. */
+function objectParticle(word:string){
+  const code=word.charCodeAt(word.length-1)-0xAC00;
+  if(code<0||code>11171)return '을';
+  return code%28===0?'를':'을';
+}
+
 // 스크린낚시. 오락실 낚시 기계처럼 던지기 → 입질 → 챔질 → 릴 싸움으로 이어집니다.
 // 판정은 전부 src/screenfishing.ts에 있고 이 화면은 누른 시각과 상태만 다룹니다.
 function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(value:number)=>boolean;onSettle:(stake:number,multiplier:number,detail:string)=>void}){
@@ -4951,7 +4958,7 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
     if(next.landed){
       const multiplier=fishingPayout(fish,true);
       setPhase('result');setPrize(multiplier);
-      setMessage(multiplier>0?`${fish.name}을(를) 건졌습니다!`:`${fish.name}… 값이 안 나갑니다`);
+      setMessage(multiplier>0?`${fish.name}${objectParticle(fish.name)} 건졌습니다!`:`${fish.name}… 값이 안 나갑니다`);
       onSettle(selectedBet,multiplier,`${spot.name} · ${fish.name}`);
     }
   };
