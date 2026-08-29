@@ -88,7 +88,7 @@ import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canB
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
-import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,isHooked,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
+import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
 import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
 import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
@@ -4911,7 +4911,6 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
   const [fight,setFight]=useState<FightState|null>(null);
   const [message,setMessage]=useState('자리를 고르고 던지세요');
   const [prize,setPrize]=useState(0);
-  const biteAt=useRef(0);
   const timers=useRef<ReturnType<typeof setTimeout>[]>([]);
   const spot=findFishingSpot(spotId);
 
@@ -4928,7 +4927,6 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
     setFish(next);setFight(null);setPrize(0);
     setPhase('waiting');setMessage('찌를 보세요…');
     timers.current.push(setTimeout(()=>{
-      biteAt.current=Date.now();
       setPhase('bite');setMessage('입질! 지금 챔질하세요');
       // 챔질 시간이 지나면 놓칩니다.
       timers.current.push(setTimeout(()=>lose('늦었습니다 · 미끼만 뺏겼습니다','챔질 놓침'),next.hookWindow));
@@ -4938,9 +4936,9 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
   const hook=()=>{
     if(phase==='waiting'){lose('너무 일렀습니다 · 물고기가 달아났습니다','성급한 챔질');return;}
     if(phase!=='bite'||!fish)return;
-    const reaction=Date.now()-biteAt.current;
+    // 늦었는지는 타이머가 이미 지키고 있습니다. 여기서 시각을 다시 재면
+    // 화면이 다시 그려지는 사이의 차이 때문에 제때 눌러도 늦은 것으로 나옵니다.
     clearTimers();
-    if(!isHooked(fish,reaction)){lose('늦었습니다 · 미끼만 뺏겼습니다','챔질 놓침');return;}
     setFight(startFight(fish));setPhase('fight');
     setMessage(`${fish.name}입니다 · 줄이 끊기지 않게 감으세요`);
   };
