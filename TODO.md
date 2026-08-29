@@ -25,12 +25,18 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 | 1. 경륜 원형 트랙 | `CycleRacingGameScreen` | `cycleTrack` · `cycleLane` · `cycleRider` · `cycleJersey` |
 | 2. 홀덤·오마하 나눠 열기 | `PokerGameScreen` (`mode`로 홀덤/오마하 겸용) | 안에 있는 `stage` 상태, `holdemCommunity` · `holdemCards` |
 | 3. 테이블 모양 | 카드 게임 전반 | `holdemTable`(이미 둥근 테이블, 반경 110) · `feltLook`(공용 펠트) · `cardRow` |
-| 4. 카드 크기 | — | `playingCard` 72×108 · `compactPlayingCard` 58×88 · `hwatuCard` 52×78(**건드리지 말 것**) · `tujeonCard` 52×96 |
+| 4. 카드 크기 | `PlayingCard`(공용 카드 컴포넌트) | `playingCard` 72×108 · `compactPlayingCard` 58×88 · `hwatuCard` 52×78(**건드리지 말 것**) · `tujeonCard` 52×96 |
 | 5. 스크린낚시 | 새로 만들기 | 아래 "새 게임 붙이는 자리" 참고 |
 | 6. 배경 사진 | 화면별 바탕 | `app`(앱 전체) · `detailScreen` · `pokerTable` `#052E22` · `baccaratScreen` `#071D25` |
 | 7. 윷 던지는 느낌 | `YutBetGameScreen`, `YutStickView` | `yutStick` · `yutStickTumbling` · `yutMat` |
 | 7. 비디오포커 회전 | `VideoPokerGameScreen` | `videoPokerHand` · `videoPokerCardWrap` |
 | 7. 피시 레이스 멈칫 | `FishRaceGameScreen` | `fishSwim` · `fishLane` · `fishRunner`, 사건은 `src/fishrace.ts`의 `events` |
+
+⚠️ **카드 크기는 값만 줄이면 안 됩니다.** `playingCard`와 `compactPlayingCard`는 **공용**이라
+블랙잭 · 바카라 · 홀덤 · 오마하 · 세븐 포커 · 하이로우 · 파이 고우 · 틴 파티 · 비디오 포커 ·
+빅투 · 차이니즈 포커 · 조커 포커가 전부 같이 바뀝니다. 카드가 작아지면 그 줄들의 높이와
+간격(`cardRow`의 `minHeight: 126` 등)도 같이 손봐야 하고, 안 그러면 카드 아래에 빈 공간이 남습니다.
+줄인 뒤 이 화면들을 한 번씩 열어 확인해야 합니다.
 
 **한 장씩 공개를 다른 게임에 더 넣을 때** — 공용 도구가 이미 있습니다.
 `useReveal()`(연 장수 세기)와 `<RevealButton opened total onPress label/>`. 쓰는 방법은
@@ -47,9 +53,9 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 
 ## 지금 상태
 
-- 마지막 커밋 `6d7c56a`
 - 게임 **34개**, 전부 플레이 가능
 - 테스트 **571개 통과**, 타입 오류 0, 웹 빌드 확인됨
+- 어디까지 했는지는 `git log --oneline -5`로 봅니다. (커밋 해시를 여기 적으면 이 문서를 커밋하는 순간 바로 틀려집니다.)
 
 | 카테고리 | 게임 |
 | --- | --- |
