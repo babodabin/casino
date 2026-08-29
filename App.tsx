@@ -4690,15 +4690,40 @@ function BlackjackGameScreen(props: {
       </View>
 
       <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.handHeader}>
-          <Text style={styles.handTitle}>딜러</Text>
-          <Text style={styles.scoreBadge}>{dealerScore}</Text>
-        </View>
-        <View style={styles.cardRow}>
-          {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
-        </View>
+        {/* 실제 블랙잭 테이블 모양입니다. 딜러가 서는 쪽이 곧은 변이고 손님 쪽이 둥급니다.
+            슈(카드 통)는 딜러의 왼손 쪽에 놓이므로, 마주 본 우리 눈에는 오른쪽에 옵니다.
+            버림 카드 통은 그 반대쪽, 칩 트레이는 딜러 바로 앞 가운데입니다. */}
+        <View style={styles.bjTable}>
+          <View style={styles.bjDealerEdge}>
+            <View style={styles.bjEdgeSlot}><View style={styles.bjDiscardBox}/><Text style={styles.bjEdgeLabel}>버림</Text></View>
+            <View style={styles.bjEdgeSlot}><View style={styles.bjChipTray}>{['#E4E4E4','#C8402F','#2F6BC8','#2F9B5A','#171107'].map((color)=><View key={color} style={[styles.bjChip,{backgroundColor:color}]}/>)}</View><Text style={styles.bjEdgeLabel}>칩 트레이</Text></View>
+            <View style={styles.bjEdgeSlot}><FaceDownCardDeck label="슈"/></View>
+          </View>
 
-        <View style={styles.tableRule}><Text style={styles.tableRuleText}>딜러는 17 이상에서 멈춥니다</Text></View>
+          <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>딜러</Text><Text style={styles.bjScore}>{dealerScore}</Text></View>
+          <View style={styles.bjCardRow}>
+            {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
+          </View>
+
+          <Text style={styles.bjFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
+
+          <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text><Text style={styles.bjScore}>{handValue(player)}</Text></View>
+          <View style={styles.bjCardRow}>
+            {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} />)}
+          </View>
+
+          {splitHand && (
+            <>
+              <View style={styles.bjSeatRow}><Text style={styles.bjSeatLabel}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.bjScore}>{handValue(splitHand)}</Text></View>
+              <View style={styles.bjCardRow}>
+                {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} compact />)}
+              </View>
+            </>
+          )}
+
+          {/* 베팅 서클. 실제로 내 카드는 이 동그라미 바로 위에 깔립니다. */}
+          <View style={styles.bjBetSpot}><CoinStack amount={totalBet} compact /><Text style={styles.bjBetSpotText}>내 자리</Text></View>
+        </View>
 
         {insuranceOpen && (
           <View style={styles.insurancePanel}>
@@ -4715,26 +4740,6 @@ function BlackjackGameScreen(props: {
           </View>
         )}
         {insuranceMessage && <Text style={styles.insuranceMessage}>{insuranceMessage}</Text>}
-
-        <View style={styles.handHeader}>
-          <Text style={styles.handTitle}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text>
-          <Text style={styles.scoreBadge}>{handValue(player)}</Text>
-        </View>
-        <View style={styles.cardRow}>
-          {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} />)}
-        </View>
-
-        {splitHand && (
-          <>
-            <View style={styles.handHeader}>
-              <Text style={styles.handTitle}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text>
-              <Text style={styles.scoreBadge}>{handValue(splitHand)}</Text>
-            </View>
-            <View style={styles.cardRow}>
-              {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} />)}
-            </View>
-          </>
-        )}
 
         {phase === 'reveal' && (
           <RevealButton opened={reveal.opened} total={dealerLeft} onPress={openDealerCard} label="딜러 뒷장 뒤집기" />
@@ -5730,6 +5735,22 @@ const styles = StyleSheet.create({
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
   blackjackTable: { flex: 1, backgroundColor: '#07251D' },
+  // 반원형 블랙잭 테이블. 위쪽 곧은 변이 딜러 자리, 아래쪽 둥근 변이 손님 자리입니다.
+  // 아래 모서리 반경을 크게 줘서 반원처럼 보이게 합니다.
+  bjTable: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 10, paddingHorizontal: 14, paddingBottom: 20, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14 },
+  bjDealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  bjEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
+  bjChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
+  bjChip: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
+  bjDiscardBox: { width: 34, height: 26, borderRadius: 4, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
+  bjEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
+  bjSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
+  bjSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
+  bjScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
+  bjCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 92, flexWrap: 'wrap' },
+  bjFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 6, textAlign: 'center' },
+  bjBetSpot: { marginTop: 8, width: 98, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  bjBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
   gameTopActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
