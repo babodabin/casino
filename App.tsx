@@ -1919,7 +1919,7 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     <><DealerTable>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
       <View style={styles.dealerCardRow}>{round.dealer.map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
-      <Text style={styles.dealerFeltRule}>하이 5장과 로우 2장을 모두 이겨야 승리 · 한 패씩 나누면 무승부</Text>
+      <Text style={styles.dealerFeltRule}>하이 5장·로우 2장을 모두 이겨야 승리</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
       <View style={styles.dealerCardRow}>{round.player.map((card,index)=><Pressable key={card.id} style={index?styles.dealerCardFan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
       <DealerBetSpot amount={selectedBet}/>
@@ -5804,7 +5804,7 @@ const styles = StyleSheet.create({
   // 들린 카드가 바로 위 이름줄을 덮습니다.
   dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 104, paddingTop: 16, flexWrap: 'wrap' },
   // 일곱 장처럼 많을 때 부채처럼 겹쳐 한 줄에 담습니다.
-  dealerCardFan: { marginLeft: -22 },
+  dealerCardFan: { marginLeft: -30 },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
   dealerBetSpot: { marginTop: 6, width: 98, height: 46, borderRadius: 23, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
   dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
