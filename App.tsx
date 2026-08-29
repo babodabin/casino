@@ -4924,6 +4924,10 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
   const clearTimers=()=>{timers.current.forEach((timer)=>clearTimeout(timer));timers.current=[];};
   useEffect(()=>clearTimers,[]);
 
+  // 물결과 찌를 움직이는 시계. 이 값이 바뀔 때마다 화면이 조금씩 흔들립니다.
+  const [tick,setTick]=useState(0);
+  useEffect(()=>{const timer=setInterval(()=>setTick((value)=>value+1),140);return()=>clearInterval(timer);},[]);
+
   /** 놓쳤을 때. 어떤 이유든 한 푼도 못 받습니다. */
   const lose=(why:string,detail:string)=>{clearTimers();setPhase('result');setPrize(0);setMessage(why);onSettle(selectedBet,0,`${spot.name} · ${detail}`);};
 
@@ -4968,11 +4972,25 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
 
   return <View style={styles.fishingScreen}><ScreenHeader title="스크린낚시" onBack={onBack}/><View style={styles.fixedTableArea}>
     <View style={styles.fishingSea}>
+      {/* 수면. 물결이 서로 조금씩 어긋나게 오르내립니다. */}
+      <View style={styles.fishingWaves}>{Array.from({length:11},(_,index)=>
+        <View key={index} style={[styles.fishingWave,{transform:[{translateY:Math.sin(tick*0.45+index*0.8)*4}]}]}/>)}
+      </View>
       <View style={styles.fishingSeaTop}>
         <Text style={styles.fishingSpotName}>{spot.name}</Text>
         <Text style={styles.fishingSpotDetail}>{spot.detail}</Text>
       </View>
-      <Text style={styles.fishingFloat}>{phase==='waiting'?'🎣':phase==='bite'?'❗':phase==='fight'?'🐟':phase==='result'?(prize>0?'🎉':'💧'):'🌊'}</Text>
+      {/* 찌. 기다릴 때는 위아래로 까딱이고, 입질이 오면 물속으로 쑥 들어갑니다. */}
+      <View style={styles.fishingStage}>
+        <View style={[styles.fishingLine,{height:phase==='bite'?46:34}]}/>
+        <Text style={[styles.fishingFloat,{transform:[{translateY:
+          phase==='waiting'?Math.sin(tick*0.7)*5:
+          phase==='bite'?18+Math.sin(tick*2.4)*3:
+          phase==='fight'?Math.sin(tick*0.9)*4:0}]}]}>
+          {phase==='waiting'?'🎣':phase==='bite'?'❗':phase==='fight'?'🐟':phase==='result'?(prize>0?'🎉':'💧'):'🌊'}
+        </Text>
+        {phase==='fight'?<Text style={[styles.fishingShadow,{transform:[{translateX:Math.sin(tick*0.5)*54}]}]}>〰</Text>:null}
+      </View>
       <Text style={styles.fishingMessage}>{message}</Text>
       {phase==='fight'&&fight?<View style={styles.fishingGauges}>
         <Text style={styles.fishingGaugeLabel}>당겨 온 정도 {Math.round(fight.progress)}%</Text>
@@ -4982,6 +5000,10 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
       </View>:null}
       {phase==='result'?<Text style={styles.fishingPrize}>{prize>0?`+${Math.round(selectedBet*prize).toLocaleString()} WC · ${prize}배`:`-${selectedBet.toLocaleString()} WC`}</Text>:null}
       {phase==='idle'?<Text style={styles.fishingHint}>가장 큰 고기: {biggest.name} {biggest.payout}배</Text>:null}
+      {/* 바닥의 수초. 물결과 반대로 흔들려 물속처럼 보이게 합니다. */}
+      <View style={styles.fishingBed}>{Array.from({length:7},(_,index)=>
+        <Text key={index} style={[styles.fishingWeed,{transform:[{rotate:`${Math.sin(tick*0.35+index)*9}deg`}]}]}>🌿</Text>)}
+      </View>
     </View>
 
     <View style={styles.fishingActionArea}>
@@ -6611,11 +6633,18 @@ const styles = StyleSheet.create({
   fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
   fishWeedText: { fontSize: 15, opacity: .5 },
   fishingScreen: { flex: 1, backgroundColor: '#06202E' },
-  fishingSea: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#0A3247', borderWidth: 2, borderColor: '#1D5875' },
+  fishingSea: { flex: 1, alignItems: 'center', justifyContent: 'space-evenly', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#0A3247', borderWidth: 2, borderColor: '#1D5875', overflow: 'hidden' },
+  fishingWaves: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 22 },
+  fishingWave: { width: 22, height: 8, borderRadius: 4, backgroundColor: '#1D6A90' },
+  fishingStage: { width: '100%', height: 96, alignItems: 'center', justifyContent: 'center' },
+  fishingLine: { position: 'absolute', top: 0, width: 2, backgroundColor: '#7FA6BC' },
+  fishingShadow: { position: 'absolute', bottom: 4, color: '#2E7EA6', fontSize: 26 },
+  fishingBed: { flexDirection: 'row', gap: 10, opacity: 0.7 },
+  fishingWeed: { fontSize: 18 },
   fishingSeaTop: { alignItems: 'center', gap: 2 },
   fishingSpotName: { color: '#EAF4FA', fontSize: 18, fontWeight: '900' },
   fishingSpotDetail: { color: '#8FB6CC', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  fishingFloat: { fontSize: 52, lineHeight: 60 },
+  fishingFloat: { fontSize: 50, lineHeight: 58 },
   fishingMessage: { color: '#FFE9A8', fontSize: 15, fontWeight: '900', textAlign: 'center' },
   fishingHint: { color: '#7FA6BC', fontSize: 11, fontWeight: '700' },
   fishingPrize: { color: '#FFD35F', fontSize: 18, fontWeight: '900' },
