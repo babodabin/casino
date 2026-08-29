@@ -9,7 +9,6 @@ import {
   PanResponder,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -815,32 +814,33 @@ function CasinoApp() {
 
   if (!entered) {
     return (
-      <SafeAreaView style={styles.splash}>
+      <View style={styles.splash}>
         <StatusBar style="light" />
         <ImageBackground source={casinoEntranceSource} resizeMode="cover" style={styles.splashBackground}>
           <View style={styles.splashShade} />
-          <View style={styles.splashHeader}>
+          <View style={[styles.splashHeader, { paddingTop: 38 + insets.top }]}>
             <Text style={styles.splashEyebrow}>WELCOME TO</Text>
             <Text style={styles.splashTitle}>WORLD CASINO</Text>
             <Text style={styles.splashSubtitle}>세계의 모든 게임이 시작되는 밤</Text>
           </View>
-          <View style={styles.splashBottom}>
+          <View style={[styles.splashBottom, { paddingBottom: 24 + insets.bottom }]}>
             <Pressable accessibilityRole="button" style={({ pressed }) => [styles.splashEnterButton, pressed && styles.pressed]} onPress={() => setEntered(true)}><Text style={styles.splashEnterButtonTop}>◆ ENTER ◆</Text><Text style={styles.splashEnterButtonText}>카지노 입장하기</Text></Pressable>
             <Text style={styles.splashDisclaimer}>WC 게임 전용 코인 · 현금 환전 불가</Text>
           </View>
         </ImageBackground>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    // SafeAreaView(웹)는 스스로 env(safe-area-inset-*) 여백을 붙입니다.
-    // 아래 탭바에서도 같은 값을 쓰기 때문에 여기서 쓰면 여백이 두 번 들어갑니다.
-    // 그래서 일반 View를 쓰고, 여백은 이 아래에서 한 번만 줍니다.
+    // 노치·홈 인디케이터 여백은 배경 바깥이 아니라 안쪽에 줍니다. 바깥 상자에 주면
+    // 그 자리에 앱 배경(거의 검정)이 드러나 화면 아래에 검은 띠가 생깁니다.
+    // 위쪽은 헤더가 시계와 겹치지 않게 여기서 한 번만 띄우고, 아래쪽은 탭바가
+    // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
     <View style={[styles.app, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
       <Header coins={coins} totalPlays={totalPlays} />
-      <View style={[styles.screen, appScreen !== 'tabs' && { paddingBottom: insets.bottom }]}>
+      <View style={styles.screen}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
             category={selectedCategory}
