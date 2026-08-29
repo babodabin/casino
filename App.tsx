@@ -1878,7 +1878,14 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
   const showdown=(raised=false)=>{if(!round||result||pending)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';reveal.reset();setPending({mine:myBet,theirs:opponentBet,result:next,detail:`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`});};
   const openNext=()=>{if(!pending)return;const next=Math.min(3,reveal.opened+1);reveal.open(3);if(next<3)return;setResult(pending.result);onSettle(pending.mine,pending.theirs,pending.result,pending.detail);setPending(null);};
   const fold=()=>{if(!round||result)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
-  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><Text style={styles.pokerSeat}>컴퓨터</Text><View style={styles.cardRow}>{round.opponent.map((card,index)=><PlayingCard key={card.id} card={card} hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View><FaceDownCardDeck label="남은 카드"/><Text style={styles.pokerSeat}>나 · {evaluateTeenPatti(round.player).label}</Text><View style={styles.cardRow}>{round.player.map(card=><PlayingCard key={card.id} card={card} emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:revealing?<RevealButton opened={reveal.opened} total={3} onPress={openNext} label="컴퓨터 패 열기"/>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</ScrollView></View>;
+  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
+      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>컴퓨터</Text><Text style={styles.dealerSeatNote}>{folded?'비공개':result?evaluateTeenPatti(round.opponent).label:`${reveal.opened}/3 공개`}</Text></View>
+      <View style={styles.dealerCardRow}>{round.opponent.map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <Text style={styles.dealerFeltRule}>트레일 · 스트레이트 플러시 · 스트레이트 · 플러시 · 페어 순으로 셉니다</Text>
+      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>나</Text><Text style={styles.dealerSeatNote}>{evaluateTeenPatti(round.player).label}</Text></View>
+      <View style={styles.dealerCardRow}>{round.player.map(card=><PlayingCard key={card.id} card={card} compact emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>
+      <DealerBetSpot amount={mine}/>
+    </DealerTable>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:revealing?<RevealButton opened={reveal.opened} total={3} onPress={openNext} label="컴퓨터 패 열기"/>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</ScrollView></View>;
 }
 
 function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}){
@@ -4821,13 +4828,18 @@ function FaceDownCardDeck({label='DECK'}:{label?:string}){
     슈는 딜러의 왼손 쪽에 놓이므로 마주 본 화면에서는 오른쪽에 옵니다.
     버림 카드 통은 그 반대쪽, 칩 트레이는 딜러 바로 앞 가운데입니다. */
 const dealerTrayChips = ['#E4E4E4', '#C8402F', '#2F6BC8', '#2F9B5A', '#171107'];
-function DealerTable({ shoe = '슈', children }: { shoe?: string; children: React.ReactNode }) {
+function DealerTable({ host = 'dealer', shoe, children }: { host?: 'dealer' | 'computer'; shoe?: string; children: React.ReactNode }) {
   return (
     <View style={styles.dealerFelt}>
       <View style={styles.dealerEdge}>
-        <View style={styles.dealerEdgeSlot}><View style={styles.dealerDiscardBox} /><Text style={styles.dealerEdgeLabel}>버림</Text></View>
-        <View style={styles.dealerEdgeSlot}><View style={styles.dealerChipTray}>{dealerTrayChips.map((color) => <View key={color} style={[styles.dealerChip, { backgroundColor: color }]} />)}</View><Text style={styles.dealerEdgeLabel}>칩 트레이</Text></View>
-        <View style={styles.dealerEdgeSlot}><FaceDownCardDeck label={shoe} /></View>
+        {host === 'dealer' ? <>
+          <View style={styles.dealerEdgeSlot}><View style={styles.dealerDiscardBox} /><Text style={styles.dealerEdgeLabel}>버림</Text></View>
+          <View style={styles.dealerEdgeSlot}><View style={styles.dealerChipTray}>{dealerTrayChips.map((color) => <View key={color} style={[styles.dealerChip, { backgroundColor: color }]} />)}</View><Text style={styles.dealerEdgeLabel}>칩 트레이</Text></View>
+        </> : <>
+          <View style={styles.dealerEdgeSlot} />
+          <View style={styles.dealerEdgeSlot}><View style={styles.dealerOpponentSeat} /><Text style={styles.dealerEdgeLabel}>상대 자리</Text></View>
+        </>}
+        <View style={styles.dealerEdgeSlot}><FaceDownCardDeck label={shoe ?? (host === 'dealer' ? '슈' : '남은 카드')} /></View>
       </View>
       {children}
     </View>
@@ -5759,6 +5771,8 @@ const styles = StyleSheet.create({
   dealerChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
   dealerChip: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
   dealerDiscardBox: { width: 34, height: 26, borderRadius: 4, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
+  // 딜러가 아니라 사람(컴퓨터)이 앉는 자리. 반원 반대쪽 좌석을 나타냅니다.
+  dealerOpponentSeat: { width: 46, height: 22, borderTopLeftRadius: 23, borderTopRightRadius: 23, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
   dealerEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   dealerSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
   dealerSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
@@ -5785,7 +5799,7 @@ const styles = StyleSheet.create({
   playingCard: { width: 72, height: 108, borderRadius: 10, padding: 8, justifyContent: 'space-between', backgroundColor: '#F7F1E3', borderWidth: 1, borderColor: '#D4C9B2' },
   cardWinner: { transform: [{ translateY: -16 }, { scale: 1.06 }], borderWidth: 3, borderColor: '#F2C85B', shadowColor: '#FFD35F', shadowOpacity: 0.9, shadowRadius: 10, elevation: 9 },
   cardSelected: { transform: [{ translateY: -10 }, { scale: 1.04 }], borderWidth: 2, borderColor: '#D6DCE6' },
-  cardDim: { opacity: 0.04, transform: [{ scale: 0.96 }] },
+  cardDim: { opacity: 0.4, transform: [{ scale: 0.96 }] },
   holdemGuide: { padding: 18, borderRadius: 18, backgroundColor: '#18251F', borderWidth: 1, borderColor: '#3D7658', gap: 8 },
   holdemPage: { padding: 16, paddingBottom: 42, gap: 16 },
   holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 110, backgroundColor: '#075332', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
