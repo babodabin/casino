@@ -5764,7 +5764,9 @@ const styles = StyleSheet.create({
   dealerSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
   dealerSeatNote: { color: '#8FBFA8', fontSize: 11, fontWeight: '700' },
   dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
-  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 92, flexWrap: 'wrap' },
+  // 이긴 카드는 cardWinner가 위로 16 들어 올립니다. 그만큼 위쪽 자리를 비워 두지 않으면
+  // 들린 카드가 바로 위 이름줄을 덮습니다.
+  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 112, paddingTop: 16, flexWrap: 'wrap' },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 6, textAlign: 'center' },
   dealerBetSpot: { marginTop: 8, width: 98, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
   dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
