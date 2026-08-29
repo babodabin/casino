@@ -4701,7 +4701,8 @@ function BlackjackGameScreen(props: {
         <View style={styles.gameTopActions}><View style={styles.gameBetPill}><CoinStack amount={totalBet} compact /><Text style={styles.gameBetText}>{phase === 'result' ? '정산 완료' : '베팅 중'}</Text></View><Pressable accessibilityRole="button" accessibilityLabel="블랙잭 나가기" style={styles.gameExitButton} onPress={props.onExit}><Text style={styles.gameExitButtonText}>나가기</Text></Pressable></View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.tableContent} showsVerticalScrollIndicator={false}>
+      {/* 스크롤 없이 한 화면에 고정합니다. 위쪽은 테이블, 아래쪽은 버튼 자리로 나눕니다. */}
+      <View style={styles.fixedTableArea}>
         <DealerTable>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={styles.dealerCardRow}>
@@ -4727,6 +4728,7 @@ function BlackjackGameScreen(props: {
           <DealerBetSpot amount={totalBet} />
         </DealerTable>
 
+        <View style={styles.fixedActionArea}>
         {insuranceOpen && (
           <View style={styles.insurancePanel}>
             <Text style={styles.insuranceTitle}>딜러의 공개 카드가 에이스입니다</Text>
@@ -4749,35 +4751,33 @@ function BlackjackGameScreen(props: {
 
         {phase === 'player' && !insuranceOpen && (
           <View>
-            <View style={styles.gameActions}>
-            <Pressable style={[styles.gameActionButton, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
-            <Pressable style={[styles.gameActionButton, styles.standButton]} onPress={stand}><Text style={styles.gameActionText}>스탠드</Text><Text style={styles.gameActionSubtext}>멈추기</Text></Pressable>
+            <View style={[styles.gameActions, styles.gameActionsTight]}>
+            <Pressable style={[styles.gameActionButton, styles.gameActionButtonTight, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
+            <Pressable style={[styles.gameActionButton, styles.gameActionButtonTight, styles.standButton]} onPress={stand}><Text style={styles.gameActionText}>스탠드</Text><Text style={styles.gameActionSubtext}>멈추기</Text></Pressable>
             </View>
             {!splitHand && player.length === 2 && (
               <Pressable
                 disabled={props.coins < props.bet}
-                style={[styles.doubleButton, props.coins < props.bet && styles.disabledCard]}
+                style={[styles.doubleButton, styles.stakeButtonTight, props.coins < props.bet && styles.disabledCard]}
                 onPress={doubleDown}
               >
-                <Text style={styles.doubleButtonText}>더블다운 · {props.bet.toLocaleString()} WC 추가</Text>
-                <Text style={styles.doubleButtonSubtext}>베팅을 두 배로 올리고 카드 한 장만 받기</Text>
+                <Text style={styles.doubleButtonText}>더블다운 · {props.bet.toLocaleString()} WC 추가 · 한 장만</Text>
               </Pressable>
             )}
             {!splitHand && canSplit(player) && (
               <Pressable
                 disabled={props.coins < props.bet}
-                style={[styles.splitButton, props.coins < props.bet && styles.disabledCard]}
+                style={[styles.splitButton, styles.stakeButtonTight, props.coins < props.bet && styles.disabledCard]}
                 onPress={split}
               >
-                <Text style={styles.doubleButtonText}>스플릿 · {props.bet.toLocaleString()} WC 추가</Text>
-                <Text style={styles.doubleButtonSubtext}>같은 값의 카드 두 장을 두 손으로 나누기</Text>
+                <Text style={styles.doubleButtonText}>스플릿 · {props.bet.toLocaleString()} WC 추가 · 두 손으로</Text>
               </Pressable>
             )}
           </View>
         )}
 
         {phase === 'result' && splitResults && splitHand && (
-          <View style={styles.resultPanel}>
+          <View style={[styles.resultPanel, styles.resultPanelTight]}>
             <Text style={styles.resultTitle}>스플릿 결과</Text>
             <Text style={[styles.resultNet, splitNet > 0 && styles.positive, splitNet < 0 && styles.negative]}>{splitNet > 0 ? '+' : ''}{splitNet.toLocaleString()} WC</Text>
             <Text style={styles.resultDetail}>손 1 {resultLabel(splitResults[0])} · 손 2 {resultLabel(splitResults[1])}</Text>
@@ -4789,7 +4789,7 @@ function BlackjackGameScreen(props: {
         )}
 
         {phase === 'result' && result && !splitResults && (
-          <View style={styles.resultPanel}>
+          <View style={[styles.resultPanel, styles.resultPanelTight]}>
             <Text style={styles.resultTitle}>{resultLabel(result)}</Text>
             <Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text>
             <Text style={styles.resultDetail}>플레이어 {handValue(player)} · 딜러 {handValue(dealer)}</Text>
@@ -4801,7 +4801,8 @@ function BlackjackGameScreen(props: {
         )}
 
         <Text style={styles.gameFooter}>베팅 등급 {betTierName(props.difficulty)} · 게임 전용 가상 코인</Text>
-      </ScrollView>
+        </View>
+      </View>
     </View>
   );
 }
@@ -4819,8 +4820,8 @@ function Die({ value, rolling=false, index=0 }: { value: number; rolling?:boolea
   return <View style={[styles.die,rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-7:6):0},{scale:rolling?1.08:1}]}]}><Text style={styles.dieText}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text></View>;
 }
 
-function FaceDownCardDeck({label='DECK'}:{label?:string}){
-  return <View style={styles.tableDeckArea}><View style={styles.tableDeckShadow}/><View style={[styles.playingCard,styles.compactPlayingCard,styles.hiddenCard,styles.tableDeckCard]}><Text style={styles.hiddenCardMark}>◆</Text></View><Text style={styles.tableDeckLabel}>{label}</Text></View>;
+function FaceDownCardDeck({label='DECK',small=false}:{label?:string;small?:boolean}){
+  return <View style={[styles.tableDeckArea,small&&styles.tableDeckAreaSmall]}><View style={[styles.tableDeckShadow,small&&styles.tableDeckShadowSmall]}/><View style={[styles.playingCard,styles.compactPlayingCard,styles.hiddenCard,styles.tableDeckCard,small&&styles.tableDeckCardSmall]}><Text style={[styles.hiddenCardMark,small&&styles.hiddenCardMarkSmall]}>◆</Text></View><Text style={styles.tableDeckLabel}>{label}</Text></View>;
 }
 
 /** 딜러가 서는 쪽이 곧은 변, 손님이 앉는 쪽이 둥근 변인 반원형 테이블입니다.
@@ -4839,7 +4840,7 @@ function DealerTable({ host = 'dealer', shoe, children }: { host?: 'dealer' | 'c
           <View style={styles.dealerEdgeSlot} />
           <View style={styles.dealerEdgeSlot}><View style={styles.dealerOpponentSeat} /><Text style={styles.dealerEdgeLabel}>상대 자리</Text></View>
         </>}
-        <View style={styles.dealerEdgeSlot}><FaceDownCardDeck label={shoe ?? (host === 'dealer' ? '슈' : '남은 카드')} /></View>
+        <View style={styles.dealerEdgeSlot}><FaceDownCardDeck small label={shoe ?? (host === 'dealer' ? '슈' : '남은 카드')} /></View>
       </View>
       {children}
     </View>
@@ -5765,7 +5766,7 @@ const styles = StyleSheet.create({
   blackjackTable: { flex: 1, backgroundColor: '#07251D' },
   // 반원형 블랙잭 테이블. 위쪽 곧은 변이 딜러 자리, 아래쪽 둥근 변이 손님 자리입니다.
   // 아래 모서리 반경을 크게 줘서 반원처럼 보이게 합니다.
-  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 10, paddingHorizontal: 14, paddingBottom: 20, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14 },
+  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 8, paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14 },
   dealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   dealerEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
   dealerChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
@@ -5780,9 +5781,9 @@ const styles = StyleSheet.create({
   dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
   // 이긴 카드는 cardWinner가 위로 16 들어 올립니다. 그만큼 위쪽 자리를 비워 두지 않으면
   // 들린 카드가 바로 위 이름줄을 덮습니다.
-  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 112, paddingTop: 16, flexWrap: 'wrap' },
-  dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 6, textAlign: 'center' },
-  dealerBetSpot: { marginTop: 8, width: 98, height: 54, borderRadius: 27, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 104, paddingTop: 16, flexWrap: 'wrap' },
+  dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
+  dealerBetSpot: { marginTop: 6, width: 98, height: 46, borderRadius: 23, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
   dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
@@ -5792,6 +5793,13 @@ const styles = StyleSheet.create({
   gameBetPill: { minWidth: 82, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 6, borderRadius: 24, backgroundColor: '#2A2312', borderWidth: 1, borderColor: '#806526' },
   gameBetText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
   tableContent: { padding: 18, paddingBottom: 38 },
+  // 스크롤 없이 한 화면에 담는 판. 위는 테이블, 아래는 버튼 자리로 나눕니다.
+  fixedTableArea: { flex: 1, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10, justifyContent: 'space-between' },
+  fixedActionArea: { width: '100%' },
+  gameActionsTight: { marginTop: 10 },
+  gameActionButtonTight: { minHeight: 56 },
+  stakeButtonTight: { minHeight: 42, marginTop: 8 },
+  resultPanelTight: { marginTop: 10, paddingVertical: 12 },
   handHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 10 },
   handTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
   scoreBadge: { minWidth: 34, height: 28, textAlign: 'center', lineHeight: 28, overflow: 'hidden', borderRadius: 14, color: '#171107', backgroundColor: colors.goldLight, fontSize: 14, fontWeight: '900' },
@@ -6682,6 +6690,11 @@ const styles = StyleSheet.create({
   lottoBonusBall: { backgroundColor:'#6C315F', borderColor:'#CE7FBD' },
   lottoMatchSummary: { color:'#FFE287', fontSize:13, lineHeight:21, fontWeight:'900' },
   tableDeckArea: { alignItems:'center', justifyContent:'center', minHeight:80, marginVertical:8 },
+  // 테이블 안에 놓는 작은 더미. 한 화면에 다 담으려면 이 자리를 아껴야 합니다.
+  tableDeckAreaSmall: { minHeight:56, marginVertical:0 },
+  tableDeckShadowSmall: { width:36, height:50, borderRadius:5 },
+  tableDeckCardSmall: { width:36, height:50, borderRadius:5, borderWidth:2 },
+  hiddenCardMarkSmall: { fontSize:20 },
   tableDeckShadow: { position:'absolute', width:50, height:69, borderRadius:7, backgroundColor:'rgba(0,0,0,0.35)', transform:[{translateX:5},{translateY:5},{rotate:'4deg'}] },
   tableDeckCard: { width:50, height:69, borderRadius:7, alignItems:'center', justifyContent:'center', backgroundColor:'#182847', borderWidth:3, borderColor:'#E2D7B0', transform:[{rotate:'-2deg'}] },
   tableDeckLabel: { color:'#D8CC9B', fontSize:8, fontWeight:'900', letterSpacing:1, marginTop:4 },
