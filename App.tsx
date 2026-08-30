@@ -5919,8 +5919,11 @@ function RouletteGameScreen({
     const pocketIndex = europeanWheelOrder.indexOf(number);
     const step = 360 / europeanWheelOrder.length;
     const landing = 360 - pocketIndex * step;
-    // 1단계에서 빠르게 여섯 바퀴를 돌고, 2단계에서 마지막 한 바퀴 반을 기어가듯 붙입니다.
-    const handoff = 360 * 6 + landing - 540;
+    // 여섯 바퀴를 한 번에 돕니다. 처음이 제일 빠르고 끝으로 갈수록 느려집니다.
+    //
+    // 예전에는 두 단계로 나눠 돌렸는데, 1단계가 끝에서 105°/초까지 느려진 뒤
+    // 2단계(Easing.out)가 318°/초로 시작해서 이어지는 자리에서 속도가 세 배로 튀었습니다.
+    // "중간에 한 번 더 세게 돈다"는 게 그것입니다. 곡선 하나로 합쳐 없앴습니다.
     const target = 360 * 6 + landing;
 
     wheelProgress.setValue(0);
@@ -5928,20 +5931,12 @@ function RouletteGameScreen({
     setResultNumber(null);
     pendingSettle.current = () => onSettle(bet, selectedBet, number, betLabel);
 
-    Animated.sequence([
-      Animated.timing(wheelProgress, {
-        toValue: handoff,
-        duration: Math.max(120, Math.round(2400 * motion)),
-        easing: Easing.bezier(0.22, 0.68, 0.42, 0.92),
-        useNativeDriver: true,
-      }),
-      Animated.timing(wheelProgress, {
-        toValue: target,
-        duration: Math.max(180, Math.round(3400 * motion)),
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
+    Animated.timing(wheelProgress, {
+      toValue: target,
+      duration: Math.max(300, Math.round(4800 * motion)),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
       if (!finished) return;
       setResultNumber(number);
       setPhase('result');
