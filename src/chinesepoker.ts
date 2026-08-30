@@ -62,6 +62,16 @@ export function dealChinesePoker(random: () => number = Math.random): { player: 
   return { player: deck.slice(0, 13), opponent: deck.slice(13, 26) };
 }
 
+/**
+ * 여러 명이 할 때 몫을 나눕니다. 0번이 나입니다.
+ * 열세 장씩이라 네 명이면 52장을 딱 나눠 갖습니다. 그래서 네 명이 상한입니다.
+ */
+export function dealChinesePokerTable(players: number, random: () => number = Math.random): Card[][] {
+  if (players < 2 || players > 4) throw new Error('차이니즈 포커는 두 명에서 네 명까지 합니다.');
+  const deck = shuffleDeck(createDeck(), random);
+  return Array.from({ length: players }, (_, index) => deck.slice(index * 13, (index + 1) * 13));
+}
+
 // 족보를 숫자 하나로 눌러 담습니다. 자동 배치에서 7만 가지 조합을 훑을 때 비교를 빠르게 하려는 것으로,
 // 자리값이 15라 킥커까지 순서대로 반영됩니다.
 const strengthOf = (hand: PokerHand): number =>
@@ -114,6 +124,43 @@ export function arrangeChinesePoker(cards: Card[]): ChineseLayout {
 }
 
 export const chineseMultiplier = (units: number): number => Math.max(0, Math.min(2, 1 + units / chineseMaxUnits));
+
+/**
+ * 여러 명일 때의 배당. 상대마다 따로 겨루고 그 값을 다 더합니다.
+ * 상대가 늘면 딸 수 있는 값도 같이 늘어나므로 상대 수로 나눠 1대1과 눈금을 맞춥니다.
+ * 그래서 사람이 몇 명이든 "모두에게 세 줄을 다 이기면 2배"입니다.
+ */
+export const chineseTableMultiplier = (units: number, maxUnits: number): number =>
+  Math.max(0, Math.min(2, 1 + units / Math.max(1, maxUnits)));
+
+export type ChineseSeatScore = {
+  /** 1번부터. 0번은 나라서 여기 없습니다. */
+  seat: number;
+  rows: ChineseRowOutcome[];
+  units: number;
+  scoop: 'player' | 'opponent' | null;
+  opponentFoul: boolean;
+};
+
+export type ChineseTableResult = {
+  perSeat: ChineseSeatScore[];
+  units: number;
+  maxUnits: number;
+  multiplier: number;
+  playerFoul: boolean;
+};
+
+/** 나와 상대 한 명씩을 따로 견주고 값을 다 더합니다. 상대끼리는 겨루지 않습니다. */
+export function resolveChinesePokerTable(player: ChineseArrangement, opponents: ChineseArrangement[]): ChineseTableResult {
+  if (opponents.length < 1) throw new Error('상대가 적어도 한 명은 있어야 합니다.');
+  const perSeat = opponents.map((opponent, index) => {
+    const one = resolveChinesePoker(player, opponent);
+    return { seat: index + 1, rows: one.rows, units: one.units, scoop: one.scoop, opponentFoul: one.opponentFoul };
+  });
+  const units = perSeat.reduce((sum, seat) => sum + seat.units, 0);
+  const maxUnits = chineseMaxUnits * opponents.length;
+  return { perSeat, units, maxUnits, multiplier: chineseTableMultiplier(units, maxUnits), playerFoul: player.foul };
+}
 
 export function resolveChinesePoker(player: ChineseArrangement, opponent: ChineseArrangement): ChineseResult {
   const pairs: { row: ChineseRowName; mine: PokerHand; theirs: PokerHand }[] = [

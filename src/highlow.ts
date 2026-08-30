@@ -59,3 +59,53 @@ export function resolveHighLow(player: Card[], opponent: Card[]): HighLowResult 
   else share += lowWinner === 'player' ? 0.5 : lowWinner === 'tie' ? 0.25 : 0;
   return { result: share > 0.5 ? 'win' : share < 0.5 ? 'loss' : 'push', share, playerHigh, opponentHigh, playerLow, opponentLow, highWinner, lowWinner };
 }
+
+/** 여러 명이 할 때 몫을 나눕니다. 0번이 나입니다. 일곱 장씩이라 일곱 명까지 됩니다. */
+export function dealHighLowTable(players: number, random: () => number = Math.random): Card[][] {
+  if (players < 2 || players > 7) throw new Error('하이로우는 두 명에서 일곱 명까지 합니다.');
+  const deck = shuffleDeck(createDeck(), random);
+  return Array.from({ length: players }, (_, index) => deck.slice(index * 7, (index + 1) * 7));
+}
+
+export type HighLowTableResult = {
+  highWinners: number[];
+  /** 8 이하 로우를 만든 사람이 아무도 없으면 빈 배열이고, 그때는 하이가 팟을 다 가져갑니다. */
+  lowWinners: number[];
+  /** 자리별 팟 몫. 살아 있는 사람들 몫을 다 더하면 1입니다. */
+  shares: number[];
+};
+
+/**
+ * 여러 명의 승부. 하이 절반 · 로우 절반이고 같은 세기가 여럿이면 그 안에서 다시 나눕니다.
+ * live에는 폴드하지 않고 끝까지 간 자리만 넘깁니다.
+ */
+export function resolveHighLowTable(hands: Card[][], live: number[]): HighLowTableResult {
+  if (live.length === 0) throw new Error('승부할 사람이 없습니다.');
+  const highs = new Map(live.map((seat) => [seat, evaluateHoldem(hands[seat])]));
+  let highWinners = [live[0]];
+  for (const seat of live.slice(1)) {
+    const compared = compareHands(highs.get(seat)!, highs.get(highWinners[0])!);
+    if (compared > 0) highWinners = [seat];
+    else if (compared === 0) highWinners.push(seat);
+  }
+
+  const qualified = live.map((seat) => ({ seat, low: evaluateLow(hands[seat]) })).filter((item): item is { seat: number; low: LowHand } => item.low !== null);
+  let lowWinners: number[] = [];
+  if (qualified.length > 0) {
+    let best = [qualified[0]];
+    for (const item of qualified.slice(1)) {
+      const compared = compareLow(item.low, best[0].low);
+      if (compared > 0) best = [item];
+      else if (compared === 0) best.push(item);
+    }
+    lowWinners = best.map((item) => item.seat);
+  }
+
+  const shares = hands.map(() => 0);
+  if (lowWinners.length === 0) highWinners.forEach((seat) => { shares[seat] += 1 / highWinners.length; });
+  else {
+    highWinners.forEach((seat) => { shares[seat] += 0.5 / highWinners.length; });
+    lowWinners.forEach((seat) => { shares[seat] += 0.5 / lowWinners.length; });
+  }
+  return { highWinners, lowWinners, shares };
+}

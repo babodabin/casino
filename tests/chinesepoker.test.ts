@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {arrangeChinesePoker,chineseMaxUnits,chineseMultiplier,dealChinesePoker,evaluateChineseArrangement,evaluateThree,isValidChineseLayout,resolveChinesePoker,type ChineseLayout} from '../src/chinesepoker.ts';
+import {arrangeChinesePoker,chineseMaxUnits,chineseMultiplier,chineseTableMultiplier,dealChinesePoker,dealChinesePokerTable,resolveChinesePokerTable,evaluateChineseArrangement,evaluateThree,isValidChineseLayout,resolveChinesePoker,type ChineseLayout} from '../src/chinesepoker.ts';
 import {createDeck,type Card} from '../src/blackjack.ts';
 import {compareHands,evaluateFive} from '../src/texasholdem.ts';
 
@@ -196,4 +196,49 @@ test('실제로 여러 판 돌려도 배당이 범위를 벗어나지 않는다'
     assert.ok(result.multiplier>=0&&result.multiplier<=2);
     assert.ok(Math.abs(result.units)<=chineseMaxUnits);
   }
+});
+
+test('여러 명이면 몫을 열세 장씩 나누고 카드가 겹치지 않는다', () => {
+  for (const players of [2, 3, 4]) {
+    const hands = dealChinesePokerTable(players);
+    assert.equal(hands.length, players);
+    hands.forEach((hand) => assert.equal(hand.length, 13));
+    const ids = new Set(hands.flat().map((card) => card.id));
+    assert.equal(ids.size, players * 13);
+  }
+});
+
+test('다섯 명은 카드가 모자라 받지 않는다', () => {
+  assert.throws(() => dealChinesePokerTable(5), /두 명에서 네 명까지/);
+  assert.throws(() => dealChinesePokerTable(1), /두 명에서 네 명까지/);
+});
+
+test('상대마다 따로 겨루고 값을 다 더한다', () => {
+  const hands = dealChinesePokerTable(4, seeded(11));
+  const arranged = hands.map((hand) => evaluateChineseArrangement(arrangeChinesePoker(hand)));
+  const table = resolveChinesePokerTable(arranged[0], arranged.slice(1));
+  assert.equal(table.perSeat.length, 3);
+  assert.deepEqual(table.perSeat.map((seat) => seat.seat), [1, 2, 3]);
+  assert.equal(table.maxUnits, chineseMaxUnits * 3);
+  assert.equal(table.units, table.perSeat.reduce((sum, seat) => sum + seat.units, 0));
+  // 상대 한 명씩 따로 본 값과 같아야 합니다.
+  table.perSeat.forEach((seat, index) => assert.equal(seat.units, resolveChinesePoker(arranged[0], arranged[index + 1]).units));
+});
+
+test('사람이 몇 명이든 모두에게 세 줄을 다 이기면 두 배다', () => {
+  for (const opponents of [1, 2, 3]) {
+    assert.equal(chineseTableMultiplier(chineseMaxUnits * opponents, chineseMaxUnits * opponents), 2);
+    assert.equal(chineseTableMultiplier(-chineseMaxUnits * opponents, chineseMaxUnits * opponents), 0);
+    assert.equal(chineseTableMultiplier(0, chineseMaxUnits * opponents), 1);
+  }
+});
+
+test('한 명만 상대하면 1대1 배당과 똑같다', () => {
+  const hands = dealChinesePokerTable(2, seeded(7));
+  const mine = evaluateChineseArrangement(arrangeChinesePoker(hands[0]));
+  const theirs = evaluateChineseArrangement(arrangeChinesePoker(hands[1]));
+  const one = resolveChinesePoker(mine, theirs);
+  const table = resolveChinesePokerTable(mine, [theirs]);
+  assert.equal(table.multiplier, one.multiplier);
+  assert.equal(table.units, one.units);
 });

@@ -41,3 +41,19 @@ export function resolveHoldem(player:Card[],opponent:Card[],community:Card[]){ c
 export function dealOmaha(random:()=>number=Math.random){ const deck=shuffleDeck(createDeck(),random); return { player:deck.slice(0,4), opponent:deck.slice(4,8), community:deck.slice(8,13) }; }
 export function evaluateOmaha(hole:Card[],community:Card[]){ if(hole.length!==4||community.length!==5)throw new Error('오마하는 개인 4장과 공용 5장이 필요합니다.'); const hands:PokerHand[]=[]; for(let a=0;a<3;a++)for(let b=a+1;b<4;b++)for(let c=0;c<3;c++)for(let d=c+1;d<4;d++)for(let e=d+1;e<5;e++)hands.push(evaluateFive([hole[a],hole[b],community[c],community[d],community[e]])); return hands.sort((x,y)=>compareHands(y,x))[0]; }
 export function resolveOmaha(player:Card[],opponent:Card[],community:Card[]){ const playerHand=evaluateOmaha(player,community); const opponentHand=evaluateOmaha(opponent,community); const compared=compareHands(playerHand,opponentHand); return {result:compared>0?'win' as const:compared<0?'loss' as const:'push' as const,playerHand,opponentHand}; }
+
+/**
+ * 여러 명이 할 때 몫을 나눕니다. 0번이 나입니다.
+ * 홀덤은 개인 2장, 오마하는 4장이고 공용 5장은 다 같이 씁니다.
+ */
+export function dealTable(variant: 'holdem' | 'omaha', players: number, random: () => number = Math.random): { hands: Card[][]; community: Card[] } {
+  if (players < 2 || players > 4) throw new Error('두 명에서 네 명까지 합니다.');
+  const hole = variant === 'holdem' ? 2 : 4;
+  const deck = shuffleDeck(createDeck(), random);
+  const hands = Array.from({ length: players }, (_, index) => deck.slice(index * hole, (index + 1) * hole));
+  return { hands, community: deck.slice(players * hole, players * hole + 5) };
+}
+
+/** 자리 하나의 완성된 패. 홀덤은 개인+공용 일곱 장, 오마하는 개인 2장과 공용 3장을 골라 씁니다. */
+export const evaluateTableHand = (variant: 'holdem' | 'omaha', hole: Card[], community: Card[]): PokerHand =>
+  (variant === 'holdem' ? evaluateHoldem([...hole, ...community]) : evaluateOmaha(hole, community));
