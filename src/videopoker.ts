@@ -38,5 +38,23 @@ export function evaluateVideoPoker(hand: Card[]): VideoPokerResult {
   return { key: 'noWin', label: '당첨 없음', multiplier: 0 };
 }
 
+/**
+ * 족보를 이루는 카드만. 화면에서 **그 카드만 번쩍이게** 하는 데 씁니다.
+ *
+ * 다섯 장을 다 쓰는 족보(로열·스트레이트 플러시·플러시·스트레이트·풀하우스)는 다섯 장을
+ * 그대로 돌려줍니다. 짝으로 되는 족보는 짝이 된 카드만 돌려줍니다.
+ * 당첨이 아니면 빈 배열입니다.
+ */
+export function videoPokerMadeCards(hand: Card[]): Card[] {
+  const result = evaluateVideoPoker(hand);
+  if (result.multiplier === 0) return [];
+  if (['royalFlush', 'straightFlush', 'flush', 'straight', 'fullHouse'].includes(result.key)) return [...hand];
+  const counts = new Map<number, number>();
+  for (const card of hand) counts.set(rankValue[card.rank], (counts.get(rankValue[card.rank]) ?? 0) + 1);
+  // 몇 장짜리 짝이 족보를 만들었는지. 투 페어만 두 짝(네 장)을 같이 씁니다.
+  const size = result.key === 'fourKind' ? 4 : result.key === 'threeKind' ? 3 : 2;
+  return hand.filter((card) => counts.get(rankValue[card.rank]) === size);
+}
+
 export const videoPokerPayout = (stake: number, hand: Card[]) => stake * evaluateVideoPoker(hand).multiplier;
 export const videoPokerNet = (stake: number, hand: Card[]) => videoPokerPayout(stake, hand) - stake;

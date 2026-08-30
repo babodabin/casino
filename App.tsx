@@ -100,7 +100,7 @@ import { boatBetLabels, boatTicketOdds, createBoatField, requiredBoatSelections,
 import { createGreyhoundField, greyhoundBetLabels, greyhoundTicketOdds, requiredGreyhoundSelections, settleGreyhoundTicket, simulateGreyhoundRace, type Greyhound, type GreyhoundBetType, type GreyhoundRaceResult, type GreyhoundTicket } from './src/greyhound';
 import { carTicketPayout, createCarField, simulateCarRace, type CarRaceResult, type CarRaceTicket, type RaceCar } from './src/carracing';
 import { bullTicketPayout, createBullField, simulateBullTournament, type BullTicket, type BullTournamentResult, type FightingBull } from './src/bullfighting';
-import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerNet, videoPokerPayout } from './src/videopoker';
+import { dealVideoPoker, evaluateVideoPoker, exchangeVideoPoker, videoPokerMadeCards, videoPokerNet, videoPokerPayout } from './src/videopoker';
 import { compareHands, dealHoldem, dealOmaha, dealTable, evaluateHoldem, evaluateTableHand, madeHandCards, resolveHoldem, resolveOmaha } from './src/texasholdem';
 import { dealSevenPoker, dealSevenPokerTable, resolveSevenPoker } from './src/sevenpoker';
 import { applyTableAction, maxRaisesPerStreet, openTable, startTableRound, tableLive, tableOthersPot, tablePot, tableShowdown, tableToCall, tableWalkover, type TableAction, type TableRound } from './src/table';
@@ -1363,6 +1363,25 @@ function useTableDeal(deal: unknown, seats: number, target: number) {
 
 /** 비디오 포커에서 바꾸는 카드가 좌우로 도는 시간. 네 번 돌고 멈춥니다. */
 const VIDEO_POKER_FLIP_MS = 820;
+
+/**
+ * 비디오 포커 배당표. **맞은 줄에 불이 들어옵니다.**
+ * `key`는 `src/videopoker.ts`가 돌려주는 결과의 key와 같아야 합니다.
+ */
+const videoPokerPaytable: { key: string; label: string; pay: string }[] = [
+  { key: 'royalFlush', label: 'ROYAL', pay: '250×' },
+  { key: 'straightFlush', label: 'ST.FLUSH', pay: '50×' },
+  { key: 'fourKind', label: 'FOUR', pay: '25×' },
+  { key: 'fullHouse', label: 'FULL', pay: '9×' },
+  { key: 'flush', label: 'FLUSH', pay: '6×' },
+  { key: 'straight', label: 'STRAIGHT', pay: '4×' },
+  { key: 'threeKind', label: 'THREE', pay: '3×' },
+  { key: 'twoPair', label: 'TWO PAIR', pay: '2×' },
+  { key: 'jacksOrBetter', label: 'JACKS+', pay: '1×' },
+];
+
+/** 이길 때 튀어 오르는 코인 수. 홀수라 가운데 한 개가 곧게 올라갑니다. */
+const VIDEO_POKER_COINS = 9;
 
 /** 딜러가 카드 한 장을 여는 데 걸리는 시간. 실제 딜러가 뒤집는 속도쯤입니다. */
 const DEALER_REVEAL_MS = 620;
@@ -3024,6 +3043,25 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
   const flip = useRef(new Animated.Value(0)).current;
   const [spinning, setSpinning] = useState<boolean[] | null>(null);
   const flipScale = flip.interpolate({ inputRange: [0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1], outputRange: [1, 0.08, 1, 0.08, 1, 0.08, 1, 0.08, 1] });
+  // 족보를 이루는 카드만 번쩍입니다. 다섯 장이 다 번쩍이면 어느 카드로 이겼는지 안 보입니다.
+  const madeIds = new Set((phase === 'result' ? videoPokerMadeCards(hand) : []).map((card) => card.id));
+  const won = !!result && result.multiplier > 0;
+  const shine = useRef(new Animated.Value(1)).current;
+  const coinBurst = useRef([...Array(VIDEO_POKER_COINS)].map(() => new Animated.Value(0))).current;
+  useEffect(() => {
+    if (!won) { shine.setValue(1); return; }
+    const blink = Animated.loop(Animated.sequence([
+      Animated.timing(shine, { toValue: 0.3, duration: 250, easing: Easing.linear, useNativeDriver: true }),
+      Animated.timing(shine, { toValue: 1, duration: 250, easing: Easing.linear, useNativeDriver: true }),
+    ]), { iterations: 5 });
+    const burst = Animated.stagger(70, coinBurst.map((value) => {
+      value.setValue(0);
+      return Animated.timing(value, { toValue: 1, duration: 1100, easing: Easing.out(Easing.quad), useNativeDriver: true });
+    }));
+    blink.start();
+    burst.start();
+    return () => { blink.stop(); burst.stop(); shine.setValue(1); coinBurst.forEach((value) => value.setValue(0)); };
+  }, [won, result?.key]);
   const deal = () => { if (!onPlaceBet(selectedBet)) return; const next = dealVideoPoker(); setHand(next.hand); setDeck(next.deck); setHeld([false, false, false, false, false]); setPhase('hold'); };
   const finishDraw = (next: { hand: Card[]; deck: Card[] }) => { setSpinning(null); setHand(next.hand); setDeck(next.deck); setPhase('result'); onSettle(selectedBet, next.hand); };
   const draw = () => {
@@ -3042,13 +3080,25 @@ function VideoPokerGameScreen({ coins, difficulty, selectedBet, onBack, onBetCha
     <View style={styles.videoPokerCabinet}>
       <View style={styles.videoPokerMarquee}><View style={styles.marqueeBulb} /><View><Text style={styles.videoPokerMarqueeSmall}>WORLD CASINO</Text><Text style={styles.videoPokerMarqueeTitle}>JACKS OR BETTER</Text></View><View style={styles.marqueeBulb} /></View>
       <View style={styles.videoPokerGlass}>
-        <View style={styles.videoPokerMiniPaytable}><Text style={styles.videoPokerPayline}>ROYAL 250× · STRAIGHT FLUSH 50× · FOUR 25×</Text><Text style={styles.videoPokerPayline}>FULL HOUSE 9× · FLUSH 6× · STRAIGHT 4×</Text><Text style={styles.videoPokerPayline}>THREE 3× · TWO PAIR 2× · JACKS+ 1×</Text></View>
+        <View style={styles.videoPokerMiniPaytable}>{videoPokerPaytable.map((row) => {
+          const hit = result?.key === row.key;
+          return <View key={row.key} style={[styles.videoPokerPayCell, hit && styles.videoPokerPayCellHit]}><Text numberOfLines={1} style={[styles.videoPokerPayline, hit && styles.videoPokerPaylineHit]}>{row.label} {row.pay}</Text></View>;
+        })}</View>
         <View style={styles.videoPokerMeters}><View><Text style={styles.videoPokerMeterLabel}>CREDIT</Text><Text style={styles.videoPokerMeterValue}>{coins.toLocaleString()}</Text></View><View><Text style={styles.videoPokerMeterLabel}>BET</Text><Text style={styles.videoPokerMeterValue}>{selectedBet.toLocaleString()}</Text></View><View><Text style={styles.videoPokerMeterLabel}>WIN</Text><Text style={styles.videoPokerMeterValue}>{result && result.multiplier > 0 ? videoPokerPayout(selectedBet, hand).toLocaleString() : '0'}</Text></View></View>
         <Text style={styles.videoPokerPrompt}>{spinning ? '카드를 바꾸는 중…' : phase === 'ready' ? '카드 5장을 받아보세요' : phase === 'hold' ? '카드를 눌러 HOLD' : result?.label}</Text><View style={styles.videoPokerHand}>{hand.length ? hand.map((card, index) => <Pressable key={card.id} disabled={phase !== 'hold' || !!spinning} onPress={() => setHeld((current) => current.map((value, cardIndex) => cardIndex === index ? !value : value))} style={[styles.videoPokerCardWrap, held[index] && styles.videoPokerHeld]}>{spinning?.[index]
       ? <Animated.View style={{ transform: [{ scaleX: flipScale }] }}><PlayingCard card={card} compact hidden/></Animated.View>
-      : <PlayingCard card={card} compact emphasis={result?(result.multiplier>0?'winner':'dim'):undefined}/>}<Text style={[styles.videoPokerHoldLabel, held[index] && styles.videoPokerHoldActive]}>{held[index] ? 'HOLD' : phase === 'hold' ? '선택' : ' '}</Text></Pressable>) : [0,1,2,3,4].map((index) => <View key={index} style={[styles.playingCard, styles.compactPlayingCard, styles.hiddenCard, styles.videoPokerEmpty]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View>{result && <View style={styles.videoPokerResult}><Text style={styles.resultTitle}>{result.label}</Text><Text style={[styles.resultNet, result.multiplier > 0 ? styles.positive : styles.negative]}>{result.multiplier > 0 ? `+${videoPokerPayout(selectedBet, hand).toLocaleString()} WC 지급` : `-${selectedBet.toLocaleString()} WC`}</Text></View>}
+      : <Animated.View style={madeIds.has(card.id)?{opacity:shine}:undefined}><PlayingCard card={card} compact emphasis={result?(madeIds.has(card.id)?'winner':'dim'):undefined}/></Animated.View>}<Text style={[styles.videoPokerHoldLabel, held[index] && styles.videoPokerHoldActive]}>{held[index] ? 'HOLD' : phase === 'hold' ? '선택' : ' '}</Text></Pressable>) : [0,1,2,3,4].map((index) => <View key={index} style={[styles.playingCard, styles.compactPlayingCard, styles.hiddenCard, styles.videoPokerEmpty]}><Text style={styles.hiddenCardMark}>◆</Text></View>)}</View>{result && <View style={styles.videoPokerResult}><Text style={styles.resultTitle}>{result.label}</Text><Text style={[styles.resultNet, result.multiplier > 0 ? styles.positive : styles.negative]}>{result.multiplier > 0 ? `+${videoPokerPayout(selectedBet, hand).toLocaleString()} WC 지급` : `-${selectedBet.toLocaleString()} WC`}</Text></View>}
       </View>
       <View style={styles.videoPokerControlDeck}><View style={styles.videoPokerCoinSlot}><Text style={styles.videoPokerCoinSlotText}>WC</Text></View>{phase === 'ready' && <Pressable disabled={selectedBet > coins} onPress={deal} style={[styles.videoPokerDealButton, selectedBet > coins && styles.disabledCard]}><Text style={styles.videoPokerDealText}>DEAL</Text><Text style={styles.videoPokerDealSub}>카드 받기</Text></Pressable>}{phase === 'hold' && <Pressable disabled={!!spinning} onPress={draw} style={[styles.videoPokerDealButton, !!spinning && styles.disabledCard]}><Text style={styles.videoPokerDealText}>DRAW</Text><Text style={styles.videoPokerDealSub}>카드 교환</Text></Pressable>}{phase === 'result' && <Pressable onPress={reset} style={styles.videoPokerDealButton}><Text style={styles.videoPokerDealText}>NEW GAME</Text><Text style={styles.videoPokerDealSub}>다시 베팅</Text></Pressable>}<View style={styles.videoPokerSpeaker}><Text style={styles.videoPokerSpeakerText}>••••</Text></View></View>
+      {/* 이길 때 화면 위로 튀는 코인. 자리를 안 차지하도록 판 위에 겹쳐 놓습니다. */}
+      <View pointerEvents="none" style={styles.videoPokerCoinLayer}>{coinBurst.map((value, index) => {
+        const spread = (index - (VIDEO_POKER_COINS - 1) / 2) * 27;
+        return <Animated.Text key={index} style={[styles.videoPokerCoin, { opacity: value.interpolate({ inputRange: [0, 0.12, 0.75, 1], outputRange: [0, 1, 1, 0] }), transform: [
+          { translateX: value.interpolate({ inputRange: [0, 1], outputRange: [0, spread] }) },
+          { translateY: value.interpolate({ inputRange: [0, 0.55, 1], outputRange: [0, -104, -34] }) },
+          { scale: value.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.3, 1, 0.8] }) },
+        ] }]}>🪙</Animated.Text>;
+      })}</View>
       <View style={styles.videoPokerBase}><Text style={styles.videoPokerBaseText}>INSERT WORLD COIN · TOUCH SCREEN</Text></View>
     </View>
 
@@ -7654,8 +7704,15 @@ const styles = StyleSheet.create({
   videoPokerMarqueeSmall: { color: '#FFD767', fontSize: 10, fontWeight: '900', textAlign: 'center', letterSpacing: 3 },
   videoPokerMarqueeTitle: { color: '#FFFFFF', fontSize: 23, fontWeight: '900', textAlign: 'center', letterSpacing: 1, textShadowColor: '#FFB02E', textShadowRadius: 9 },
   videoPokerGlass: { paddingVertical: 17, paddingHorizontal: 10, backgroundColor: '#071D3A', borderBottomWidth: 5, borderBottomColor: '#B4832B', alignItems: 'center' },
-  videoPokerMiniPaytable: { width: '100%', padding: 8, borderRadius: 8, backgroundColor: '#102E59', borderWidth: 1, borderColor: '#4D81B2' },
+  // 아홉 줄을 세 줄씩 세 칸으로. 맞은 줄 하나에만 불이 들어옵니다.
+  videoPokerMiniPaytable: { width: '100%', paddingVertical: 6, paddingHorizontal: 5, borderRadius: 8, backgroundColor: '#102E59', borderWidth: 1, borderColor: '#4D81B2', flexDirection: 'row', flexWrap: 'wrap' },
+  videoPokerPayCell: { width: '33.33%', paddingVertical: 1, paddingHorizontal: 1, borderRadius: 4 },
+  videoPokerPayCellHit: { backgroundColor: '#FFD469' },
   videoPokerPayline: { color: '#FFE47E', fontSize: 8, lineHeight: 14, fontWeight: '900', textAlign: 'center' },
+  videoPokerPaylineHit: { color: '#12233F' },
+  // 튀는 코인. 판 아래쪽에서 시작해 위로 올라갔다 흩어집니다.
+  videoPokerCoinLayer: { position: 'absolute', left: 0, right: 0, bottom: 40, alignItems: 'center' },
+  videoPokerCoin: { position: 'absolute', fontSize: 21, lineHeight: 26 },
   videoPokerMeters: { width: '100%', marginTop: 10, paddingHorizontal: 9, paddingVertical: 7, flexDirection: 'row', justifyContent: 'space-between', borderRadius: 7, backgroundColor: '#030B12', borderWidth: 1, borderColor: '#31516A' },
   videoPokerMeterLabel: { color: '#7FA9C2', fontSize: 7, fontWeight: '900', textAlign: 'center' },
   videoPokerMeterValue: { color: '#FFDD66', fontSize: 13, fontWeight: '900', textAlign: 'center' },
