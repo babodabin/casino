@@ -1313,10 +1313,13 @@ const cardSizeBox: Record<CardSize, { width: number; height: number }> = {
 };
 
 /**
- * 부채처럼 겹칠 때 **한 장이 더 차지하는 너비의 비율**. 0.48이면 절반쯤만 보입니다.
+ * 부채처럼 겹칠 때 **한 장이 더 차지하는 너비의 비율**. 0.68이면 3분의 2쯤 보입니다.
  * 비율로 두어야 크기 단계가 바뀌어도 보이는 정도가 같습니다.
+ *
+ * ⚠️ 예전 0.48은 카드가 절반 넘게 가려져 무슨 카드인지 읽기 어려웠습니다.
+ * 더 벌리면 줄이 넓어져 카드 크기가 한 단계 내려갑니다 — useCardFit이 알아서 맞춥니다.
  */
-const cardFanSpread = 0.48;
+const cardFanSpread = 0.68;
 const cardFanMargin = (size: CardSize) => -Math.round(cardSizeBox[size].width * (1 - cardFanSpread));
 /**
  * 부채로 n장을 늘어놓았을 때의 전체 너비. **줄에 걸어 둔 gap도 같이 넣어야 합니다.**
@@ -1342,6 +1345,8 @@ const cardFanWidth = (size: CardSize, count: number, gap = 0) =>
  */
 function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, biggest = 'mid' as CardSize, smallest = 'mini' as CardSize } = {}) {
   const [fit, setFit] = useState<CardSize>(biggest);
+  // 겹쳐야만 들어가는지. 자리가 넉넉하면 안 겹치고 나란히 놓는 편이 훨씬 잘 보입니다.
+  const [crowded, setCrowded] = useState(false);
   const onLayout = (event: LayoutChangeEvent) => {
     const { height, width } = event.nativeEvent.layout;
     const room = (height - spare) / Math.max(1, rows);
@@ -1349,9 +1354,13 @@ function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, b
     const steps = cardSizeOrder.slice(cardSizeOrder.indexOf(biggest), cardSizeOrder.indexOf(smallest) + 1);
     const picked = steps.find((step) => cardSizeBox[step].height <= room && (across <= 0 || cardFanWidth(step, across, gap) <= side))
       ?? steps[steps.length - 1];
+    // 안 겹치고 나란히 놓았을 때의 폭. 이게 들어가면 겹칠 이유가 없습니다.
+    const sideBySide = cardSizeBox[picked].width * across + Math.max(0, across - 1) * 6;
+    const tight = across > 0 && sideBySide > side;
     setFit((current) => (current === picked ? current : picked));
+    setCrowded((current) => (current === tight ? current : tight));
   };
-  return { fit, onLayout };
+  return { fit, crowded, onLayout };
 }
 
 /**
@@ -2131,9 +2140,9 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
    * 너비는 부채로 일곱 장을 늘어놓은 폭을 봅니다. 테두리 18과 여백 28을 뺍니다.
    */
   const fit=useCardFit({rows:2,spare:394,across:7,sideSpare:46,biggest:'big'});
-  const fan={marginLeft:cardFanMargin(fit.fit)};
-  // 부채로 겹치는 줄이라 gap은 0입니다. 겹치는 정도는 fan이 정합니다.
-  const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[fit.fit].height+16,gap:0}];
+  // 겹쳐야만 들어갈 때만 겹칩니다. 자리가 남으면 나란히 놓아 카드가 다 보입니다.
+  const fan=fit.crowded?{marginLeft:cardFanMargin(fit.fit)}:null;
+  const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[fit.fit].height+16,gap:fit.crowded?0:6}];
   const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
   const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
   const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
@@ -5332,6 +5341,10 @@ function BlackjackGameScreen(props: {
   const settled = useRef(false);
   const reveal = useReveal();
   const [pendingSettle, setPendingSettle] = useState<(() => void) | null>(null);
+  // 처음 넉 장은 실제 딜러처럼 **나 · 딜러 · 나 · 딜러** 한 장씩 놓입니다.
+  // 판이 바뀌면 이 화면이 통째로 새로 뜨므로 initial만 넘겨도 다시 깔립니다.
+  const openDeal = useTableDeal(initial, 2, 2);
+  const dealing = openDeal.dealing;
 
   const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
     const nextResult = resolveRound(nextPlayer, nextDealer);
@@ -5349,12 +5362,14 @@ function BlackjackGameScreen(props: {
     });
   };
 
+  // 처음부터 블랙잭이면 바로 승부로 갑니다. 카드가 다 깔린 다음에 봐야 합니다.
   useEffect(() => {
+    if (dealing) return;
     if (initial.dealer[0].rank === 'A') return;
     if (isBlackjack(initial.player) || isBlackjack(initial.dealer)) {
       completeRound(initial.player, initial.dealer, initial.deck);
     }
-  }, []);
+  }, [dealing]);
 
   const decideInsurance = (takeInsurance: boolean) => {
     if (!insuranceOpen) return;
@@ -5373,7 +5388,7 @@ function BlackjackGameScreen(props: {
   };
 
   const hit = () => {
-    if (phase !== 'player') return;
+    if (phase !== 'player' || dealing) return;
     const currentHand = activeHand === 0 ? player : splitHand!;
     const next = drawCard(deck, currentHand);
     setDeck(next.deck);
@@ -5397,7 +5412,7 @@ function BlackjackGameScreen(props: {
   };
 
   const stand = () => {
-    if (phase !== 'player') return;
+    if (phase !== 'player' || dealing) return;
     if (splitHand) {
       if (activeHand === 0) {
         setActiveHand(1);
@@ -5430,7 +5445,7 @@ function BlackjackGameScreen(props: {
   };
 
   const split = () => {
-    if (phase !== 'player' || !canSplit(player) || !props.onDoubleDown()) return;
+    if (phase !== 'player' || dealing || !canSplit(player) || !props.onDoubleDown()) return;
     const firstDraw = drawCard(deck, [player[0]]);
     const secondDraw = drawCard(firstDraw.deck, [player[1]]);
     setPlayer(firstDraw.hand);
@@ -5441,7 +5456,7 @@ function BlackjackGameScreen(props: {
   };
 
   const doubleDown = () => {
-    if (phase !== 'player' || splitHand || player.length !== 2 || !props.onDoubleDown()) return;
+    if (phase !== 'player' || dealing || splitHand || player.length !== 2 || !props.onDoubleDown()) return;
     const doubledBet = props.bet * 2;
     const next = drawCard(deck, player);
     if (handValue(next.hand) > 21) {
@@ -5451,6 +5466,21 @@ function BlackjackGameScreen(props: {
     const dealerResult = playDealer(next.deck, dealer);
     completeRound(next.hand, dealerResult.hand, dealerResult.deck, doubledBet);
   };
+
+  /**
+   * 손이 커지면 카드를 작게 잡습니다. 히트를 몇 번 하면 다섯 장이 넘고,
+   * 그러면 줄이 접혀 **판 아래로 잘려 나갔습니다**(딜러가 뽑은 카드가 안 보이던 원인).
+   * spare 350은 실제로 잰 값입니다 — 판 자리 748 가운데 카드 높이 말고 들어가는 것이
+   * 반원 테이블의 테두리·이름줄·규칙줄·베팅 자리 약 260과 아래 버튼 자리 90입니다.
+   */
+  const handFit = useCardFit({
+    rows: splitHand ? 3 : 2,
+    spare: splitHand ? 369 : 350,
+    across: Math.max(2, player.length, dealer.length, splitHand?.length ?? 0),
+    biggest: 'big',
+  });
+  const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
+  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 16, gap: handFit.crowded ? 0 : 6 }];
 
   const net = result ? netForResult(totalBet, result) : 0;
   const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
@@ -5482,22 +5512,22 @@ function BlackjackGameScreen(props: {
       <View style={styles.fixedTableArea}>
         <DealerTable>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
-          <View style={styles.dealerCardRow}>
-            {dealer.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} />)}
+          <View style={handRow}>
+            {dealer.slice(0, dealing ? openDeal.countFor(1) : dealer.length).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
 
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
-          <View style={styles.dealerCardRow}>
-            {player.map((card, index) => <PlayingCard key={`${card.id}-${index}`} card={card} compact emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} />)}
+          <View style={handRow}>
+            {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           {splitHand && (
             <>
               <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
-              <View style={styles.dealerCardRow}>
-                {splitHand.map((card, index) => <PlayingCard key={`split-${card.id}-${index}`} card={card} compact />)}
+              <View style={handRow}>
+                {splitHand.map((card, index) => <View key={`split-${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} /></View>)}
               </View>
             </>
           )}
@@ -6756,7 +6786,7 @@ const styles = StyleSheet.create({
   // 작은 로마자 라벨. 자간을 벌려야 간판처럼 보입니다.
   eyebrow: { color: colors.goldLight, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, marginBottom: 5 },
   pageTitle: { color: colors.text, fontSize: 29, fontWeight: '800', marginBottom: 20 },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 14, marginBottom: 11 },
+  sectionTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '800', marginTop: 14, marginBottom: 11 },
   heroCard: { minHeight: 128, flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', borderRadius: 18 },
   blackjackMark: { width: 72, height: 92, borderRadius: 12, backgroundColor: '#10372C', alignItems: 'center', justifyContent: 'center', gap: 3 },
   cardSuit: { color: '#F2E6CB', fontSize: 19, fontWeight: '800' },
@@ -6788,7 +6818,7 @@ const styles = StyleSheet.create({
   chipText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   chipActiveText: { color: '#171107', fontSize: 13, fontWeight: '800' },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  categoryCard: { width: '48%', minHeight: 155, borderRadius: 17, padding: 15, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  categoryCard: { width: '48%', minHeight: 155, borderRadius: 17, padding: 15, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.22)' },
   categoryIcon: { color: colors.gold, fontSize: 28, fontWeight: '700', marginBottom: 16 },
   categoryName: { color: colors.text, fontSize: 16, fontWeight: '800' },
   categoryDetail: { color: colors.muted, fontSize: 11, lineHeight: 17, marginTop: 5 },
@@ -6814,7 +6844,8 @@ const styles = StyleSheet.create({
   roadmapCard: { marginTop: 20, marginBottom: 18, padding: 18, borderRadius: 18, backgroundColor: '#15263B', borderWidth: 1, borderColor: '#315277' },
   roadmapTitle: { color: '#A9CFFF', fontSize: 16, fontWeight: '900' },
   roadmapText: { color: colors.text, fontSize: 12, lineHeight: 20, marginTop: 7 },
-  gameListCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  // 위쪽에만 얇은 샴페인 선을 둡니다. 빛이 위에서 오는 것처럼 보여 판이 도톰해집니다.
+  gameListCard: { minHeight: 96, flexDirection: 'row', alignItems: 'center', padding: 13, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.22)' },
   resultOpenArea: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   resultCategory: { color: colors.gold, fontSize: 10, fontWeight: '800', marginBottom: 3 },
   favoriteButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
@@ -6841,7 +6872,7 @@ const styles = StyleSheet.create({
   playerCountNumber: { color: colors.text, fontSize: 16, fontWeight: '900' },
   playerCountNumberActive: { color: colors.goldLight },
   playerCountNote: { color: colors.muted, fontSize: 11, marginTop: 4 },
-  setupOption: { width: '31%', minHeight: 64, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  setupOption: { width: '31%', minHeight: 64, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.18)' },
   setupOptionActive: { backgroundColor: '#2E2512', borderColor: colors.gold },
   setupOptionTitle: { color: colors.muted, fontSize: 14, fontWeight: '800' },
   setupOptionTitleActive: { color: colors.goldLight },
@@ -6868,7 +6899,7 @@ const styles = StyleSheet.create({
   blackjackBetSpot: { minHeight: 132, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingTop: 12, paddingBottom: 10, borderRadius: 66, backgroundColor: '#0B3026', borderWidth: 2, borderColor: '#B58A2E' },
   blackjackBetSpotLabel: { position: 'absolute', top: 10, color: '#8DAB9F', fontSize: 10, fontWeight: '900', letterSpacing: 3 },
   blackjackBetSpotCaption: { color: colors.goldLight, fontSize: 11, fontWeight: '800', marginTop: 5 },
-  setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.22)' },
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
   blackjackTable: { flex: 1, backgroundColor: colors.bg },
@@ -6886,7 +6917,7 @@ const styles = StyleSheet.create({
    * 잘렸습니다. 반원 모양은 접고 60으로 낮췄습니다 — 카드가 안 잘리는 쪽이 먼저입니다.
    * 60이면 곡선이 먹는 자리가 아래 60줄뿐이라 카드줄과 베팅 자리가 다 그 위에 있습니다.
    */
-  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 8, paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#0A4630', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 60, borderBottomRightRadius: 60, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14, flexShrink: 1, overflow: 'hidden' },
+  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 8, paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#0A4630', borderWidth: 9, borderColor: '#7A4A22', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 60, borderBottomRightRadius: 60, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14, flexShrink: 1, overflow: 'hidden' },
   dealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   dealerEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
   dealerChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
