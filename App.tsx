@@ -154,36 +154,7 @@ const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '
 const gameDisplayName = (name: string) => chineseGameNames[name] ? `${name}(${chineseGameNames[name]})` : englishGameNames[name] ? `${name}(${englishGameNames[name]})` : name;
 
 const gameCategories: GameCategory[] = [
-  { name: '카드', icon: '♠', detail: '홀덤 · 세븐 포커 · 빅투', eyebrow: 'PLAYER VS PLAYER', games: [
-    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
-    { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'playable' },
-    { name: '세븐 포커', icon: '7♠', description: '공개·비공개 카드 일곱 장 중 최고의 다섯 장으로 승부', status: 'playable' },
-    { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패로 팟을 나누어 승부', status: 'playable' },
-    { name: '차이니즈 포커', icon: '十三', description: '열세 장을 세 줄로 나눠 줄마다 겨루는 카드 게임', status: 'playable' },
-    { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
-  ]},
-  { name: '주사위', icon: '⚄', detail: '야찌 · 크랩스 · 룰렛', eyebrow: 'DICE & ARCADE', games: [
-    { name: '야찌', icon: '⚅', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
-    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
-    { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
-    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
-    { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
-  ]},
-  { name: '딜러', icon: '◆', detail: '블랙잭 · 바카라 · 비디오 포커', eyebrow: 'DEALER GAMES', games: [
-    { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
-    { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
-    { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
-    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
-    { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
-    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
-  ]},
-  { name: '자동 배팅', icon: '◎', detail: '슬롯 · 경마 · 경륜', eyebrow: 'AUTO BETTING', games: [
-    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
-    { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
-    { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
-    { name: '예측 마켓 · 스포츠', icon: '球', description: '실제로 끝난 경기의 승패를 예·아니오로 맞히는 게임', status: 'playable' },
-    { name: '예측 마켓 · 사회문제', icon: '社', description: '경제·선거·연예에서 실제로 일어난 일을 예·아니오로 맞히기', status: 'playable' },
-  ]},
+  // 순서는 화면에 보이는 순서 그대로입니다. 바꾸려면 이 배열 순서만 바꾸면 됩니다.
   { name: '한국 전통', icon: '花', detail: '고스톱 · 섰다 · 윷 베팅', eyebrow: 'KOREAN CLASSICS', games: [
     { name: '고스톱', icon: '花', description: '세 명이 화투패를 모아 고 또는 스톱을 선택', status: 'playable' },
     { name: '맞고', icon: '二', description: '두 명이 열 장씩 받아 빠르게 겨루는 고스톱', status: 'playable' },
@@ -197,6 +168,35 @@ const gameCategories: GameCategory[] = [
     { name: '중국식 마작', icon: '中', description: '136장으로 즐기는 중국 표준형 마작', status: 'playable' },
     { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 마작', status: 'playable' },
     { name: '사천 마작', icon: '川', description: '자패 없이 세 종류 숫자패로 승부', status: 'playable' },
+  ]},  { name: '카드', icon: '♠', detail: '홀덤 · 세븐 포커 · 빅투', eyebrow: 'PLAYER VS PLAYER', games: [
+    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
+    { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'playable' },
+    { name: '세븐 포커', icon: '7♠', description: '공개·비공개 카드 일곱 장 중 최고의 다섯 장으로 승부', status: 'playable' },
+    { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패로 팟을 나누어 승부', status: 'playable' },
+    { name: '차이니즈 포커', icon: '十三', description: '열세 장을 세 줄로 나눠 줄마다 겨루는 카드 게임', status: 'playable' },
+    { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
+  ]},
+  { name: '딜러', icon: '◆', detail: '블랙잭 · 바카라 · 파이 고우', eyebrow: 'DEALER GAMES', games: [
+    { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
+    { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
+    { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
+    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
+    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
+  ]},
+  { name: '주사위', icon: '⚄', detail: '야찌 · 크랩스 · 룰렛', eyebrow: 'DICE & ARCADE', games: [
+    { name: '야찌', icon: '⚅', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
+    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
+    { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
+    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
+    { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
+  ]},
+  { name: '자동 배팅', icon: '◎', detail: '슬롯 · 경마 · 비디오 포커', eyebrow: 'AUTO BETTING', games: [
+    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
+    { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
+    { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
+    { name: '예측 마켓 · 스포츠', icon: '球', description: '실제로 끝난 경기의 승패를 예·아니오로 맞히는 게임', status: 'playable' },
+    { name: '예측 마켓 · 사회문제', icon: '社', description: '경제·선거·연예에서 실제로 일어난 일을 예·아니오로 맞히기', status: 'playable' },
+    { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
   ]},
 ];
 
@@ -1344,23 +1344,45 @@ const cardFanWidth = (size: CardSize, count: number, gap = 0) =>
  * 카드가 밀어 올리는 칸을 재면 큰 단계와 작은 단계를 계속 오갑니다.
  */
 function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, biggest = 'mid' as CardSize, smallest = 'mini' as CardSize } = {}) {
-  const [fit, setFit] = useState<CardSize>(biggest);
-  // 겹쳐야만 들어가는지. 자리가 넉넉하면 안 겹치고 나란히 놓는 편이 훨씬 잘 보입니다.
-  const [crowded, setCrowded] = useState(false);
+  // 잰 자리만 담아 둡니다. **크기는 그릴 때마다 다시 고릅니다.**
+  // ⚠️ onLayout 안에서 크기를 정하면 안 됩니다. 자리는 안 변하고 장수만 늘어나는 일이
+  // 흔한데(블랙잭 히트, 판 시작), 그러면 onLayout이 다시 안 불려 예전 크기에 머뭅니다.
+  // 파이 고우에서 일곱 장이 큰 카드로 그려져 한 장이 아래로 밀려난 것이 이 때문이었습니다.
+  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
   const onLayout = (event: LayoutChangeEvent) => {
-    const { height, width } = event.nativeEvent.layout;
-    const room = (height - spare) / Math.max(1, rows);
-    const side = width - sideSpare;
-    const steps = cardSizeOrder.slice(cardSizeOrder.indexOf(biggest), cardSizeOrder.indexOf(smallest) + 1);
-    const picked = steps.find((step) => cardSizeBox[step].height <= room && (across <= 0 || cardFanWidth(step, across, gap) <= side))
-      ?? steps[steps.length - 1];
-    // 안 겹치고 나란히 놓았을 때의 폭. 이게 들어가면 겹칠 이유가 없습니다.
-    const sideBySide = cardSizeBox[picked].width * across + Math.max(0, across - 1) * 6;
-    const tight = across > 0 && sideBySide > side;
-    setFit((current) => (current === picked ? current : picked));
-    setCrowded((current) => (current === tight ? current : tight));
+    const { width, height } = event.nativeEvent.layout;
+    setBox((current) => (current && Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1 ? current : { width, height }));
   };
+  const steps = cardSizeOrder.slice(cardSizeOrder.indexOf(biggest), cardSizeOrder.indexOf(smallest) + 1);
+  // 아직 못 쟀으면 제일 큰 단계로 둡니다. 재고 나면 곧바로 다시 고릅니다.
+  const room = box ? (box.height - spare) / Math.max(1, rows) : Infinity;
+  const side = box ? box.width - sideSpare : Infinity;
+  const fit = steps.find((step) => cardSizeBox[step].height <= room && (across <= 0 || cardFanWidth(step, across, gap) <= side))
+    ?? steps[steps.length - 1];
+  // 안 겹치고 나란히 놓았을 때의 폭. 이게 들어가면 겹칠 이유가 없습니다.
+  const sideBySide = cardSizeBox[fit].width * across + Math.max(0, across - 1) * 6;
+  const crowded = !!box && across > 0 && sideBySide > side;
   return { fit, crowded, onLayout };
+}
+
+/**
+ * 화면에 들어오자마자 한 판을 시작합니다.
+ *
+ * 준비 화면에서 이미 "시작"을 눌렀는데 게임 화면에서 또 "카드 받기"를 누르게 하면
+ * **같은 것을 두 번 누르는 셈**입니다. 그 한 걸음을 없앱니다.
+ * 들어와서 고를 것이 있는 게임(경마·바카라·물고기 룰렛처럼 무엇에 걸지 정하는 것)에는
+ * 쓰면 안 됩니다. 코인이 먼저 빠져나갑니다.
+ */
+function useAutoStart(start: () => void) {
+  const latest = useRef(start);
+  latest.current = start;
+  const done = useRef(false);
+  useEffect(() => {
+    // 개발 모드에서 효과가 두 번 도는 일이 있어 한 번만 돌게 막습니다.
+    if (done.current) return;
+    done.current = true;
+    latest.current();
+  }, []);
 }
 
 /**
@@ -2107,6 +2129,8 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
   const deal=useTableDeal(round,2,round?3:0);
   const dealing=deal.dealing;
   const start=()=>{if(!onPlaceBet(selectedBet))return;setPending(null);reveal.reset();setRound(dealTeenPatti());setMine(selectedBet);setTheirs(selectedBet);setResult(null);setFolded(false);};
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const showdown=(raised=false)=>{if(!round||result||pending||dealing)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';reveal.reset();setPending({mine:myBet,theirs:opponentBet,result:next,detail:`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`});};
   const openNext=()=>{if(!pending)return;const next=Math.min(3,reveal.opened+1);reveal.open(3);if(next<3)return;setResult(pending.result);onSettle(pending.mine,pending.theirs,pending.result,pending.detail);setPending(null);};
   const fold=()=>{if(!round||result||dealing)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
@@ -2137,13 +2161,16 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
    * 위 상태줄 32 · 반원 테이블의 테두리와 이름줄과 규칙줄 216 · 하이/로우 요약 62 ·
    * 버튼 52로 합쳐 **394**입니다. 남은 370을 두 줄로 나눠 한 장이 185까지 쓸 수 있어
    * 지금은 제일 큰 단계(72×108)로 올라갑니다.
-   * 너비는 부채로 일곱 장을 늘어놓은 폭을 봅니다. 테두리 18과 여백 28을 뺍니다.
+   * 너비는 부채로 일곱 장을 늘어놓은 폭을 봅니다. 재는 자리는 375이고 반원 테이블 안쪽은
+   * 301이라(테두리 18 · 좌우 여백 28 · 판 여백 28) 74를 뺍니다.
    */
-  const fit=useCardFit({rows:2,spare:394,across:7,sideSpare:46,biggest:'big'});
+  const fit=useCardFit({rows:2,spare:394,across:7,sideSpare:74,biggest:'big'});
   // 겹쳐야만 들어갈 때만 겹칩니다. 자리가 남으면 나란히 놓아 카드가 다 보입니다.
   const fan=fit.crowded?{marginLeft:cardFanMargin(fit.fit)}:null;
   const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[fit.fit].height+16,gap:fit.crowded?0:6}];
   const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
   const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
   const chosenLow=round?round.player.filter(card=>lowIds.includes(card.id)):[];
@@ -2204,6 +2231,8 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
     setRound({player:dealt[0],opponents:dealt.slice(1)});
     setRows({back:[],middle:[],front:[]});setTarget('back');setOpponentHands([]);setResult(null);setPending(null);reveal.reset();
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const cardsOf=(key:ChineseRowKey):Card[]=>round?rows[key].flatMap(id=>{const found=round.player.find(card=>card.id===id);return found?[found]:[];}):[];
   const assigned=new Set([...rows.back,...rows.middle,...rows.front]);
   // 아직 다 안 깔렸으면 깔린 만큼만 손에 보입니다.
@@ -2319,6 +2348,8 @@ function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
     settledRef.current=false;setPicked([]);setRound(startJokerRound());
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const done=!!round&&isJokerRoundOver(round);
   useEffect(()=>{
@@ -2574,6 +2605,8 @@ function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
     settledRef.current=false;setPicked([]);setDealKey(value=>value+1);setState(startBigTwo(players));
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   // 컴퓨터 차례는 한 박자 쉬고 저절로 넘어갑니다. 카드가 다 깔리기 전에는 기다립니다.
   useEffect(()=>{
@@ -2677,6 +2710,8 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     settledRef.current=false;
     setRound(dealTujeon());setOutcome(null);setFolded(false);setOpened(0);
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const myHand:TujeonHand|null=round?evaluateTujeon(round.player):null;
   /** 판을 더 이상 만질 수 없는 상태. 죽었거나, 상대 패가 다 열려 결과가 나온 뒤입니다. */
   const done=folded||(!!outcome&&opened>=tujeonHandSize);
@@ -3304,6 +3339,8 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
     setOutcome('');setWinners(null);setPending(null);reveal.reset();seatActions.clear();
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   /** 승부 없이 끝났을 때(한 명만 남음) 바로 정산합니다. */
   const finishWalkover=(done:TableRound,winner:number)=>{
@@ -3483,6 +3520,8 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
     setOutcome('');setTable(null);setPending(null);reveal.reset();seatActions.clear();
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const finishWalkover=(done:TableRound,winner:number)=>{
     const mine=done.seats[0].contributed,theirs=tableOthersPot(done);
@@ -3773,6 +3812,8 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
     setStage(1);setDealt(0);setWinners(null);setOutcome('');seatActions.clear();
     setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const finishWalkover=(done:TableRound,winner:number)=>{
     const mine=done.seats[0].contributed,theirs=tableOthersPot(done);
@@ -4094,6 +4135,8 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     setMessage(dealerSeat===0?`뽑은 패를 확인하고 한 장을 버리세요${mode==='riichi'&&indicator&&dora?` · 도라 표시 ${indicator.glyph} → 도라 ${dora.suit}${dora.value}`:''}`:`컴퓨터 ${dealerSeat}이 친 · 컴퓨터부터 시작합니다`);
     setPhase('playing');
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
   // 도중유국: 친이 그대로 유지되고 본장만 하나 올라갑니다.
@@ -4761,6 +4804,8 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);
     if(next.finished)finish(next,true);
   };
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const play=(card:HwatuCard,selectedMatchId?:string)=>{
     if(!round||round.turn!==0||round.pendingDecision!==null&&round.pendingDecision!==undefined)return;
     const matches=round.floor.filter((item)=>item.month===card.month);
@@ -4912,6 +4957,8 @@ function MinhwatuGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coin
     let next=initial;if(!next.finished&&next.turn===1){const card=chooseComputerMinhwatuCard(next);next=playMinhwatuTurn(next,card.id,automaticMinhwaChoice(next,card));}return next;
   };
   const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealMinhwatu());setPendingPlay(null);setSettled(false);setResultText('');};
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
   const play=(card:HwatuCard,selectedId?:string)=>{
     if(!round||round.turn!==0||round.finished)return;const matches=round.floor.filter((item)=>item.month===card.month);
     if(matches.length===2&&!selectedId){setPendingPlay(card);return;}
@@ -5037,6 +5084,8 @@ function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:nu
   const myResult=round?evaluateDori(round.player):null;
 
   const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealDori());setBetting({mine:selectedBet,theirs:selectedBet,raises:0});setOutcome('');setOpponentNote('컴퓨터도 같은 금액을 냈습니다');setShowdown(null);setPending(null);reveal.reset();setPhase('bet');};
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const settle=(current:PokerBetting,active:ReturnType<typeof dealDori>)=>{
     const resolved=resolveDori(active.player,active.opponent);
@@ -5209,6 +5258,8 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
   const [showdown,setShowdown]=useState<ReturnType<typeof resolveSeotda>|null>(null);
 
   const start=()=>{if(!onPlaceBet(selectedBet))return;setRound(dealSeotda());setBetting({mine:selectedBet,theirs:selectedBet,raises:0});setOutcome('두 장을 받았습니다');setOpponentNote('컴퓨터도 같은 금액을 냈습니다');setShowdown(null);setOpened(0);pendingRef.current=null;setPhase('bet');};
+  // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
+  useAutoStart(() => start());
 
   const settle=(current:PokerBetting,active:ReturnType<typeof dealSeotda>)=>{
     const resolved=resolveSeotda(active.player,active.opponent,rules);
@@ -5477,6 +5528,8 @@ function BlackjackGameScreen(props: {
     rows: splitHand ? 3 : 2,
     spare: splitHand ? 369 : 350,
     across: Math.max(2, player.length, dealer.length, splitHand?.length ?? 0),
+    // 재는 자리는 375인데 반원 테이블 안쪽은 301입니다(테두리 18 · 좌우 여백 28 · 판 여백 28).
+    sideSpare: 74,
     biggest: 'big',
   });
   const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
