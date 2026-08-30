@@ -4177,6 +4177,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(kind==='띠')group.sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣'));
     return <View key={kind} style={styles.goStopTakenGroup}>{group.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
   })}</View>;
+  // 방금 가져간 패. 상대 것뿐 아니라 내 것도 금색으로 표시합니다.
   const freshIds=new Set(lastOpponentCapture.map((card)=>card.id));
   // 손패 한 줄에 다 들어오도록 장수에 맞춰 겹치는 정도를 정합니다. 적을 때는 겹치지 않습니다.
   const handCount=round?round.players[0].hand.length:0;
@@ -4205,7 +4206,10 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
           const hit=round.floor.filter((item)=>item.month===slap.card.month);
           // 낸 패를 처리한 뒤 더미에서 한 장을 뒤집습니다. 그 패도 바닥을 칠 수 있습니다.
           const drawn=round.deck[0];
-          const drawnHit=drawn?round.floor.filter((item)=>item.month===drawn.month&&item.month!==slap.card.month):[];
+          const drawnHit=drawn?round.floor.filter((item)=>item.month===drawn.month):[];
+          // 이번 차례에 실제로 가져간 패입니다. 판이 넘어가기 전과 뒤를 견줘서 구합니다.
+          const had=new Set(round.players[slap.who].captured.map((card)=>card.id));
+          const took=slap.next.players[slap.who].captured.filter((card)=>!had.has(card.id));
           return <View style={styles.goStopSlapOverlay}>
             <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
             <View style={styles.goStopSlapPair}>
@@ -4225,13 +4229,17 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
                 <Text style={styles.goStopSlapTag}>뒤집은 패 · {drawn.month}월</Text>
               </View>:null}
             </View>
+            {took.length?<View style={styles.goStopSlapSide}>
+              <View style={styles.goStopSlapRow}>{took.map((card,index)=><View key={card.id} style={index?styles.goStopTakenOverlap:null}><HwatuCardView card={card} size="small"/></View>)}</View>
+              <Text style={styles.goStopSlapTook}>가져간 패 {took.length}장</Text>
+            </View>:<Text style={styles.goStopSlapTag}>가져간 패 없음 · 바닥에 놓습니다</Text>}
           </View>;
         })():null}
       </View>
 
       {/* 내 자리 */}
       <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
-      {takenRow(round.players[0].captured)}
+      {takenRow(round.players[0].captured,freshIds)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
       {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
@@ -7025,6 +7033,7 @@ const styles = StyleSheet.create({
   goStopSlapPair: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   goStopSlapSide: { alignItems: 'center', gap: 3 },
   goStopSlapTag: { color: '#9FC4B4', fontSize: 10, fontWeight: '800' },
+  goStopSlapTook: { color: '#FFD35F', fontSize: 11, fontWeight: '900' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
   goStopSlapOver: { marginLeft: -30, marginTop: 12, transform: [{ rotate: '8deg' }] },
   // 친 패에 금빛을 둘러 눈에 띄게 합니다.
