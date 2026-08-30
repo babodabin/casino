@@ -4108,6 +4108,21 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(next.finished)finish(next);
   };
 
+  // 친 패를 잠깐 보여 준 뒤 저절로 가져갑니다. 누를 필요 없이 보이기만 하면 됩니다.
+  useEffect(()=>{
+    if(!slap)return;
+    const timer=setTimeout(()=>takeSlap(),1200);
+    return ()=>clearTimeout(timer);
+  },[slap]);
+
+  // 컴퓨터 차례면 잠깐 쉬었다 저절로 냅니다. 친 패를 보여 주는 시간과 합쳐
+  // 한 사람당 2초쯤 걸립니다. 무엇을 가져갔는지 보기에 충분한 속도입니다.
+  useEffect(()=>{
+    if(!round||round.finished||round.turn===0||slap)return;
+    const timer=setTimeout(()=>runComputerStep(),700);
+    return ()=>clearTimeout(timer);
+  },[round,slap]);
+
   /** 얹어 둔 패를 실제로 가져갑니다. 이때 판이 넘어갑니다. */
   const takeSlap=()=>{
     if(!round||!slap)return;
@@ -4180,7 +4195,20 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       })}</View>
 
       {/* 바닥과 뒤집을 더미 */}
-      <View style={styles.goStopFloorArea}><HwatuFloor cards={round.floor} deckCount={round.deck.length} compact/></View>
+      <View style={styles.goStopFloorArea}>
+        <HwatuFloor cards={round.floor} deckCount={round.deck.length} compact/>
+        {slap?(()=>{
+          const hit=round.floor.filter((item)=>item.month===slap.card.month);
+          return <View style={styles.goStopSlapOverlay}>
+            <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`} · {slap.card.month}월</Text>
+            <View style={styles.goStopSlapRow}>
+              {hit.map((card)=><View key={card.id}><HwatuCardView card={card} size="small"/></View>)}
+              {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
+              <View style={hit.length?styles.goStopSlapOver:null}><HwatuCardView card={slap.card} size="small"/></View>
+            </View>
+          </View>;
+        })():null}
+      </View>
 
       {/* 내 자리 */}
       <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
@@ -4190,20 +4218,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?{marginLeft:handStep-52}:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
 
       <View style={styles.goStopActionArea}>
-        {slap?(()=>{
-          const hit=round.floor.filter((item)=>item.month===slap.card.month);
-          return <View style={styles.goStopTurnBox}>
-            <Text style={styles.goStopMessage}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`} · {slap.card.month}월</Text>
-            <View style={styles.goStopSlapRow}>
-              {hit.map((card)=><View key={card.id}><HwatuCardView card={card} size="small"/></View>)}
-              {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
-              <View style={hit.length?styles.goStopSlapOver:null}><HwatuCardView card={slap.card} size="small"/></View>
-            </View>
-            <Pressable style={styles.goStopButton} onPress={takeSlap}><Text style={styles.primaryButtonText}>{hit.length?'가져가기':'바닥에 놓기'}</Text></Pressable>
-          </View>;
-        })():round.turn!==0&&!round.finished?<View style={styles.goStopTurnBox}>
-          <Pressable style={styles.goStopButton} onPress={runComputerStep}><Text style={styles.primaryButtonText}>컴퓨터 {round.turn} 차례 · 눌러서 보기</Text></Pressable>
-        </View>:pendingPlay?<>
+        {pendingPlay?<>
           <Text style={styles.goStopMessage}>{pendingPlay.month}월 바닥 패가 두 장입니다 · 가져갈 패를 고르세요</Text>
           <View style={styles.goStopChoiceRow}>{round.floor.filter((item)=>item.month===pendingPlay.month).map((card)=><Pressable key={card.id} onPress={()=>play(pendingPlay,card.id)}><HwatuCardView card={card} size="small"/></Pressable>)}
             <Pressable style={styles.goStopCancel} onPress={()=>setPendingPlay(null)}><Text style={styles.holdemActionText}>취소</Text></Pressable></View>
@@ -6979,6 +6994,9 @@ const styles = StyleSheet.create({
   goStopTakenRow: { flexDirection: 'row', flexWrap: 'wrap', minHeight: 46, alignItems: 'center', gap: 8 },
   goStopTakenGroup: { flexDirection: 'row' },
   goStopTurnBox: { alignItems: 'center', gap: 6 },
+  // 판 위에 떠 있는 상자입니다. 자리를 차지하지 않으므로 나타나도 화면이 안 밀립니다.
+  goStopSlapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4 },
+  goStopSlapWho: { color: '#FFE9A8', fontSize: 13, fontWeight: '900' },
   goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
   goStopSlapOver: { marginLeft: -24, marginTop: 10, transform: [{ rotate: '7deg' }] },
