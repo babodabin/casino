@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StatusBar } from 'expo-status-bar';
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
@@ -74,7 +74,8 @@ import { backupFileName, buildBackup, checkBackup, type BackupData } from './src
 import { levelFromPlays } from './src/level';
 import { DAILY_MISSION_GOAL, DAILY_MISSION_REWARD, countPlayedOn, missionDayKey, shouldClaimMission } from './src/mission';
 import { decidePokerAction, doriEquity, estimateDrawEquity, estimateEquity, pokerActionLabel, seotdaEquity } from './src/pokerai';
-import { evaluatePachislot, pachislotSymbols, spinPachislotReels, spinSlot, type PachislotResult, type PachislotSymbol, type SlotResult, type SlotSymbol } from './src/slot';
+import { spinSlot, type SlotResult, type SlotSymbol } from './src/slot';
+import { createPachiState, pachiBetMedals, pachiCeiling, pachiToCeiling, pachiToZone, spinPachi, type PachiReels, type PachiSpin, type PachiState } from './src/pachislot';
 import { rollSicBo, sicBoBetLabel, sicBoNet, sicBoPayout, type SicBoBet, type SicBoDice } from './src/sicbo';
 import { rollYahtzeeDice, scoreYahtzeeCategory, yahtzeeCategories, yahtzeeCategoryLabels, yahtzeePayoutMultiplier, yahtzeeTotal, yahtzeeUpperBonus, yahtzeeUpperSubtotal, type YahtzeeCategory, type YahtzeeDie, type YahtzeeScoreCard } from './src/yahtzee';
 import { drawLotto, drawOddEven, drawScratch, lottoResult, oddEvenWins, scratchResult, type OddEvenChoice, type ScratchSymbol } from './src/worldgames';
@@ -88,6 +89,7 @@ import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canB
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
+import { createFishRouletteField, fishPositionAt, fishRouletteBetDetails, fishRouletteBetLabels, fishRouletteCovers, fishRouletteMultiplier, fishRouletteOdds, fishRouletteSummary, fishRouletteWins, nextSlot, roundMs as fishRouletteRoundMs, slotAngle, slotCount as fishRouletteSlotCount, spinFishRoulette, type FishRouletteBet, type FishRouletteBetType, type FishRouletteResult } from './src/fishroulette';
 import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
 import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
@@ -112,14 +114,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSetup' | 'predictGame' | 'jokerSetup' | 'jokerGame' | 'fishingSetup' | 'fishingGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSportsSetup' | 'predictSportsGame' | 'predictSocialSetup' | 'predictSocialGame' | 'jokerSetup' | 'jokerGame' | 'fishingSetup' | 'fishingGame' | 'fishRouletteSetup' | 'fishRouletteGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓' | '조커 포커' | '스크린낚시';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓 · 스포츠' | '예측 마켓 · 사회문제' | '조커 포커' | '스크린낚시' | '물고기 룰렛';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -127,6 +129,9 @@ type GameRecord = {
   playedAt: string;
   detail?: string;
 };
+
+/** 릴이 도는 동안만 쓰는 그림입니다. 결과는 레버를 당길 때 이미 정해져 있습니다. */
+const pachiSpinSymbols = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🔁'] as const;
 
 const difficultyOptions = [
   { name: '입문', min: 10, max: 100, bets: [10, 25, 50, 100] },
@@ -147,7 +152,37 @@ const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '
 const gameDisplayName = (name: string) => chineseGameNames[name] ? `${name}(${chineseGameNames[name]})` : englishGameNames[name] ? `${name}(${englishGameNames[name]})` : name;
 
 const gameCategories: GameCategory[] = [
-  { name: '한국 전통', icon: '花', detail: '고스톱 · 맞고 · 섰다', eyebrow: 'KOREAN CLASSICS', games: [
+  { name: '개인 카드', icon: '♠', detail: '홀덤 · 세븐 포커 · 빅투', eyebrow: 'PLAYER VS PLAYER', games: [
+    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
+    { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'playable' },
+    { name: '세븐 포커', icon: '7♠', description: '공개·비공개 카드 일곱 장 중 최고의 다섯 장으로 승부', status: 'playable' },
+    { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패로 팟을 나누어 승부', status: 'playable' },
+    { name: '차이니즈 포커', icon: '十三', description: '열세 장을 세 줄로 나눠 줄마다 겨루는 카드 게임', status: 'playable' },
+    { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
+  ]},
+  { name: '주사위', icon: '⚄', detail: '야찌 · 크랩스 · 물고기 룰렛', eyebrow: 'DICE & ARCADE', games: [
+    { name: '야찌', icon: '⚅', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
+    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
+    { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
+    { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
+  ]},
+  { name: '뱅커 카드', icon: '◆', detail: '블랙잭 · 바카라 · 비디오 포커', eyebrow: 'BANKER GAMES', games: [
+    { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
+    { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
+    { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
+    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
+    { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
+    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
+  ]},
+  { name: '자동 배팅', icon: '◎', detail: '슬롯 · 룰렛 · 경마', eyebrow: 'AUTO BETTING', games: [
+    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
+    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
+    { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
+    { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
+    { name: '예측 마켓 · 스포츠', icon: '球', description: '실제로 끝난 경기의 승패를 예·아니오로 맞히는 게임', status: 'playable' },
+    { name: '예측 마켓 · 사회문제', icon: '社', description: '경제·선거·연예에서 실제로 일어난 일을 예·아니오로 맞히기', status: 'playable' },
+  ]},
+  { name: '한국 전통', icon: '花', detail: '고스톱 · 섰다 · 윷 베팅', eyebrow: 'KOREAN CLASSICS', games: [
     { name: '고스톱', icon: '花', description: '세 명이 화투패를 모아 고 또는 스톱을 선택', status: 'playable' },
     { name: '맞고', icon: '二', description: '두 명이 열 장씩 받아 빠르게 겨루는 고스톱', status: 'playable' },
     { name: '섰다', icon: '光', description: '두 장의 화투 조합으로 승부', status: 'playable' },
@@ -155,42 +190,11 @@ const gameCategories: GameCategory[] = [
     { name: '투전', icon: '箋', description: '여든 장 종이패로 같은 숫자를 짝지어 겨루는 노름', status: 'playable' },
     { name: '윷 베팅', icon: '윷', description: '도·개·걸·윷·모 중 던진 결과를 예측', status: 'playable' },
   ]},
-  { name: '카지노', icon: '◆', detail: '블랙잭 · 룰렛 · 바카라', eyebrow: 'CASINO GAMES', games: [
-    { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
-    { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
-    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
-    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
-    { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
-    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
-  ]},
-  { name: '포커·카드', icon: '♠', detail: '홀덤 · 오마하 · 포커', eyebrow: 'POKER & CARDS', games: [
-    { name: '텍사스 홀덤', icon: 'H', description: '공용 카드 다섯 장으로 만드는 포커', status: 'playable' },
-    { name: '오마하', icon: 'O', description: '네 장의 개인 카드를 받는 포커', status: 'playable' },
-    { name: '세븐 포커', icon: '7♠', description: '공개·비공개 카드 일곱 장 중 최고의 다섯 장으로 승부', status: 'playable' },
-    { name: '차이니즈 포커', icon: '十三', description: '열세 장을 세 줄로 나눠 줄마다 겨루는 카드 게임', status: 'playable' },
-    { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
-    { name: '하이로우', icon: '↕', description: '높은 패와 낮은 패로 팟을 나누어 승부', status: 'playable' },
-  ]},
   { name: '마작', icon: '發', detail: '리치 · 중국식 마작', eyebrow: 'MAHJONG', games: [
     { name: '리치 마작', icon: '立', description: '패를 뽑고 버려 네 몸통과 한 머리를 완성', status: 'playable' },
     { name: '중국식 마작', icon: '中', description: '136장으로 즐기는 중국 표준형 마작', status: 'playable' },
     { name: '홍콩 마작', icon: '港', description: '빠르고 직관적인 홍콩식 마작', status: 'playable' },
     { name: '사천 마작', icon: '川', description: '자패 없이 세 종류 숫자패로 승부', status: 'playable' },
-  ]},
-  { name: '스포츠/아케이드', icon: '⚑', detail: '경마 · 경륜 · 아케이드', eyebrow: 'SPORTS & ARCADE', games: [
-    { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
-    { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
-    { name: '예측 마켓', icon: '?!', description: '실제로 일어난 일을 예·아니오로 맞히는 게임', status: 'playable' },
-    { name: '그레이하운드', icon: '犬', description: '6마리의 출발과 첫 코너, 막판 질주를 예측', status: 'playable' },
-    { name: '피시 레이스', icon: '魚', description: '여섯 물고기의 수중 장애물 경주 우승자를 예측', status: 'playable' },
-    { name: '스크린낚시', icon: '🎣', description: '던지고 입질을 기다렸다 챔질하고 릴 싸움으로 건져 올리기', status: 'playable' },
-  ]},
-  { name: '세계 게임', icon: '◎', detail: '세계 전통 · 주사위 · 복권', eyebrow: 'WORLD GAMES', games: [
-    { name: '야찌', icon: '⚄', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
-    { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
-    { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
-    { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
-    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
   ]},
 ];
 
@@ -215,8 +219,10 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '경정':'boatSetup',
   '그레이하운드':'greyhoundSetup',
   '코인 푸셔':'pusherSetup',
-  '예측 마켓':'predictSetup',
+  '예측 마켓 · 스포츠':'predictSportsSetup',
+  '예측 마켓 · 사회문제':'predictSocialSetup',
   '스크린낚시':'fishingSetup',
+  '물고기 룰렛':'fishRouletteSetup',
   '조커 포커':'jokerSetup',
   '자동차 레이스':'carSetup',
   '소싸움':'bullSetup',
@@ -716,10 +722,13 @@ function CasinoApp() {
     addRecord((count) => ({ id: `${Date.now()}-slot-${count}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeSpin ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `${result.reels.join(' ')} · ${result.label}` }));
   };
 
-  const settlePachislot = (stake: number, result: PachislotResult, usedFreeGame: boolean) => {
-    if (result.payout > 0) setCoins((current) => current + result.payout);
-    const net = result.payout - (usedFreeGame ? 0 : stake);
-    addRecord((count) => ({ id: `${Date.now()}-pachislot-${count}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: usedFreeGame ? 0 : stake, net, playedAt: new Date().toISOString(), detail: `파치슬롯 · ${result.reels.join(' ')} · ${result.label}` }));
+  // 파치슬롯은 실제 기기처럼 '매'로 셉니다. 1게임 3매 = 베팅 금액 한 번입니다.
+  const settlePachislot = (stake: number, spin: PachiSpin) => {
+    const payout = Math.round(stake * spin.outMedals / pachiBetMedals);
+    const charged = spin.inMedals > 0 ? stake : 0;
+    if (payout > 0) setCoins((current) => current + payout);
+    const net = payout - charged;
+    addRecord((count) => ({ id: `${Date.now()}-pachislot-${count}`, game: '슬롯', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: charged, net, playedAt: new Date().toISOString(), detail: `파치슬롯 · ${spin.state.phase} · ${spin.label}` }));
   };
 
   const settleSicBo = (bet: SicBoBet, stake: number, dice: SicBoDice) => {
@@ -737,7 +746,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓'|'조커 포커'|'스크린낚시',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓 · 스포츠'|'예측 마켓 · 사회문제'|'조커 포커'|'스크린낚시'|'물고기 룰렛',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1088,8 +1097,12 @@ function CasinoApp() {
         {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
         {appScreen === 'fishingSetup' && <SimpleSetupScreen title="스크린낚시 준비" hero="🎣 바다" lead="던지고 · 기다리고 · 챔질하고 · 건져 올리기" rules={['1. 갯바위 · 방파제 · 먼바다 중 한 곳을 고릅니다. 깊을수록 큰 고기가 나오지만 어렵습니다.','2. 던진 뒤 찌를 보다가 입질이 오면 곧바로 챔질을 누릅니다. 너무 이르거나 늦으면 놓칩니다.','3. 챔질에 성공하면 릴 싸움입니다. 감기로 당겨 오고, 줄이 팽팽하면 버티기로 늦춥니다.','4. 장력이 끝까지 차면 줄이 끊어져 한 푼도 못 받습니다.','5. 불가사리 · 복어 · 해파리도 뭅니다. 잡아도 값이 안 나갑니다.']} startLabel="바다로 나가기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishingGame')}/>}
         {appScreen === 'fishingGame' && <ScreenFishingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishingSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('스크린낚시',stake,multiplier,detail)}/>}
-        {appScreen === 'predictSetup' && <SimpleSetupScreen title="예측 마켓 준비" hero="YES · NO" lead="이미 결과가 나온 실제 사건을 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 사건입니다.','2. 스포츠와 사회문제 두 갈래가 있습니다. 예인지 아니오인지 고르세요.','3. 배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictGame')}/>}
-        {appScreen === 'predictGame' && <PredictGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓',stake,multiplier,detail)}/>}
+        {appScreen === 'fishRouletteSetup' && <SimpleSetupScreen title="물고기 룰렛 준비" hero="🐟 ① ~ ⑫" lead="열두 마리가 어느 자리로 들어가는지 지켜봅니다" rules={["1. 둥근 바다 둘레에 자리 12곳이 있습니다. 시작하면 물고기 12마리를 풀어 놓습니다.","2. 물고기는 헤엄쳐 다니다 자리 하나로 들어갑니다. 한 번 들어가면 다시 안 나옵니다.","3. 20초가 지나면 판이 끝납니다. 그때까지 못 들어간 물고기는 세지 않습니다.","4. 먼저 · 많이 · 없음 · 이웃 두 자리 · 홀짝 · 앞뒤 절반 중에 골라 겁니다.","5. 많이에서 같은 마릿수면 먼저 받은 자리가 이깁니다. 그래서 동점이 안 생깁니다."]} startLabel="바다에 물고기 풀기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishRouletteGame')}/>}
+        {appScreen === 'fishRouletteGame' && <FishRouletteGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishRouletteSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('물고기 룰렛',stake,multiplier,detail)}/>}
+        {appScreen === 'predictSportsSetup' && <SimpleSetupScreen title="예측 마켓 · 스포츠 준비" hero="YES · NO" lead="이미 끝난 실제 경기의 승패를 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 경기입니다.','2. 축구·테니스·야구처럼 승패가 이미 갈린 경기가 나옵니다. 예인지 아니오인지 고르세요.','3. 배당은 그 경기가 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictSportsGame')}/>}
+        {appScreen === 'predictSportsGame' && <PredictGameScreen group="스포츠" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSportsSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 스포츠',stake,multiplier,detail)}/>}
+        {appScreen === 'predictSocialSetup' && <SimpleSetupScreen title="예측 마켓 · 사회문제 준비" hero="YES · NO" lead="이미 결과가 나온 실제 사건을 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 사건입니다.','2. 경제·선거·연예·과학기술에서 일어난 일이 나옵니다. 예인지 아니오인지 고르세요.','3. 배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictSocialGame')}/>}
+        {appScreen === 'predictSocialGame' && <PredictGameScreen group="사회문제" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSocialSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 사회문제',stake,multiplier,detail)}/>}
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
@@ -1687,7 +1700,7 @@ function SlotSetupScreen(props: { coins: number; difficulty: string; selectedBet
   const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
   return <View style={styles.detailScreen}><ScreenHeader title="슬롯(Slot) 설정" onBack={props.onBack} /><ScrollView {...useScrollMemory('SlotSetupScreen')} contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
     <View style={styles.slotSetupHero}><Text style={styles.slotLogo}>7</Text><View style={styles.slotSetupCopy}><Text style={styles.eyebrow}>WORLD SLOTS</Text><Text style={styles.detailLead}>그림을 맞추고 보너스에 도전</Text><Text style={styles.gameListDescription}>한 번 회전이 한 판이며, 무료 회전이 나오면 계속 이어집니다.</Text></View></View>
-    <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><Pressable onPress={() => props.onModeChange('classic')} style={[styles.slotModeCard, props.mode === 'classic' && styles.slotModeActive]}><Text style={props.mode === 'classic' ? styles.slotModeTitleActive : styles.slotModeTitle}>클래식 슬롯(Classic Slot)</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></Pressable><Pressable onPress={() => props.onModeChange('pachislot')} style={[styles.slotModeCard, props.mode === 'pachislot' && styles.slotModeActive]}><Text style={props.mode === 'pachislot' ? styles.slotModeTitleActive : styles.slotModeTitle}>일본식 파치슬롯(Pachislot)</Text><Text style={styles.slotModeText}>레버 시작 · 릴 3개 직접 정지</Text></Pressable></View>
+    <Text style={styles.sectionTitle}>게임 방식</Text><View style={styles.slotModeRow}><Pressable onPress={() => props.onModeChange('classic')} style={[styles.slotModeCard, props.mode === 'classic' && styles.slotModeActive]}><Text style={props.mode === 'classic' ? styles.slotModeTitleActive : styles.slotModeTitle}>클래식 슬롯(Classic Slot)</Text><Text style={styles.slotModeText}>자동으로 멈추는 3릴</Text></Pressable><Pressable onPress={() => props.onModeChange('pachislot')} style={[styles.slotModeCard, props.mode === 'pachislot' && styles.slotModeActive]}><Text style={props.mode === 'pachislot' ? styles.slotModeTitleActive : styles.slotModeTitle}>일본식 파치슬롯(Pachislot)</Text><Text style={styles.slotModeText}>천장 · 찬스존 · 순증이 있는 일본식</Text></Pressable></View>
     <SlotRules />
     <Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={props.selectedBet === amount} disabled={amount > props.coins} onPress={() => props.onBetChange(amount)} />)}</View>
@@ -1723,48 +1736,66 @@ function SlotGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBetC
   </ScrollView></View>;
 }
 
-function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; motion: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, result: PachislotResult, usedFreeGame: boolean) => void }) {
+function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; motion: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, spin: PachiSpin) => void }) {
   const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
-  const [reels, setReels] = useState<[PachislotSymbol, PachislotSymbol, PachislotSymbol]>(['🍒', '🔔', '7️⃣']);
-  const [target, setTarget] = useState<[PachislotSymbol, PachislotSymbol, PachislotSymbol]>(reels);
+  const [machine, setMachine] = useState<PachiState>(createPachiState);
+  const [reels, setReels] = useState<PachiReels>(['🍒', '🔔', '7️⃣']);
   const [stopped, setStopped] = useState<[boolean, boolean, boolean]>([true, true, true]);
   const [spinning, setSpinning] = useState(false);
-  const [result, setResult] = useState<PachislotResult | null>(null);
-  const [replay, setReplay] = useState(false);
-  const [bonusSpins, setBonusSpins] = useState(0);
-  const roundFreeRef = useRef(false);
+  const [shown, setShown] = useState<PachiSpin | null>(null);
+  // 레버를 당길 때 결과를 이미 정해 둡니다. 정지 버튼은 정해진 것을 한 줄씩 보여 줄 뿐입니다.
+  const pending = useRef<PachiSpin | null>(null);
 
   useEffect(() => {
     if (!spinning) return;
-    const timer = setInterval(() => setReels((current) => current.map((symbol, index) => stopped[index] ? symbol : pachislotSymbols[Math.floor(Math.random() * pachislotSymbols.length)]) as [PachislotSymbol, PachislotSymbol, PachislotSymbol]), Math.max(30, Math.round(90 * motion)));
+    const timer = setInterval(() => setReels((current) => current.map((symbol, index) => stopped[index] ? symbol : pachiSpinSymbols[Math.floor(Math.random() * pachiSpinSymbols.length)]) as PachiReels), Math.max(30, Math.round(90 * motion)));
     return () => clearInterval(timer);
-  }, [spinning, stopped]);
+  }, [spinning, stopped, motion]);
+
+  const free = machine.freeNext;
+  const blocked = !free && selectedBet > coins;
 
   const pullLever = () => {
-    if (spinning) return;
-    const free = replay || bonusSpins > 0;
+    if (spinning || blocked) return;
     if (!free && !onPlaceBet(selectedBet)) return;
-    if (replay) setReplay(false); else if (bonusSpins > 0) setBonusSpins((value) => value - 1);
-    roundFreeRef.current = free; setTarget(spinPachislotReels()); setStopped([false, false, false]); setResult(null); setSpinning(true);
+    pending.current = spinPachi(machine);
+    setStopped([false, false, false]); setShown(null); setSpinning(true);
   };
 
   const stopReel = (index: number) => {
-    if (!spinning || stopped[index]) return;
+    if (!spinning || stopped[index] || !pending.current) return;
+    const result = pending.current;
     const nextStopped: [boolean, boolean, boolean] = [...stopped] as [boolean, boolean, boolean]; nextStopped[index] = true;
-    const nextReels: [PachislotSymbol, PachislotSymbol, PachislotSymbol] = [...reels] as [PachislotSymbol, PachislotSymbol, PachislotSymbol]; nextReels[index] = target[index];
+    const nextReels: PachiReels = [...reels] as PachiReels; nextReels[index] = result.reels[index];
     setStopped(nextStopped); setReels(nextReels);
     if (nextStopped.every(Boolean)) {
-      const next = evaluatePachislot(target, selectedBet); setResult(next); setSpinning(false); setReplay(next.replay); setBonusSpins((value) => value + next.bonusSpins); onSettle(selectedBet, next, roundFreeRef.current);
+      setSpinning(false); setShown(result); setMachine(result.state); onSettle(selectedBet, result);
     }
   };
 
+  const payout = shown ? Math.round(selectedBet * shown.outMedals / pachiBetMedals) : 0;
+  const ceilingRatio = Math.min(1, machine.games / pachiCeiling);
+
   return <View style={styles.pachislotScreen}><ScreenHeader title="일본식 파치슬롯(Pachislot)" onBack={onBack} /><ScrollView contentContainerStyle={styles.slotPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>PACHISLOT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
-    <View style={[styles.slotMachine, styles.pachislotMachine]}><Text style={styles.slotJackpot}>BIG BONUS · 7️⃣ 7️⃣ 7️⃣</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, stopped[index] && Boolean(result?.payout) ? styles.slotReelWin : null]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '정지 버튼을 하나씩 누르세요' : result?.label ?? '레버를 당겨 시작하세요'}</Text>{result?.payout ? <Text style={[styles.slotPayout, styles.positive]}>+{result.payout.toLocaleString()} WC 지급</Text> : null}{replay && <Text style={styles.freeSpinBadge}>REPLAY · 다음 게임 무료</Text>}{bonusSpins > 0 && <Text style={styles.bigBonusBadge}>BONUS {bonusSpins}게임 남음</Text>}</View>
+
+    <View style={[styles.pachiStatusPanel, machine.phase === 'AT' && styles.pachiStatusAt, machine.phase === '찬스존' && styles.pachiStatusZone]}>
+      <View style={styles.pachiStatusHead}><Text style={styles.pachiPhaseName}>{machine.phase}</Text>{machine.phase === 'AT' && <Text style={styles.pachiSetBadge}>{machine.atSets}세트째</Text>}</View>
+      {machine.phase === 'AT'
+        ? <Text style={styles.pachiStatusText}>남은 {machine.atLeft}게임 · 이번 당첨 {machine.atMedals >= 0 ? '+' : ''}{machine.atMedals}매</Text>
+        : machine.phase === '찬스존'
+          ? <Text style={styles.pachiStatusText}>남은 {machine.zoneLeft}게임 · 여기서 맞으면 AT로 들어갑니다</Text>
+          : <Text style={styles.pachiStatusText}>{machine.games}게임 돌림 · 다음 찬스존까지 {pachiToZone(machine)}게임</Text>}
+      <View style={styles.pachiCeilingBar}><View style={[styles.pachiCeilingFill, { width: `${Math.round(ceilingRatio * 100)}%` }]} /></View>
+      <Text style={styles.pachiCeilingText}>천장까지 {pachiToCeiling(machine)}게임 · 닿으면 무조건 당첨(은혜 AT 100게임)</Text>
+    </View>
+
+    <View style={[styles.slotMachine, styles.pachislotMachine, machine.phase === 'AT' && styles.pachislotMachineAt]}><Text style={styles.slotJackpot}>AT 당첨 · 7️⃣ 7️⃣ 7️⃣</Text><View style={styles.slotReels}>{reels.map((symbol, index) => <View key={index} style={[styles.slotReel, stopped[index] && Boolean(shown?.outMedals) ? styles.slotReelWin : null]}><Text style={styles.slotSymbol}>{symbol}</Text></View>)}</View><View style={styles.slotPayline} /><Text style={styles.slotMachineLabel}>{spinning ? '정지 버튼을 하나씩 누르세요' : shown?.label ?? '레버를 당겨 시작하세요'}</Text>{payout > 0 ? <Text style={[styles.slotPayout, styles.positive]}>+{payout.toLocaleString()} WC · {shown?.outMedals}매</Text> : null}{free && <Text style={styles.freeSpinBadge}>리플레이 · 다음 게임 무료</Text>}{shown?.byCeiling && <Text style={styles.bigBonusBadge}>천장 도달</Text>}</View>
+
     <View style={styles.stopButtonRow}>{[0, 1, 2].map((index) => <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={[styles.stopButton, (!spinning || stopped[index]) && styles.stopButtonStopped]}><Text style={styles.stopButtonText}>{stopped[index] ? 'STOP' : `${index + 1} 정지`}</Text></Pressable>)}</View>
-    <Pressable disabled={spinning || (!replay && bonusSpins === 0 && selectedBet > coins)} onPress={pullLever} style={[styles.pachiLever, (spinning || (!replay && bonusSpins === 0 && selectedBet > coins)) && styles.disabledCard]}><Text style={styles.pachiLeverIcon}>●</Text><Text style={styles.pachiLeverText}>{spinning ? '릴 회전 중' : replay ? 'REPLAY 시작' : bonusSpins > 0 ? `보너스 게임 시작 · ${bonusSpins}회` : `레버 당기기 · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
-    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={spinning || replay || bonusSpins > 0} onPress={() => onBetChange(amount)} />)}</View>
-    <View style={styles.slotRules}><Text style={styles.slotRulesTitle}>파치슬롯 규칙</Text><Text style={styles.slotRuleText}>레버를 당긴 뒤 세 정지 버튼을 원하는 순서로 누릅니다.</Text><Text style={styles.slotRuleText}>🔁 3개는 리플레이 · 🔔 3개는 REGULAR 4게임</Text><Text style={styles.slotRuleText}>7️⃣ 3개는 BIG BONUS 8게임과 10배 당첨</Text></View>
+    <Pressable disabled={spinning || blocked} onPress={pullLever} style={[styles.pachiLever, (spinning || blocked) && styles.disabledCard]}><Text style={styles.pachiLeverIcon}>●</Text><Text style={styles.pachiLeverText}>{spinning ? '릴 회전 중' : free ? '리플레이 시작 · 무료' : `레버 당기기 · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
+    <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={spinning || free || machine.phase === 'AT'} onPress={() => onBetChange(amount)} />)}</View>
+    <View style={styles.slotRules}><Text style={styles.slotRulesTitle}>파치슬롯 규칙</Text><Text style={styles.slotRuleText}>1게임에 3매(베팅 금액 한 번)를 넣고 세 정지 버튼을 원하는 순서로 누릅니다.</Text><Text style={styles.slotRuleText}>천장 — {pachiCeiling}게임을 돌리면 무조건 당첨되고, 은혜로 AT가 두 배가 됩니다.</Text><Text style={styles.slotRuleText}>찬스존 — 150게임마다 5게임짜리 기회 구간이 옵니다. 다섯 번 중 한 번꼴로 성공합니다.</Text><Text style={styles.slotRuleText}>순증 — AT에 들어가면 1게임마다 평균 2.4매씩 늘어납니다. 한 번 당첨에 평균 113게임 · 270매입니다.</Text><Text style={styles.slotRuleText}>200만 게임을 돌려 잰 환급률은 95.0%입니다.</Text></View>
   </ScrollView></View>;
 }
 
@@ -2149,20 +2180,12 @@ function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
   </ScrollView></View>;
 }
 
-const predictGroups:PredictGroup[]=['스포츠','사회문제'];
-
-function PredictGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
-  const [group,setGroup]=useState<PredictGroup>('스포츠');
-  const [question,setQuestion]=useState<PredictQuestion|null>(()=>pickPredictQuestion(predictQuestions,'스포츠'));
+function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:{group:PredictGroup;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [question,setQuestion]=useState<PredictQuestion|null>(()=>pickPredictQuestion(predictQuestions,group));
   const [side,setSide]=useState<PredictSide|null>(null);
   const [outcome,setOutcome]=useState<ReturnType<typeof settlePredict>|null>(null);
   const [solved,setSolved]=useState<string[]>([]);
 
-  const chooseGroup=(next:PredictGroup)=>{
-    if(next===group)return;
-    setGroup(next);setSide(null);setOutcome(null);
-    setQuestion(pickPredictQuestion(predictQuestions,next,solved));
-  };
   const nextQuestion=()=>{
     const done=question?[...solved,question.id]:solved;
     setSolved(done);setSide(null);setOutcome(null);
@@ -2185,12 +2208,8 @@ function PredictGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
   };
   const closed=question?question.closeTime.slice(0,10):'';
 
-  return <View style={styles.predictScreen}><ScreenHeader title="예측 마켓(Prediction Market)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
-    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>실제로 일어난 일 · kalshi.com</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
-
-    <View style={styles.predictTabs}>{predictGroups.map((item)=><Pressable key={item} onPress={()=>chooseGroup(item)} style={[styles.predictTab,group===item&&styles.predictTabActive]}>
-      <Text style={[styles.predictTabText,group===item&&styles.predictTabTextActive]}>{item}</Text>
-    </Pressable>)}</View>
+  return <View style={styles.predictScreen}><ScreenHeader title={`예측 마켓 · ${group}`} onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>{group} · 실제로 일어난 일 · kalshi.com</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
 
     {!question?<View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>낼 문제가 없습니다</Text><Text style={styles.slotRuleText}>받아 둔 문제 중 이 갈래에 맞는 것이 없습니다. 다음 갱신 때 채워집니다.</Text></View>:<>
       <View style={styles.predictCard}>
@@ -5000,6 +5019,155 @@ function objectParticle(word:string){
 
 // 스크린낚시. 오락실 낚시 기계처럼 던지기 → 입질 → 챔질 → 릴 싸움으로 이어집니다.
 // 판정은 전부 src/screenfishing.ts에 있고 이 화면은 누른 시각과 상태만 다룹니다.
+/** 판 크기. 아이폰 세로 폭(375 - 좌우 여백 28)에 들어가야 합니다. */
+const fishRouletteBoard = 300;
+const fishRouletteCenter = fishRouletteBoard / 2;
+/** 자리 12곳이 놓이는 둘레. */
+const fishRouletteRing = 112;
+/**
+ * 물고기가 자리로 들어갔을 때 서는 둘레. 자리보다 조금 바깥입니다.
+ * 자리 한가운데에 세우면 물고기가 자리 번호를 덮어 어디에 몇 마리인지 안 보입니다.
+ */
+const fishRouletteFishRing = 134;
+const fishRouletteSlotSize = 36;
+const fishRouletteFishSize = 22;
+
+/** 각도(도)와 중심에서의 거리로 판 위의 자리를 잡습니다. Velodrome과 같은 방식입니다. */
+const fishRoulettePoint = (angle: number, radius: number, size: number) => {
+  const radian = (angle * Math.PI) / 180;
+  return { left: fishRouletteCenter + Math.cos(radian) * radius - size / 2, top: fishRouletteCenter + Math.sin(radian) * radius - size / 2 };
+};
+
+const fishRouletteBetTypes: FishRouletteBetType[] = ['first', 'most', 'none', 'neighbour', 'parity', 'half'];
+const fishRouletteSlots = Array.from({ length: fishRouletteSlotCount }, (_, index) => index + 1);
+/** 무엇에 걸었는지 한 마디로. 경주권과 기록에 씁니다. */
+const fishRoulettePick = (bet: FishRouletteBet): string =>
+  bet.type === 'parity' ? (bet.parity === 'odd' ? '홀' : '짝')
+  : bet.type === 'half' ? (bet.half === 'front' ? '앞 1~6' : '뒤 7~12')
+  : bet.type === 'neighbour' ? `${bet.slot}·${nextSlot(bet.slot)}번`
+  : `${bet.slot}번`;
+
+function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+  const [betType,setBetType]=useState<FishRouletteBetType>('first');
+  const [slot,setSlot]=useState(1);
+  const [parity,setParity]=useState<'odd'|'even'>('odd');
+  const [half,setHalf]=useState<'front'|'back'>('front');
+  const [phase,setPhase]=useState<'betting'|'running'|'finished'>('betting');
+  const [result,setResult]=useState<FishRouletteResult|null>(null);
+  const [ticket,setTicket]=useState<{bet:FishRouletteBet;stake:number}|null>(null);
+  const [elapsed,setElapsed]=useState(0);
+  const settledRef=useRef(false);
+  // 베팅 중에 물고기가 가만히 서 있으면 죽은 판처럼 보입니다. 이 값으로 살살 흔듭니다.
+  const [tick,setTick]=useState(0);
+  useEffect(()=>{const timer=setInterval(()=>setTick(value=>value+1),140);return()=>clearInterval(timer);},[]);
+  // 베팅 중에 맴도는 물고기. 판이 시작되면 계산된 물고기로 갈아탑니다.
+  const idleField=useMemo(()=>createFishRouletteField(),[]);
+
+  // 승식마다 고르는 것이 달라서, 지금 화면 상태를 베팅 하나로 모읍니다.
+  const bet=useMemo<FishRouletteBet>(()=>{
+    switch(betType){
+      case 'parity':return {type:'parity',parity};
+      case 'half':return {type:'half',half};
+      case 'most':return {type:'most',slot};
+      case 'none':return {type:'none',slot};
+      case 'neighbour':return {type:'neighbour',slot};
+      default:return {type:'first',slot};
+    }
+  },[betType,slot,parity,half]);
+
+  // 판은 시작할 때 이미 다 정해져 있습니다. 아래는 그것을 시간에 따라 보여 주기만 합니다.
+  useEffect(()=>{
+    if(phase!=='running')return;
+    const startedAt=Date.now();
+    const timer=setInterval(()=>setElapsed(Math.min(fishRouletteRoundMs,Date.now()-startedAt)),60);
+    return()=>clearInterval(timer);
+  },[phase]);
+
+  useEffect(()=>{
+    if(phase!=='running'||elapsed<fishRouletteRoundMs||!result||!ticket||settledRef.current)return;
+    settledRef.current=true;setPhase('finished');
+    const hit=fishRouletteWins(ticket.bet,result);
+    onSettle(ticket.stake,hit?fishRouletteMultiplier(ticket.bet):0,`${fishRouletteBetLabels[ticket.bet.type]} ${fishRoulettePick(ticket.bet)} · ${fishRouletteSummary(result)}`);
+  },[phase,elapsed,result,ticket]);
+
+  const start=()=>{
+    if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    settledRef.current=false;setTicket({bet,stake:selectedBet});setResult(spinFishRoulette());setElapsed(0);setPhase('running');
+  };
+  const reset=()=>{settledRef.current=false;setResult(null);setTicket(null);setElapsed(0);setPhase('betting');};
+
+  const shownBet=ticket?.bet??bet;
+  const covered=fishRouletteCovers(shownBet);
+  const odds=fishRouletteOdds[shownBet.type];
+  // 지금까지 들어간 물고기만 셉니다. 판이 끝나면 최종 결과와 같아집니다.
+  const entered=result?result.entered.filter(fish=>fish.at<=elapsed):[];
+  const counts=fishRouletteSlots.map(item=>entered.filter(fish=>fish.slot===item).length);
+  const left=Math.max(0,Math.ceil((fishRouletteRoundMs-elapsed)/1000));
+  const won=phase==='finished'&&result&&ticket?fishRouletteWins(ticket.bet,result):false;
+
+  return <View style={styles.fishRouletteScreen}><ScreenHeader title="물고기 룰렛" onBack={onBack}/><View style={styles.fixedTableArea}>
+    <View style={styles.rouletteStatusRow}>
+      <View><Text style={styles.eyebrow}>ROUND SEA · 12 SLOTS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
+      <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'베팅 접수 중':phase==='running'?`남은 시간 ${left}초`:'판 종료'}</Text></View>
+    </View>
+
+    <View style={styles.fishRouletteBoardWrap}><View style={styles.fishRouletteBoard}>
+      <View style={styles.fishRouletteWater}>
+        <Text style={styles.fishRouletteWaterTitle}>{phase==='betting'?'출발 대기':phase==='running'?`${entered.length} / ${result?.swimmers.length??0}`:`먼저 ${result?.first??'-'}번`}</Text>
+        <Text style={styles.fishRouletteWaterSub}>{phase==='betting'?'물고기 12마리':phase==='running'?'들어간 물고기':`많이 ${result?.most??'-'}번`}</Text>
+      </View>
+
+      {/* 바깥 둘레의 자리 12곳. 고른 자리는 금테를 두르고, 물고기가 들어오면 마릿수를 적습니다. */}
+      {fishRouletteSlots.map(item=>{
+        const spot=fishRoulettePoint(slotAngle(item),fishRouletteRing,fishRouletteSlotSize);
+        const count=counts[item-1];
+        const isFirst=phase!=='betting'&&entered.length>0&&entered[0].slot===item;
+        return <View key={item} style={[styles.fishRouletteSlot,spot,count>0&&styles.fishRouletteSlotFilled,isFirst&&styles.fishRouletteSlotFirst,covered.includes(item)&&styles.fishRouletteSlotPicked]}>
+          <Text style={styles.fishRouletteSlotNumber}>{item}</Text>
+          <Text style={styles.fishRouletteSlotCount}>{count>0?`${count}마리`:''}</Text>
+        </View>;
+      })}
+
+      {/* 물고기. 판이 돌면 계산된 자리로 헤엄쳐 들어가고, 들어가면 그 자리에 붙어 안 나옵니다. */}
+      {result?result.swimmers.map(fish=>{
+        const at=fishPositionAt(fish,elapsed);
+        const spot=fishRoulettePoint(at.angle,at.radius*fishRouletteFishRing,fishRouletteFishSize);
+        const missed=phase==='finished'&&!at.settled;
+        return <Text key={fish.id} style={[styles.fishRouletteFish,spot,{color:fish.color},at.settled&&styles.fishRouletteFishSettled,missed&&styles.fishRouletteFishMissed]}>{fish.emoji}</Text>;
+      }):idleField.map((fish,index)=>{
+        const spot=fishRoulettePoint(index*30+tick*1.1,(0.55+Math.sin(tick*0.3+index)*0.05)*fishRouletteFishRing,fishRouletteFishSize);
+        return <Text key={fish.id} style={[styles.fishRouletteFish,spot,{color:fish.color}]}>{fish.emoji}</Text>;
+      })}
+    </View></View>
+
+    {phase==='betting'?<View style={styles.fishRouletteBetArea}>
+      <View style={styles.fishRouletteTypeRow}>{fishRouletteBetTypes.map(type=><Pressable key={type} onPress={()=>setBetType(type)} style={[styles.fishRouletteType,betType===type&&styles.fishRouletteTypeActive]}>
+        <Text style={styles.fishRouletteTypeName}>{fishRouletteBetLabels[type]}</Text>
+        <Text style={styles.fishRouletteTypeOdds}>{fishRouletteOdds[type].toFixed(2)}배</Text>
+      </Pressable>)}</View>
+      <Text style={styles.fishRouletteHint}>{fishRouletteBetDetails[betType]}</Text>
+      {betType==='parity'?<View style={styles.fishRouletteSideRow}>{(['odd','even'] as const).map(item=><Pressable key={item} onPress={()=>setParity(item)} style={[styles.fishRouletteSide,parity===item&&styles.fishRouletteSideActive]}><Text style={styles.fishRouletteSideText}>{item==='odd'?'홀 · 1 3 5 7 9 11':'짝 · 2 4 6 8 10 12'}</Text></Pressable>)}</View>
+      :betType==='half'?<View style={styles.fishRouletteSideRow}>{(['front','back'] as const).map(item=><Pressable key={item} onPress={()=>setHalf(item)} style={[styles.fishRouletteSide,half===item&&styles.fishRouletteSideActive]}><Text style={styles.fishRouletteSideText}>{item==='front'?'앞 절반 · 1~6':'뒤 절반 · 7~12'}</Text></Pressable>)}</View>
+      :<View style={styles.fishRouletteSlotPicker}>{fishRouletteSlots.map(item=><Pressable key={item} onPress={()=>setSlot(item)} style={[styles.fishRoulettePick,covered.includes(item)&&styles.fishRoulettePickActive]}><Text style={styles.fishRoulettePickText}>{item}</Text></Pressable>)}</View>}
+      <Text style={styles.fishRouletteTicket}>{fishRouletteBetLabels[betType]} {fishRoulettePick(bet)} · {selectedBet.toLocaleString()} WC · 적중 시 {Math.round(selectedBet*odds).toLocaleString()} WC</Text>
+      <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>물고기 풀기 · {selectedBet.toLocaleString()} WC</Text></Pressable>
+    </View>:<View style={styles.fishRouletteBetArea}>
+      <View style={styles.fishRouletteOrder}>{entered.length===0?<Text style={styles.fishRouletteHint}>아직 아무도 안 들어갔습니다</Text>
+        :entered.map((fish,index)=><View key={fish.id} style={[styles.fishRouletteOrderItem,covered.includes(fish.slot)&&styles.fishRouletteOrderMine]}>
+          <Text style={styles.fishRouletteOrderPlace}>{index+1}</Text>
+          <View style={[styles.velodromeStandingDot,{backgroundColor:fish.color}]}/>
+          <Text style={styles.fishRouletteOrderSlot}>{fish.slot}번</Text>
+        </View>)}</View>
+      <Text style={styles.fishRouletteTicket}>{ticket?`${fishRouletteBetLabels[ticket.bet.type]} ${fishRoulettePick(ticket.bet)} · ${ticket.stake.toLocaleString()} WC`:''}</Text>
+      {phase==='finished'&&result?<>
+        <Text style={[styles.fishRoulettePrize,won?styles.positive:styles.negative]}>{won?`+${Math.round((ticket?.stake??0)*odds).toLocaleString()} WC · ${odds.toFixed(2)}배`:`-${(ticket?.stake??0).toLocaleString()} WC`}</Text>
+        <Text style={styles.fishRouletteHint}>{fishRouletteSummary(result)}</Text>
+        <Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 판</Text></Pressable>
+      </>:<Text style={styles.fishRouletteHint}>물고기가 자리로 들어가는 중입니다</Text>}
+    </View>}
+  </View></View>;
+}
+
 function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(value:number)=>boolean;onSettle:(stake:number,multiplier:number,detail:string)=>void}){
   const [spotId,setSpotId]=useState<FishingSpotId>('shore');
   const [phase,setPhase]=useState<'idle'|'waiting'|'bite'|'fight'|'result'>('idle');
@@ -6663,6 +6831,17 @@ const styles = StyleSheet.create({
   stopButton: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: '#D72F42', borderWidth: 3, borderColor: '#FFE48B' },
   stopButtonStopped: { backgroundColor: '#303746', borderColor: '#697283' },
   stopButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  pachiStatusPanel: { width: '100%', borderRadius: 16, padding: 14, marginTop: 12, backgroundColor: 'rgba(16,22,34,0.9)', borderWidth: 1, borderColor: '#2A3346' },
+  pachiStatusZone: { borderColor: '#4FA3D1', backgroundColor: 'rgba(14,38,56,0.9)' },
+  pachiStatusAt: { borderColor: '#E8B23A', backgroundColor: 'rgba(48,34,10,0.92)' },
+  pachiStatusHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pachiPhaseName: { color: colors.goldLight, fontSize: 17, fontWeight: '900' },
+  pachiSetBadge: { color: '#281900', fontSize: 11, fontWeight: '900', paddingHorizontal: 10, paddingVertical: 4, overflow: 'hidden', borderRadius: 10, backgroundColor: '#FFD65A' },
+  pachiStatusText: { color: colors.text, fontSize: 13, fontWeight: '700', marginTop: 6 },
+  pachiCeilingBar: { height: 6, borderRadius: 3, marginTop: 10, backgroundColor: '#1E2534', overflow: 'hidden' },
+  pachiCeilingFill: { height: '100%', borderRadius: 3, backgroundColor: colors.gold },
+  pachiCeilingText: { color: colors.muted, fontSize: 11, marginTop: 6 },
+  pachislotMachineAt: { borderColor: '#FFD65A', backgroundColor: '#3A2A08' },
   pachiLever: { minHeight: 66, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 14, borderRadius: 18, backgroundColor: '#19283F', borderWidth: 2, borderColor: '#7B9BC9' },
   pachiLeverIcon: { color: '#E84252', fontSize: 34, lineHeight: 38 },
   pachiLeverText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
@@ -6722,6 +6901,48 @@ const styles = StyleSheet.create({
   fishCourse: { flex: 1, height: 46, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(6,40,55,.35)' },
   fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
   fishWeedText: { fontSize: 15, opacity: .5 },
+  fishRouletteScreen: { flex: 1, backgroundColor: '#06202E' },
+  fishRouletteBoardWrap: { width: '100%', alignItems: 'center' },
+  fishRouletteBoard: { width: fishRouletteBoard, height: fishRouletteBoard, borderRadius: fishRouletteCenter, backgroundColor: '#0A3247', borderWidth: 3, borderColor: '#1D5875', alignItems: 'center', justifyContent: 'center' },
+  // 물고기가 헤엄치는 안쪽 바다. 자리 12곳은 이 밖에 둘러 놓습니다.
+  fishRouletteWater: { width: 180, height: 180, borderRadius: 90, backgroundColor: '#0E4A68', borderWidth: 1, borderColor: '#2A7396', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  fishRouletteWaterTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  fishRouletteWaterSub: { color: '#9FC4DC', fontSize: 12, fontWeight: '700' },
+  fishRouletteSlot: { position: 'absolute', width: fishRouletteSlotSize, height: fishRouletteSlotSize, borderRadius: fishRouletteSlotSize / 2, backgroundColor: '#062432', borderWidth: 2, borderColor: '#2A7396', alignItems: 'center', justifyContent: 'center' },
+  // 물고기를 받은 자리는 밝아지고, 제일 먼저 받은 자리는 흰 테로 표시합니다.
+  fishRouletteSlotFilled: { backgroundColor: '#12617F', borderColor: '#7FD4EE' },
+  fishRouletteSlotFirst: { borderColor: '#FFFFFF', borderWidth: 3 },
+  // 내가 건 자리는 금테입니다. 위 두 가지보다 뒤에 놓아 항상 이깁니다.
+  fishRouletteSlotPicked: { borderColor: colors.gold, borderWidth: 3 },
+  fishRouletteSlotNumber: { color: '#EAF4FA', fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  fishRouletteSlotCount: { color: '#FFE28A', fontSize: 8, fontWeight: '800' },
+  fishRouletteFish: { position: 'absolute', width: fishRouletteFishSize, height: fishRouletteFishSize, fontSize: 17, lineHeight: 22, textAlign: 'center' },
+  // 자리에 들어간 물고기는 자리 바깥 테두리에 조금 작게 붙어 있습니다.
+  fishRouletteFishSettled: { fontSize: 14, opacity: 0.92 },
+  // 시간 안에 못 들어간 물고기. 안 세는 것이라 흐리게 둡니다.
+  fishRouletteFishMissed: { opacity: 0.35 },
+  fishRouletteBetArea: { width: '100%', gap: 7 },
+  fishRouletteTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  fishRouletteType: { flexGrow: 1, flexBasis: '30%', paddingVertical: 7, borderRadius: 11, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center', gap: 1 },
+  fishRouletteTypeActive: { backgroundColor: '#123F4F', borderColor: colors.gold, borderWidth: 2 },
+  fishRouletteTypeName: { color: '#EAF4FA', fontSize: 13, fontWeight: '900' },
+  fishRouletteTypeOdds: { color: '#8FE3F5', fontSize: 11, fontWeight: '800' },
+  fishRouletteHint: { color: '#8FB6CC', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  fishRouletteSlotPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center' },
+  fishRoulettePick: { width: 46, paddingVertical: 7, borderRadius: 9, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center' },
+  fishRoulettePickActive: { backgroundColor: '#123F4F', borderColor: colors.gold, borderWidth: 2 },
+  fishRoulettePickText: { color: '#EAF4FA', fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  fishRouletteSideRow: { flexDirection: 'row', gap: 8 },
+  fishRouletteSide: { flex: 1, paddingVertical: 12, borderRadius: 11, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center' },
+  fishRouletteSideActive: { backgroundColor: '#123F4F', borderColor: colors.gold, borderWidth: 2 },
+  fishRouletteSideText: { color: '#EAF4FA', fontSize: 13, fontWeight: '800' },
+  fishRouletteTicket: { color: '#FFE9A8', fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  fishRouletteOrder: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center', minHeight: 54 },
+  fishRouletteOrderItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  fishRouletteOrderMine: { borderColor: colors.gold },
+  fishRouletteOrderPlace: { color: colors.gold, fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  fishRouletteOrderSlot: { color: '#C3CBD8', fontSize: 11, fontWeight: '800' },
+  fishRoulettePrize: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
   fishingScreen: { flex: 1, backgroundColor: '#06202E' },
   fishingSea: { flex: 1, alignItems: 'center', justifyContent: 'space-evenly', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#0A3247', borderWidth: 2, borderColor: '#1D5875', overflow: 'hidden' },
   fishingWaves: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 22 },

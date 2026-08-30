@@ -134,6 +134,8 @@ async function main() {
 
   // 사회문제는 시리즈가 만 개가 넘어 전부 확인하면 너무 오래 걸립니다.
   // 해당 카테고리만 모은 뒤 섞어서 정해진 개수까지만 두드려 봅니다.
+  // 예측 마켓을 스포츠와 사회문제 두 게임으로 나누면서 40 → 80개로 늘렸습니다.
+  // 40개면 사회문제만 서른 판쯤 하고 나면 본 문제가 다시 나옵니다.
   const socialSeries = [];
   let cursor = '', pages = 0;
   while (pages < 14) {
@@ -149,7 +151,7 @@ async function main() {
   }
   let socialTaken = 0, tried = 0;
   for (const series of socialSeries) {
-    if (socialTaken >= 40 || tried >= 700) break;
+    if (socialTaken >= 80 || tried >= 1400) break;
     tried += 1;
     const markets = await settledMarkets(series.ticker);
     markets.sort((a, b) => Number(b.volume_fp ?? 0) - Number(a.volume_fp ?? 0));
