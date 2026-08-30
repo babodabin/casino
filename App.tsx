@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
 } from 'react-native';
 
 const casinoEntranceAsset = require('./assets/casino-entrance-gold-v1.png');
@@ -837,8 +838,8 @@ function CasinoApp() {
         <ImageBackground source={casinoEntranceSource} resizeMode="cover" style={styles.splashBackground}>
           <View style={styles.splashShade} />
           <View style={[styles.splashHeader, { paddingTop: 38 + insets.top }]}>
-            <Text style={styles.splashEyebrow}>WELCOME TO</Text>
-            <Text style={styles.splashTitle}>WORLD CASINO</Text>
+            <Text {...displayFont} style={styles.splashEyebrow}>WELCOME TO</Text>
+            <Text {...displayFont} style={styles.splashTitle}>WORLD CASINO</Text>
             <Text style={styles.splashSubtitle}>세계의 모든 게임이 시작되는 밤</Text>
           </View>
           <View style={[styles.splashBottom, { paddingBottom: 24 + insets.bottom }]}>
@@ -1096,7 +1097,7 @@ function CasinoApp() {
         {appScreen === 'bigTwoSetup' && <SimpleSetupScreen title="빅투 준비" hero="♦3 · · · 2♠" lead="열세 장을 먼저 다 내려놓으면 이깁니다" rules={['1. '+tablePlayers+'명이 열세 장씩 나눠 갖습니다. ♦3을 가진 사람이 먼저 내고 첫 장에는 ♦3이 들어가야 합니다.','2. 숫자는 3이 가장 약하고 2가 가장 셉니다. 같은 숫자면 ♦ ♣ ♥ ♠ 순으로 세집니다.','3. 한 장·두 장(페어)·세 장(트리플)·다섯 장(스트레이트 이상)만 낼 수 있습니다.','4. 앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다. 낼 게 없으면 넘깁니다.','5. 먼저 다 내면 '+bigTwoWinPayout[tablePlayers]+'배입니다. 사람이 많을수록 배당이 큽니다. 져도 세 장 이하로 털었으면 절반을 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} players={tablePlayers} onPlayersChange={setTablePlayers} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bigTwoGame')}/>}
         {appScreen === 'bigTwoGame' && <BigTwoGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
         {appScreen === 'pusherSetup' && <SimpleSetupScreen title="코인 푸셔 준비" hero="◉ ◉ ◉" lead="밀판이 밀어낸 동전이 내 몫입니다" rules={['1. 동전을 한 개 넣으면 밀판이 한 번 앞으로 밉니다.','2. 앞턱을 넘어간 동전이 내 몫입니다. 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아집니다.','3. 금화는 '+pusherGoldPayout+'배로 쳐줍니다.','4. 앞쪽 양옆에는 빠지는 홈이 있어 그리로 밀린 동전은 사라집니다.','5. 판은 실제 기계처럼 그대로 남아 다음에 이어서 합니다.']} startLabel="기계 앞에 서기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('pusherGame')}/>}
-        {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['1. 여덟 장을 들고 시작합니다. 그중 다섯 장까지 골라 내면 그 족보로 점수가 붙습니다.','2. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리는 새 카드로 채워집니다.','3. 점수는 (족보 칩 + 낸 카드의 칩) × 배수입니다.','4. 판마다 조커 셋을 무작위로 받습니다. 조커가 칩과 배수를 올려 주니 조커에 맞는 족보를 노리세요.','5. 세 번 다 내고 목표 '+jokerTarget.toLocaleString()+'점을 넘기면 배당이 나옵니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
+        {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['이 게임은 남과 겨루지 않습니다. 혼자 점수를 쌓아 목표를 넘기면 이깁니다.','','― 한 판의 흐름 ―','1. 카드 여덟 장을 들고 시작합니다.','2. 그중 한 장에서 다섯 장까지 골라 냅니다. 낸 카드의 족보로 점수가 붙습니다.','3. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리와 버린 자리는 곧바로 새 카드로 채워집니다.','4. 세 번을 다 내면 판이 끝납니다. 그때까지 쌓인 점수가 목표 '+jokerTarget.toLocaleString()+'점을 넘겨야 배당이 나옵니다.','','― 점수 셈 (이게 전부입니다) ―','5. 점수 = (족보 칩 + 점수에 든 카드의 칩) × 배수.','6. 카드 한 장의 칩은 A가 11, 10·J·Q·K가 10, 나머지는 숫자 그대로입니다.','7. 족보마다 기본 칩과 배수가 있습니다 — 하이 카드 5칩 ×1 · 원 페어 10 ×2 · 투 페어 20 ×2 · 트리플 30 ×3 · 스트레이트 30 ×4 · 플러시 35 ×4 · 풀하우스 40 ×4 · 포카드 60 ×7 · 스트레이트 플러시 100 ×8.','8. 점수에 드는 카드는 족보를 이룬 카드뿐입니다. 페어를 내면 짝이 된 두 장만 칩을 보태고, 스트레이트와 플러시는 다섯 장이 모두 들어갑니다.','9. 예를 들어 K♥ K♠를 원 페어로 내면 (10 + 10 + 10) × 2 = 60점입니다. 족보 칩 10에 K 두 장의 칩 10+10을 더하고 배수 2를 곱한 값입니다.','','― 조커 ―','10. 판을 시작할 때 조커 세 장을 무작위로 받습니다. 조커는 칩이나 배수를 올려 줍니다.','11. 광대는 배수 +4, 계산가는 칩 +40, 쌍둥이는 같은 숫자가 있으면 배수 ×2, 무늬꾼은 무늬가 다 같으면 배수 ×3, 짝수쟁이·홀수쟁이는 해당하는 카드마다 배수 +2, 막내는 점수에 든 카드마다 칩 +12, 욕심쟁이는 ◆마다 배수 +3입니다.','12. 어떤 조커를 받았느냐에 따라 노려야 할 족보가 달라집니다. 이것이 이 게임의 핵심입니다. 무늬꾼을 받았으면 플러시를, 막내를 받았으면 카드가 많이 들어가는 족보를 노립니다.','13. 배수는 마지막에 곱해집니다. 그래서 칩을 먼저 크게 만든 뒤 배수를 걸수록 점수가 크게 뜁니다.','','― 요령 ―','14. 버리기 두 번은 아껴도 남으면 그냥 사라집니다. 조커에 안 맞는 카드는 일찍 버리세요.','15. 낮은 족보를 세 번 내는 것보다, 버리기를 써서 조커에 맞는 큰 족보를 한 번 만드는 편이 대개 낫습니다.','16. 화면의 골라주기를 누르면 지금 손에서 점수가 제일 높게 나오는 조합을 잡아 줍니다.','','― 배당 ―','17. 목표를 넘기면 1.7배, 목표의 두 배를 넘기면 3배, 세 배를 넘기면 10배입니다. 목표에 못 미치면 베팅금을 잃습니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
         {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
         {appScreen === 'fishingSetup' && <SimpleSetupScreen title="스크린낚시 준비" hero="🎣 바다" lead="던지고 · 기다리고 · 챔질하고 · 건져 올리기" rules={['1. 갯바위 · 방파제 · 먼바다 중 한 곳을 고릅니다. 깊을수록 큰 고기가 나오지만 어렵습니다.','2. 던진 뒤 찌를 보다가 입질이 오면 곧바로 챔질을 누릅니다. 너무 이르거나 늦으면 놓칩니다.','3. 챔질에 성공하면 릴 싸움입니다. 감기로 당겨 오고, 줄이 팽팽하면 버티기로 늦춥니다.','4. 장력이 끝까지 차면 줄이 끊어져 한 푼도 못 받습니다.','5. 불가사리 · 복어 · 해파리도 뭅니다. 잡아도 값이 안 나갑니다.']} startLabel="바다로 나가기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishingGame')}/>}
         {appScreen === 'fishingGame' && <ScreenFishingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishingSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('스크린낚시',stake,multiplier,detail)}/>}
@@ -1164,6 +1165,12 @@ function CasinoApp() {
         })}
       </View>}
       {!loaded && <View style={styles.loadingCover}><Text style={styles.muted}>저장 정보 불러오는 중…</Text></View>}
+      {/*
+        샹들리에 아래 느낌. 가운데 위가 밝고 네 귀퉁이가 어두워야 '실내'로 보입니다.
+        둘 다 그림자로만 그려서 **자리를 한 칸도 안 먹고**, 눌림은 그대로 통과시킵니다.
+      */}
+      <View pointerEvents="none" style={styles.roomLight} />
+      <View pointerEvents="none" style={styles.roomVignette} />
     </View>
   );
 }
@@ -1289,6 +1296,63 @@ const tabBarHeight = 52;
 /** 홈 인디케이터에서 띄울 높이. 기기가 여백을 0으로 알려 줘도 최소 22는 띄웁니다. */
 const tabBarLift = (bottom: number) => Math.max(bottom, 22);
 const BottomInsetContext = createContext(0);
+
+/**
+ * 카드 크기 단계. **큰 것부터**입니다. 게임마다 다른 크기를 쓰지 않고 이 넷만 씁니다.
+ *
+ * `small` 46×70과 `mini` 40×62는 여러 명이 앉아 자리가 좁을 때 쓰는 단계입니다.
+ * 어느 단계를 쓸지는 `useCardFit`이 자리를 재서 고릅니다.
+ */
+type CardSize = 'big' | 'mid' | 'small' | 'mini';
+const cardSizeOrder: CardSize[] = ['big', 'mid', 'small', 'mini'];
+const cardSizeBox: Record<CardSize, { width: number; height: number }> = {
+  big: { width: 72, height: 108 },
+  mid: { width: 58, height: 88 },
+  small: { width: 46, height: 70 },
+  mini: { width: 40, height: 62 },
+};
+
+/**
+ * 부채처럼 겹칠 때 **한 장이 더 차지하는 너비의 비율**. 0.48이면 절반쯤만 보입니다.
+ * 비율로 두어야 크기 단계가 바뀌어도 보이는 정도가 같습니다.
+ */
+const cardFanSpread = 0.48;
+const cardFanMargin = (size: CardSize) => -Math.round(cardSizeBox[size].width * (1 - cardFanSpread));
+/**
+ * 부채로 n장을 늘어놓았을 때의 전체 너비. **줄에 걸어 둔 gap도 같이 넣어야 합니다.**
+ * 이걸 빼먹으면 계산상 들어가는데 실제로는 줄이 접힙니다(파이 고우에서 한 번 겪었습니다).
+ */
+const cardFanWidth = (size: CardSize, count: number, gap = 0) =>
+  cardSizeBox[size].width + Math.max(0, count - 1) * (cardSizeBox[size].width * cardFanSpread + gap);
+
+/**
+ * 자리에 맞춰 카드 크기를 고릅니다. **판이 쓸 수 있는 자리를 재서 단계를 하나 고릅니다.**
+ *
+ * 모자라면 작은 단계로 내려가 버튼이 화면 밖으로 안 밀리고, 남으면 큰 단계로 올라가
+ * 빈자리가 안 생깁니다. 지금까지 실제로 터진 문제는 전부 "자리가 모자람"이었습니다.
+ *
+ * - `rows` — 이 자리에 카드가 세로로 몇 줄 들어가는지
+ * - `spare` — 카드 높이 말고 같이 들어갈 높이의 합(이름줄·버튼·여백…). **재서 넣으세요**
+ * - `across` — 한 줄에 몇 장이 가로로 놓이는지. 0이면 너비는 안 봅니다
+ * - `gap` — 카드 줄에 걸어 둔 gap. 부채로 겹치는 줄은 0으로 두는 편이 낫습니다
+ * - `sideSpare` — 카드 너비 말고 좌우로 들어갈 너비(테두리·여백)
+ *
+ * ⚠️ `onLayout`은 **카드 때문에 높이가 변하지 않는 칸**에 걸어야 합니다(`flex: 1`인 칸).
+ * 카드가 밀어 올리는 칸을 재면 큰 단계와 작은 단계를 계속 오갑니다.
+ */
+function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, biggest = 'mid' as CardSize, smallest = 'mini' as CardSize } = {}) {
+  const [fit, setFit] = useState<CardSize>(biggest);
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { height, width } = event.nativeEvent.layout;
+    const room = (height - spare) / Math.max(1, rows);
+    const side = width - sideSpare;
+    const steps = cardSizeOrder.slice(cardSizeOrder.indexOf(biggest), cardSizeOrder.indexOf(smallest) + 1);
+    const picked = steps.find((step) => cardSizeBox[step].height <= room && (across <= 0 || cardFanWidth(step, across, gap) <= side))
+      ?? steps[steps.length - 1];
+    setFit((current) => (current === picked ? current : picked));
+  };
+  return { fit, onLayout };
+}
 
 /**
  * 상대 패를 한 장씩 여는 상태.
@@ -2058,6 +2122,18 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   // 일곱 장씩 두 자리. 나(0)와 딜러(1)에게 번갈아 한 장씩 놓습니다.
   const deal=useTableDeal(round,2,round?7:0);
   const dealing=deal.dealing;
+  /**
+   * 카드 줄 둘(딜러·나)이 쓸 자리. spare는 실제로 재서 넣은 값입니다 —
+   * 아이폰 375×812에서 판 자리 764 가운데 카드 높이 말고 들어가는 것이
+   * 위 상태줄 32 · 반원 테이블의 테두리와 이름줄과 규칙줄 216 · 하이/로우 요약 62 ·
+   * 버튼 52로 합쳐 **394**입니다. 남은 370을 두 줄로 나눠 한 장이 185까지 쓸 수 있어
+   * 지금은 제일 큰 단계(72×108)로 올라갑니다.
+   * 너비는 부채로 일곱 장을 늘어놓은 폭을 봅니다. 테두리 18과 여백 28을 뺍니다.
+   */
+  const fit=useCardFit({rows:2,spare:394,across:7,sideSpare:46,biggest:'big'});
+  const fan={marginLeft:cardFanMargin(fit.fit)};
+  // 부채로 겹치는 줄이라 gap은 0입니다. 겹치는 정도는 fan이 정합니다.
+  const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[fit.fit].height+16,gap:0}];
   const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
   const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
   const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
@@ -2075,15 +2151,15 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     onSettle(selectedBet,pending.result,`하이 ${playerSplit.highRank.label} ${pending.high==='win'?'승':'패'} · 로우 ${playerSplit.lowRank.label} ${pending.low==='win'?'승':'패'}`);
     setPending(null);
   };
-  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><View style={styles.fixedTableArea}>
+  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><View style={styles.fixedTableArea} onLayout={fit.onLayout}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
-      <View style={styles.dealerCardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
+      <View style={cardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?fan:null}><PlayingCard card={card} size={fit.fit} hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
       <Text style={styles.dealerFeltRule}>하이 5장·로우 2장을 모두 이겨야 승리</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
-      <View style={styles.dealerCardRow}>{round.player.slice(0,deal.countFor(0)).map((card,index)=><Pressable key={card.id} style={index?styles.dealerCardFan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+      <View style={cardRow}>{round.player.slice(0,deal.countFor(0)).map((card,index)=><Pressable key={card.id} style={index?fan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} size={fit.fit} emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
       <DealerBetSpot amount={selectedBet}/>
     </DealerTable>
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
@@ -5210,16 +5286,20 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
  * 숫자와 무늬를 진짜 카드의 모서리 표시처럼 왼쪽 위에 나란히 그립니다.
  * 위 22만 남기고 겹쳐도 숫자와 무늬가 둘 다 보입니다.
  */
-function PlayingCard({ card, hidden = false, compact = false, tiny = false, stacked = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; stacked?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
-  const size = [styles.playingCard, compact && styles.compactPlayingCard, tiny && styles.tinyPlayingCard, stacked && styles.stackedCard];
+function PlayingCard({ card, hidden = false, compact = false, tiny = false, stacked = false, size, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; stacked?: boolean; size?: CardSize; emphasis?: 'winner'|'selected'|'dim' }) {
+  // size를 주면 그것이 이깁니다. compact·tiny는 예전부터 쓰던 이름이라 그대로 둡니다.
+  const step: CardSize = size ?? (tiny ? 'small' : compact ? 'mid' : 'big');
+  const petite = step === 'small' || step === 'mini';
+  const box = [styles.playingCard, step === 'mid' && styles.compactPlayingCard, step === 'small' && styles.tinyPlayingCard, step === 'mini' && styles.miniPlayingCard, stacked && styles.stackedCard];
   if (hidden) {
-    return <View style={[...size, styles.hiddenCard, stacked && styles.stackedHiddenCard]}><Text style={[styles.hiddenCardMark, tiny && styles.tinyCardMark, stacked && styles.stackedCardMark]}>◆</Text></View>;
+    return <View style={[...box, styles.hiddenCard, stacked && styles.stackedHiddenCard]}><Text style={[styles.hiddenCardMark, petite && styles.tinyCardMark, step === 'mini' && styles.miniCardMark, stacked && styles.stackedCardMark]}>◆</Text></View>;
   }
   const red = card.suit === '♥' || card.suit === '♦';
+  const text = [petite && styles.tinyCardText, step === 'mini' && styles.miniCardText];
   return (
-    <View style={[...size, emphasis==='winner'&&styles.cardWinner, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim]}>
-      <Text style={[styles.playingCardRank, tiny && styles.tinyCardText, stacked && styles.stackedCardRank, red && styles.redCard]}>{card.rank}</Text>
-      <Text style={[styles.playingCardSuit, tiny && styles.tinyCardText, stacked && styles.stackedCardSuit, red && styles.redCard]}>{card.suit}</Text>
+    <View style={[...box, emphasis==='winner'&&styles.cardWinner, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim]}>
+      <Text style={[styles.playingCardRank, ...text, stacked && styles.stackedCardRank, red && styles.redCard]}>{card.rank}</Text>
+      <Text style={[styles.playingCardSuit, ...text, stacked && styles.stackedCardSuit, red && styles.redCard]}>{card.suit}</Text>
     </View>
   );
 }
@@ -6571,18 +6651,45 @@ function ToggleRow({ title, value, onValueChange }: { title: string; value: bool
   return <View style={styles.row}><Text style={styles.rowTitle}>{title}</Text><Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#303746', true: '#80651F' }} thumbColor={value ? '#E4BC55' : '#9AA2B0'} /></View>;
 }
 
+/**
+ * 앱 한 벌 색.
+ *
+ * ⚠️ **파란 회색을 다시 넣지 마세요.** 예전 값은 bg #150E16 · panel #221527 ·
+ * border #3B2839이었는데 전부 파란기가 돌아 카지노가 아니라 업무용 대시보드처럼
+ * 보였습니다. 카지노 실내는 파란 어둠이 아니라 **자주빛 도는 따뜻한 어둠**입니다.
+ *
+ * 금색은 한 가지가 아니라 **세 단**입니다. 한 면 안에 어두운 청동(goldDeep)과
+ * 밝은 샴페인(goldLight)이 같이 있어야 금속으로 보입니다. 한 색만 쓰면 노란
+ * 플라스틱이 됩니다. 테두리는 gold, 위쪽 하이라이트는 goldLight, 아래쪽은 goldDeep.
+ */
 const colors = {
-  bg: '#080B12',
-  panel: '#111722',
-  panel2: '#151D2A',
-  gold: '#D1A63C',
-  goldLight: '#F0D58D',
-  text: '#F4F1EA',
-  muted: '#8D96A6',
-  border: '#293140',
-  green: '#44C28B',
-  red: '#E36C72',
+  bg: '#150E16',
+  panel: '#221527',
+  panel2: '#2A1A2E',
+  /** 테두리에 쓰는 중간 금 */
+  gold: '#C9971F',
+  /** 글씨와 위쪽 하이라이트에 쓰는 밝은 샴페인 */
+  goldLight: '#F5DE8A',
+  /** 아래쪽 테두리와 그림자에 쓰는 어두운 청동 */
+  goldDeep: '#6B4A16',
+  /** 은은한 자주 조명. 카드 뒤나 강조에 아주 옅게만 씁니다 */
+  plum: '#5B2A6B',
+  text: '#F6EFE2',
+  muted: '#A08FA0',
+  border: '#3B2839',
+  green: '#4ADE80',
+  red: '#F0555F',
 };
+
+/**
+ * 제목에 세리프(Cinzel)를 입히는 표시입니다.
+ *
+ * react-native-web이 `dataSet`을 `data-*` 속성으로 내보내고 `public/index.html`의
+ * 규칙이 그것을 받습니다. 스타일로 글씨체를 못 주는 이유는, 같은 파일의 전역 규칙
+ * (`#root *`)이 스타일보다 세서 항상 이기기 때문입니다.
+ * **한글이 없는 글꼴이라 로마자 제목에만 쓰세요.**
+ */
+const displayFont = { dataSet: { display: 'y' } } as { dataSet: { display: string } };
 
 /**
  * 카드가 놓이는 판의 재질. 나무 테두리 안에 초록 펠트입니다.
@@ -6593,7 +6700,7 @@ const colors = {
 // 색은 새로 만들지 않고 이미 있던 홀덤 테이블(holdemTable)의 초록과 나무색을 그대로 씁니다.
 // 앱 안에 초록이 두 개 있으면 같은 테이블에 앉은 느낌이 깨집니다.
 const feltLook = {
-  backgroundColor: '#075332',
+  backgroundColor: '#0A4630',
   borderRadius: 16,
   borderWidth: 7,
   borderColor: '#6B3E20',
@@ -6603,6 +6710,10 @@ const feltLook = {
 
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.bg },
+  // 위 가운데에서 번지는 금빛. 배경 없는 납작한 상자에 큰 그림자만 줘서 부드럽게 퍼집니다.
+  roomLight: { position: 'absolute', top: 0, alignSelf: 'center', width: 230, height: 6, borderRadius: 6, shadowColor: '#FFC978', shadowOpacity: 0.42, shadowRadius: 120, shadowOffset: { width: 0, height: 60 } },
+  // 안쪽으로 파고드는 검은 그림자 한 겹. 구석이 어두워집니다.
+  roomVignette: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, boxShadow: 'inset 0 0 130px 30px rgba(8,2,8,0.78)' },
   screen: { flex: 1 },
   splash: { flex: 1, backgroundColor: '#040711', overflow: 'hidden' },
   splashBackground: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'space-between' },
@@ -6622,7 +6733,13 @@ const styles = StyleSheet.create({
   rightDoor: { borderLeftWidth: 1 },
   doorLine: { position: 'absolute', top: 28, bottom: 28, left: 18, right: 18, borderWidth: 1, borderColor: '#69501E', borderRadius: 80, borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
   doorHandle: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.gold, alignSelf: 'center' },
-  primaryButton: { minHeight: 52, width: '86%', borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold },
+  /**
+   * 큰 금색 버튼.
+   * 위 테두리는 밝은 샴페인, 아래 테두리는 어두운 청동입니다. 이 두 줄만으로도
+   * 납작한 노랑이 금속처럼 보입니다. 그림자는 금색이라 은은하게 빛납니다.
+   * **높이는 안 늘립니다** — 테두리 1px씩과 그림자뿐입니다.
+   */
+  primaryButton: { minHeight: 52, width: '86%', borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold, borderWidth: 1, borderTopColor: colors.goldLight, borderLeftColor: colors.goldLight, borderRightColor: colors.goldDeep, borderBottomColor: colors.goldDeep, shadowColor: '#F5B841', shadowOpacity: 0.5, shadowRadius: 14, shadowOffset: { width: 0, height: 3 } },
   primaryButtonText: { color: '#171107', fontSize: 17, fontWeight: '800' },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
   disclaimer: { color: colors.muted, fontSize: 12, marginTop: 18 },
@@ -6636,7 +6753,8 @@ const styles = StyleSheet.create({
   coin: { color: colors.gold, fontSize: 14 },
   walletText: { color: colors.text, fontSize: 14, fontWeight: '800' },
   page: { padding: 18, paddingBottom: 30 },
-  eyebrow: { color: colors.gold, fontSize: 12, fontWeight: '700', marginBottom: 5 },
+  // 작은 로마자 라벨. 자간을 벌려야 간판처럼 보입니다.
+  eyebrow: { color: colors.goldLight, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, marginBottom: 5 },
   pageTitle: { color: colors.text, fontSize: 29, fontWeight: '800', marginBottom: 20 },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: 14, marginBottom: 11 },
   heroCard: { minHeight: 128, flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', borderRadius: 18 },
@@ -6718,7 +6836,7 @@ const styles = StyleSheet.create({
   blackjackIntroCopy: { flex: 1, marginLeft: 16 },
   setupOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   playerCountRow: { flexDirection: 'row', gap: 8 },
-  playerCountCard: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#293140' },
+  playerCountCard: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   playerCountCardActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.8)' },
   playerCountNumber: { color: colors.text, fontSize: 16, fontWeight: '900' },
   playerCountNumberActive: { color: colors.goldLight },
@@ -6753,13 +6871,22 @@ const styles = StyleSheet.create({
   setupSummary: { marginTop: 20, paddingHorizontal: 14, borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   fullWidthButton: { width: '100%', marginTop: 18 },
   setupNotice: { color: colors.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 10 },
-  blackjackTable: { flex: 1, backgroundColor: '#07251D' },
+  blackjackTable: { flex: 1, backgroundColor: colors.bg },
   // 딜러가 스스로 카드를 여는 동안 버튼 자리를 그대로 채워 둡니다. 비우면 아래가 밀립니다.
   blackjackDealerTurn: { minHeight: 56, alignItems: 'center', justifyContent: 'center' },
   blackjackDealerTurnText: { color: '#F8E6B0', fontSize: 15, fontWeight: '900' },
   // 반원형 블랙잭 테이블. 위쪽 곧은 변이 딜러 자리, 아래쪽 둥근 변이 손님 자리입니다.
   // 아래 모서리 반경을 크게 줘서 반원처럼 보이게 합니다.
-  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 8, paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#075332', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 190, borderBottomRightRadius: 190, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14, flexShrink: 1, overflow: 'hidden' },
+  /**
+   * 딜러 판.
+   *
+   * ⚠️ **아래 모서리를 190으로 두면 안 됩니다.** 반원처럼 보이라고 준 값이었는데, 그 곡선이
+   * `overflow: hidden`과 맞물려 **맨 아랫줄 바깥쪽 카드의 아래 모서리를 잘라먹었습니다.**
+   * 파이 고우는 내 카드 첫 장·마지막 장이 6px, 바카라는 플레이어·뱅커 베팅 자리가 8px씩
+   * 잘렸습니다. 반원 모양은 접고 60으로 낮췄습니다 — 카드가 안 잘리는 쪽이 먼저입니다.
+   * 60이면 곡선이 먹는 자리가 아래 60줄뿐이라 카드줄과 베팅 자리가 다 그 위에 있습니다.
+   */
+  dealerFelt: { alignSelf: 'center', width: '100%', maxWidth: 380, alignItems: 'center', paddingTop: 8, paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#0A4630', borderWidth: 9, borderColor: '#6B3E20', borderTopLeftRadius: 26, borderTopRightRadius: 26, borderBottomLeftRadius: 60, borderBottomRightRadius: 60, shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 14, flexShrink: 1, overflow: 'hidden' },
   dealerEdge: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   dealerEdgeSlot: { alignItems: 'center', gap: 3, minWidth: 62 },
   dealerChipTray: { flexDirection: 'row', gap: 3, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
@@ -6803,6 +6930,10 @@ const styles = StyleSheet.create({
   tinyPlayingCard: { width: 46, height: 70, borderRadius: 8, padding: 5 },
   tinyCardText: { fontSize: 15, lineHeight: 18 },
   tinyCardMark: { fontSize: 17 },
+  // 제일 작은 단계. 여러 명이 앉아 자리가 모자랄 때만 내려갑니다.
+  miniPlayingCard: { width: 40, height: 62, borderRadius: 7, padding: 4 },
+  miniCardText: { fontSize: 13, lineHeight: 16 },
+  miniCardMark: { fontSize: 15 },
   tableSeatRow: { width: '100%', marginBottom: 6 },
   tableSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4 },
   // 판 위쪽은 둥글게 깎여 있어(반지름 110) 맨 윗줄에 쓸 수 있는 폭이 좁습니다.
@@ -6876,7 +7007,7 @@ const styles = StyleSheet.create({
   holdemPage: { padding: 16, paddingBottom: 42, gap: 16 },
   // 모서리를 110으로 깎으면 판 위아래 끝에서 쓸 수 있는 폭이 확 줄어
   // 이름줄과 카드가 초록 판 밖으로 나갑니다. 64면 타원 느낌은 남으면서 다 들어갑니다.
-  holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 64, backgroundColor: '#075332', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
+  holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 64, backgroundColor: '#0A4630', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
   holdemSeat: { color: '#F8E6B0', fontSize: 14, fontWeight: '900' },
   holdemCards: { minHeight: 106, paddingTop: 16, flexDirection: 'row', justifyContent: 'center', gap: 7 },
   // 공용 다섯 장이 좌우 자리를 덮지 않게 더 좁게 겹칩니다.
@@ -6884,12 +7015,12 @@ const styles = StyleSheet.create({
   // 31이 보이므로 모서리 표시(숫자·무늬)가 다 들어갑니다.
   pokerBoardRow: { gap: 0 },
   pokerBoardFan: { marginLeft: -27 },
-  pokerTable: { flex: 1, backgroundColor: '#052E22' },
+  pokerTable: { flex: 1, backgroundColor: colors.bg },
   pokerPage: { flexGrow: 1, padding: 16, paddingBottom: 42, gap: 16, alignItems: 'center' },
   pokerSeat: { color: '#F8E6B0', fontSize: 16, fontWeight: '900', marginTop: 5 },
   pokerActionRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 12 },
-  secondaryButton: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#6681A5' },
-  secondaryButtonText: { color: '#F4F7FC', fontSize: 14, fontWeight: '900', textAlign: 'center' },
+  secondaryButton: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#2C1B2E', borderWidth: 1, borderColor: '#7A5A3A' },
+  secondaryButtonText: { color: colors.text, fontSize: 14, fontWeight: '900', textAlign: 'center' },
   paiGowDivider: { width: '100%', padding: 12, borderRadius: 14, backgroundColor: '#153E31', borderWidth: 1, borderColor: '#5A8C75' },
   paiGowDividerTitle: { color: '#FFE080', fontSize: 14, fontWeight: '900', marginBottom: 4 },
   paiGowHandSummary: { width: '100%', flexDirection: 'row', gap: 8 },
@@ -6901,11 +7032,11 @@ const styles = StyleSheet.create({
   chineseRowLost: { borderColor: '#B4413F' },
   chineseRowHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   chineseRowName: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  chineseRowLabel: { flex: 1, color: '#9AA6B8', fontSize: 12, fontWeight: '700' },
-  chineseRowMark: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden', backgroundColor: '#2A3346' },
+  chineseRowLabel: { flex: 1, color: '#A08FA0', fontSize: 12, fontWeight: '700' },
+  chineseRowMark: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden', backgroundColor: '#3B2839' },
   chineseSlotRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
-  chineseOpponentLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '700' },
+  chineseOpponentLine: { color: '#A08FA0', fontSize: 12, fontWeight: '700' },
   chineseHandRow: { ...feltLook, width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   /** 이미 펠트 위에 올라가 있는 줄. 펠트를 두 번 겹치지 않게 맨 모양으로 둡니다. */
   handRowPlain: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
@@ -6913,14 +7044,14 @@ const styles = StyleSheet.create({
   // 화려한 실내 사진은 입구에만 두고, 게임 화면에는 재질만 가져옵니다.
   // 판 바깥(잔액·버튼·규칙)은 어둡게 두어야 눈이 판으로 갑니다.
   feltTable: { width: '100%', padding: 7, borderRadius: 22, backgroundColor: '#6B3E20', borderWidth: 1, borderColor: '#8A5730' },
-  feltSurface: { borderRadius: 16, backgroundColor: '#075332', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
+  feltSurface: { borderRadius: 16, backgroundColor: '#0A4630', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
   // 테이블 위에 조명이 떨어진 것처럼 가운데를 살짝 밝힙니다.
   feltGlow: { position: 'absolute', top: '-45%', left: '8%', right: '8%', height: '110%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.055)' },
   feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
-  jokerScreen: { flex: 1, backgroundColor: '#0B0F17' },
+  jokerScreen: { flex: 1, backgroundColor: colors.bg },
   jokerScoreRow: { width: '100%', flexDirection: 'row', gap: 8 },
-  jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
-  jokerScoreLabel: { color: '#8E9AAC', fontSize: 11, fontWeight: '800' },
+  jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
+  jokerScoreLabel: { color: '#A08FA0', fontSize: 11, fontWeight: '800' },
   jokerScoreValue: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontVariant: ['tabular-nums'] },
   jokerBar: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#1B2434' },
   jokerBarFill: { height: '100%', backgroundColor: colors.gold },
@@ -6930,24 +7061,24 @@ const styles = StyleSheet.create({
   jokerEffect: { color: '#C3CBD8', fontSize: 10, fontWeight: '700', lineHeight: 14 },
   // 펠트 위에 올라가는 글자라 금색을 조금 밝게 씁니다.
   jokerPreview: { color: '#F2D98B', fontSize: 15, fontWeight: '900' },
-  predictScreen: { flex: 1, backgroundColor: '#0B0F17' },
+  predictScreen: { flex: 1, backgroundColor: colors.bg },
   predictTabs: { width: '100%', flexDirection: 'row', gap: 8 },
-  predictTab: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  predictTab: { flex: 1, alignItems: 'center', paddingVertical: 11, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   predictTabActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.8)' },
-  predictTabText: { color: '#8E9AAC', fontSize: 14, fontWeight: '800' },
+  predictTabText: { color: '#A08FA0', fontSize: 14, fontWeight: '800' },
   predictTabTextActive: { color: colors.gold },
-  predictCard: { width: '100%', gap: 8, padding: 15, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
-  predictWhen: { color: '#8E9AAC', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  predictCard: { width: '100%', gap: 8, padding: 15, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
+  predictWhen: { color: '#A08FA0', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
   predictTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', lineHeight: 26 },
   predictSource: { color: '#6F7A8A', fontSize: 11, fontWeight: '600', lineHeight: 16 },
-  predictMarket: { color: '#9AA6B8', fontSize: 13, fontWeight: '700', marginTop: 2 },
+  predictMarket: { color: '#A08FA0', fontSize: 13, fontWeight: '700', marginTop: 2 },
   predictMarketStrong: { color: colors.gold, fontWeight: '900' },
   predictChoiceRow: { width: '100%', flexDirection: 'row', gap: 9 },
   predictChoice: { flex: 1, gap: 3, alignItems: 'center', paddingVertical: 15, paddingHorizontal: 9, borderRadius: 13, borderWidth: 1 },
   predictYes: { backgroundColor: 'rgba(24,58,38,0.7)', borderColor: '#3FA96A' },
   predictNo: { backgroundColor: 'rgba(58,24,26,0.7)', borderColor: '#B4413F' },
   predictChoiceName: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
-  predictChoiceLabel: { color: '#9AA6B8', fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  predictChoiceLabel: { color: '#A08FA0', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   predictChoiceOdds: { color: colors.gold, fontSize: 18, fontWeight: '900', marginTop: 3 },
   predictChoiceChance: { color: '#6F7A8A', fontSize: 11, fontWeight: '700' },
   predictAnswer: { width: '100%', gap: 6, padding: 15, borderRadius: 14, borderWidth: 1 },
@@ -6955,20 +7086,20 @@ const styles = StyleSheet.create({
   predictAnswerLost: { backgroundColor: 'rgba(58,24,26,0.7)', borderColor: '#B4413F' },
   predictAnswerMark: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
   predictAnswerText: { color: '#C3CBD8', fontSize: 13, fontWeight: '700', lineHeight: 20 },
-  pusherScreen: { flex: 1, backgroundColor: '#0B0F17' },
-  pusherCabinet: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#2A3346', backgroundColor: '#101724' },
+  pusherScreen: { flex: 1, backgroundColor: colors.bg },
+  pusherCabinet: { width: '100%', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#3B2839', backgroundColor: '#101724' },
   pusherPlate: { height: 22, backgroundColor: '#28324A', alignItems: 'center', justifyContent: 'center' },
-  pusherPlateText: { color: '#8E9AAC', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
+  pusherPlateText: { color: '#A08FA0', fontSize: 10, fontWeight: '800', letterSpacing: 2 },
   pusherBed: { height: 320, backgroundColor: '#152033', position: 'relative', overflow: 'hidden' },
   pusherBall: { width: 22, height: 22, marginLeft: -11, marginTop: -11, borderRadius: 11, backgroundColor: '#E0587B', borderColor: '#9C2F4C' },
   pusherBar: { width: 26, height: 15, marginLeft: -13, marginTop: -8, borderRadius: 3, backgroundColor: '#E8C062', borderColor: '#8A6414' },
   // 벽이 끝나는 자리. 이 앞부터 동전이 옆으로 밀리고 바닥 구멍에 빠질 수 있습니다.
-  pusherWallEnd: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#2A3346' },
+  pusherWallEnd: { position: 'absolute', left: 0, right: 0, height: 1, backgroundColor: '#3B2839' },
   pusherAimLine: { position: 'absolute', top: 0, bottom: 0, width: 2, marginLeft: -1, backgroundColor: 'rgba(209,166,60,0.28)' },
   pusherLaneRow: { width: '100%', flexDirection: 'row', gap: 5 },
-  pusherLane: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  pusherLane: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   pusherLaneActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.8)' },
-  pusherLaneText: { color: '#8E9AAC', fontSize: 13, fontWeight: '800' },
+  pusherLaneText: { color: '#A08FA0', fontSize: 13, fontWeight: '800' },
   pusherLaneTextActive: { color: colors.gold },
   pusherCoin: { position: 'absolute', width: 20, height: 20, marginLeft: -10, marginTop: -10, borderRadius: 10, backgroundColor: '#C9CFD8', borderWidth: 1, borderColor: '#79828F', alignItems: 'center', justifyContent: 'center' },
   pusherGold: { backgroundColor: colors.gold, borderColor: '#8A6414' },
@@ -6981,15 +7112,15 @@ const styles = StyleSheet.create({
   pusherTrayEmpty: { color: '#5D6675', fontSize: 12, fontWeight: '700' },
   pusherPayout: { color: colors.gold, fontSize: 20, fontWeight: '900' },
   bigTwoSeats: { width: '100%', flexDirection: 'row', gap: 8 },
-  bigTwoSeat: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 9, borderRadius: 10, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  bigTwoSeat: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 9, borderRadius: 10, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   bigTwoSeatActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
   bigTwoSeatWon: { borderColor: '#3FA96A' },
-  bigTwoSeatName: { color: '#9AA6B8', fontSize: 11, fontWeight: '800' },
+  bigTwoSeatName: { color: '#A08FA0', fontSize: 11, fontWeight: '800' },
   bigTwoSeatCount: { color: '#FFFFFF', fontSize: 17, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  bigTwoTable: { width: '100%', gap: 8, padding: 12, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  bigTwoTable: { width: '100%', gap: 8, padding: 12, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   bigTwoTableLabel: { color: colors.gold, fontSize: 13, fontWeight: '800' },
   bigTwoLog: { width: '100%', gap: 2, paddingHorizontal: 2 },
-  bigTwoLogLine: { color: '#8E9AAC', fontSize: 12, fontWeight: '600' },
+  bigTwoLogLine: { color: '#A08FA0', fontSize: 12, fontWeight: '600' },
   // 투전은 종이패를 방바닥이나 돗자리에서 하지, 초록 펠트 테이블에서 하지 않습니다.
   tujeonRow: { width: '100%', flexDirection: 'row', gap: 7, flexWrap: 'wrap', alignItems: 'center' },
   // 투전목은 길고 좁은 종이패라 서양 카드보다 홀쭉하게 그립니다.
@@ -7001,7 +7132,7 @@ const styles = StyleSheet.create({
   tujeonCardBack: { backgroundColor: '#2A1C1C', borderColor: '#7A3B36', justifyContent: 'center' },
   tujeonCardBackMark: { color: '#C8A06A', fontSize: 24, fontWeight: '900' },
   tujeonHandLabel: { color: colors.gold, fontSize: 20, fontWeight: '900' },
-  tujeonAdvice: { color: '#9AA6B8', fontSize: 13, fontWeight: '700' },
+  tujeonAdvice: { color: '#A08FA0', fontSize: 13, fontWeight: '700' },
   paiGowWarning: { color: '#FFB39D', fontSize: 12, lineHeight: 18, textAlign: 'center' },
   racingPickBanner: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 16, backgroundColor: '#332A12', borderWidth: 2, borderColor: '#E4BB4D' },
   racingPickCopy: { flex: 1 },
@@ -7012,7 +7143,7 @@ const styles = StyleSheet.create({
   racingSelectedTag: { color: '#231700', fontSize: 9, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFD75C' },
   racingChosenLane: { backgroundColor: 'rgba(255,215,92,.18)', borderTopWidth: 1, borderTopColor: '#FFD75C', borderBottomColor: '#FFD75C' },
   racingTrackPick: { position: 'absolute', right: -3, top: -2, color: '#211600', fontSize: 7, fontWeight: '900', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, overflow: 'hidden', backgroundColor: '#FFD75C' },
-  bullScreen: { flex: 1, backgroundColor: '#17120D' },
+  bullScreen: { flex: 1, backgroundColor: colors.bg },
   bullStatus: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#332313', borderWidth: 1, borderColor: '#C58A42' },
   bullStatusText: { color: '#FFD99A', fontSize: 11, fontWeight: '900' },
   bullArena: { marginTop: 16, padding: 13, borderRadius: 22, backgroundColor: '#8D5931', borderWidth: 4, borderColor: '#D8B374' },
@@ -7048,7 +7179,7 @@ const styles = StyleSheet.create({
   bullMatchText: { color: '#FFF0D7', fontSize: 11, fontWeight: '800', marginTop: 2 },
   bullWinner: { color: '#F1CA88', fontSize: 9, fontWeight: '900', marginTop: 2 },
   bullChampion: { color: '#FFE18A', fontSize: 20, fontWeight: '900', textAlign: 'center', marginVertical: 8 },
-  carRaceScreen: { flex: 1, backgroundColor: '#090D14' },
+  carRaceScreen: { flex: 1, backgroundColor: colors.bg },
   carStatus: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#221E16', borderWidth: 1, borderColor: '#E1B84A' },
   carStatusText: { color: '#FFE18A', fontSize: 11, fontWeight: '900' },
   carTrack: { marginTop: 15, paddingVertical: 6, borderRadius: 18, overflow: 'hidden', backgroundColor: '#242931', borderWidth: 4, borderColor: '#5C626C' },
@@ -7085,7 +7216,7 @@ const styles = StyleSheet.create({
   carTicket: { marginTop: 14, padding: 14, borderRadius: 15, backgroundColor: '#211D13', borderWidth: 1, borderColor: '#B98C26' },
   carTicketText: { color: '#FFF3C5', fontSize: 12, fontWeight: '800', marginTop: 4 },
   carResult: { marginTop: 12, padding: 16, borderRadius: 17, backgroundColor: '#171E29', borderWidth: 1, borderColor: '#53677F' },
-  horseScreen: { flex: 1, backgroundColor: '#091D16' },
+  horseScreen: { flex: 1, backgroundColor: colors.bg },
   horsePage: { padding: 14, paddingBottom: 42, gap: 13 },
   horseTrack: { paddingVertical: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#8B5A32', borderWidth: 5, borderColor: '#D3B477' },
   horseLane: { height: 54, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.25)' },
@@ -7118,7 +7249,7 @@ const styles = StyleSheet.create({
   horseExpected: { color: '#E6C765', fontSize: 13, fontWeight: '800', marginTop: 7 },
   horseResultPanel: { padding: 16, borderRadius: 18, backgroundColor: '#132C23', borderWidth: 1, borderColor: '#527665' },
   horsePodium: { color: '#FFF2C0', fontSize: 17, fontWeight: '900', textAlign: 'center', marginVertical: 12 },
-  cycleScreen: { flex: 1, backgroundColor: '#101B27' },
+  cycleScreen: { flex: 1, backgroundColor: colors.bg },
   cycleTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2' },
   // 원형 벨로드롬. 바깥 테두리가 관중석 난간, 안쪽 원이 인필드입니다.
   velodromeWrap: { width: '100%', alignItems: 'center', gap: 12 },
@@ -7132,7 +7263,7 @@ const styles = StyleSheet.create({
   velodromeRiderMine: { borderColor: colors.gold, borderWidth: 3 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
   velodromeStanding: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  velodromeStandingItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  velodromeStandingItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   velodromeStandingMine: { borderColor: colors.gold },
   velodromeStandingPlace: { color: colors.gold, fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeStandingDot: { width: 10, height: 10, borderRadius: 5 },
@@ -7147,7 +7278,7 @@ const styles = StyleSheet.create({
   cycleStyle: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, overflow: 'hidden', color: '#BDE3FF', backgroundColor: '#24475E', fontSize: 9, fontWeight: '900' },
   cycleTicket: { padding: 14, borderRadius: 16, backgroundColor: '#172B3A', borderWidth: 2, borderColor: '#6BA2C7' },
   cycleTicketText: { color: '#E7F4FC', fontSize: 12, lineHeight: 18, fontWeight: '700' },
-  boatScreen: { flex: 1, backgroundColor: '#071D2A' },
+  boatScreen: { flex: 1, backgroundColor: colors.bg },
   boatCourse: { paddingVertical: 7, borderRadius: 22, overflow: 'hidden', backgroundColor: '#087AA0', borderWidth: 5, borderColor: '#84D9E9' },
   boatLane: { height: 52, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.38)' },
   boatLaneBadge: { width: 32, height: 32, marginHorizontal: 6, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFF' },
@@ -7171,7 +7302,7 @@ const styles = StyleSheet.create({
   boatTicket: { padding: 14, borderRadius: 16, backgroundColor: '#0C3B4B', borderWidth: 2, borderColor: '#46BED2' },
   boatTicketText: { color: '#E3FBFE', fontSize: 12, lineHeight: 18, fontWeight: '700' },
   boatResultPanel: { padding: 16, borderRadius: 18, backgroundColor: '#0B3545', borderWidth: 1, borderColor: '#4ACADD' },
-  greyhoundScreen: { flex: 1, backgroundColor: '#17111D' },
+  greyhoundScreen: { flex: 1, backgroundColor: colors.bg },
   greyhoundTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#75523A', borderWidth: 6, borderColor: '#BFC6CC' },
   greyhoundLane: { height: 51, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.25)' },
   greyhoundTrap: { width: 33, height: 33, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 4, borderWidth: 2, borderColor: '#FFF' },
@@ -7449,7 +7580,7 @@ const styles = StyleSheet.create({
   slotRulesCompact: { marginTop: 22 },
   slotRulesTitle: { color: colors.goldLight, fontSize: 15, fontWeight: '900', marginBottom: 7 },
   slotRuleText: { color: '#D8D3DF', fontSize: 11, lineHeight: 19 },
-  slotScreen: { flex: 1, backgroundColor: '#130914' },
+  slotScreen: { flex: 1, backgroundColor: colors.bg },
   slotPage: { padding: 18, paddingBottom: 44 },
   slotMachine: { minHeight: 310, alignItems: 'center', marginTop: 18, padding: 18, borderRadius: 28, backgroundColor: '#5A1735', borderWidth: 6, borderColor: '#D9AE3D', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 12, shadowOffset: { width: 0, height: 8 } },
   slotMachineSpinning: { borderColor:'#FFF09A', shadowColor:'#FFCF48', shadowOpacity:0.95, shadowRadius:18 },
@@ -7478,13 +7609,13 @@ const styles = StyleSheet.create({
   freeSpinBadge: { color: '#281900', fontSize: 12, fontWeight: '900', marginTop: 10, paddingHorizontal: 14, paddingVertical: 7, overflow: 'hidden', borderRadius: 14, backgroundColor: '#FFD65A' },
   slotSpinButton: { minHeight: 72, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 36, backgroundColor: '#D82D52', borderWidth: 4, borderColor: '#FFD96B', shadowColor: '#FF5372', shadowOpacity: 0.5, shadowRadius: 8 },
   slotSpinText: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', letterSpacing: 1 },
-  pachislotScreen: { flex: 1, backgroundColor: '#090D19' },
+  pachislotScreen: { flex: 1, backgroundColor: colors.bg },
   pachislotMachine: { backgroundColor: '#17305B', borderColor: '#D74C58' },
   stopButtonRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
   stopButton: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 29, backgroundColor: '#D72F42', borderWidth: 3, borderColor: '#FFE48B' },
   stopButtonStopped: { backgroundColor: '#303746', borderColor: '#697283' },
   stopButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  pachiStatusPanel: { width: '100%', borderRadius: 16, padding: 14, marginTop: 12, backgroundColor: 'rgba(16,22,34,0.9)', borderWidth: 1, borderColor: '#2A3346' },
+  pachiStatusPanel: { width: '100%', borderRadius: 16, padding: 14, marginTop: 12, backgroundColor: 'rgba(16,22,34,0.9)', borderWidth: 1, borderColor: '#3B2839' },
   pachiStatusZone: { borderColor: '#4FA3D1', backgroundColor: 'rgba(14,38,56,0.9)' },
   pachiStatusAt: { borderColor: '#E8B23A', backgroundColor: 'rgba(48,34,10,0.92)' },
   pachiStatusHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -7502,9 +7633,9 @@ const styles = StyleSheet.create({
   sicboHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#4A1118', borderWidth: 2, borderColor: '#C89D3D' },
   sicboHeroDice: { color: '#FFF1C4', fontSize: 48, marginBottom: 10 },
   sicboRules: { marginTop: 18, padding: 16, borderRadius: 17, backgroundColor: '#21151A', borderWidth: 1, borderColor: '#76505A' },
-  sicboScreen: { flex: 1, backgroundColor: '#120B0D' },
+  sicboScreen: { flex: 1, backgroundColor: colors.bg },
 
-  yutScreen: { flex: 1, backgroundColor: '#12100A' },
+  yutScreen: { flex: 1, backgroundColor: colors.bg },
   yutMat: { marginTop: 16, padding: 18, borderRadius: 20, alignItems: 'center', backgroundColor: '#2A2415', borderWidth: 2, borderColor: '#8A6E2F' },
   yutStickRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   yutStick: { width: 34, height: 116, borderRadius: 17, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2 },
@@ -7531,7 +7662,7 @@ const styles = StyleSheet.create({
   yutHistoryChip: { color: '#E6DCC0', fontSize: 12, fontWeight: '800', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 9, overflow: 'hidden', backgroundColor: '#2F2818' },
   yutHistoryChipRare: { color: '#231700', backgroundColor: '#FFD75C' },
 
-  shellScreen: { flex: 1, backgroundColor: '#0D1420' },
+  shellScreen: { flex: 1, backgroundColor: colors.bg },
   shellTable: { marginTop: 16, paddingVertical: 24, paddingHorizontal: 12, borderRadius: 20, backgroundColor: '#16283B', borderWidth: 2, borderColor: '#2F5875' },
   shellCupRow: { flexDirection: 'row', justifyContent: 'space-between' },
   shellCupSlot: { width: '31%', alignItems: 'center', paddingVertical: 8, borderRadius: 14, borderWidth: 2, borderColor: 'transparent' },
@@ -7546,7 +7677,7 @@ const styles = StyleSheet.create({
   shellBallShadow: { width: 34, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,.28)' },
   shellHint: { color: '#BFD4E5', fontSize: 13, fontWeight: '700', textAlign: 'center', marginTop: 18 },
 
-  fishScreen: { flex: 1, backgroundColor: '#06202B' },
+  fishScreen: { flex: 1, backgroundColor: colors.bg },
   fishTank: { paddingVertical: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#0E4A63', borderWidth: 5, borderColor: '#1D7FA1' },
   fishLane: { height: 52, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.18)' },
   fishBadge: { width: 30, height: 30, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 2, borderColor: '#FFFFFF' },
@@ -7554,7 +7685,7 @@ const styles = StyleSheet.create({
   fishCourse: { flex: 1, height: 46, justifyContent: 'center', position: 'relative', backgroundColor: 'rgba(6,40,55,.35)' },
   fishWeeds: { position: 'absolute', left: 0, right: 14, flexDirection: 'row', justifyContent: 'space-around' },
   fishWeedText: { fontSize: 15, opacity: .5 },
-  fishRouletteScreen: { flex: 1, backgroundColor: '#06202E' },
+  fishRouletteScreen: { flex: 1, backgroundColor: colors.bg },
   fishRouletteBoardWrap: { width: '100%', alignItems: 'center' },
   // 자리를 잡는 틀입니다. **아무것도 그리지 않습니다.**
   // 예전에는 여기에 남색 판을 깔았는데 물과 겹쳐 원이 둘로 보였습니다.
@@ -7599,12 +7730,12 @@ const styles = StyleSheet.create({
   fishRouletteSideText: { color: '#EAF4FA', fontSize: 13, fontWeight: '800' },
   fishRouletteTicket: { color: '#FFE9A8', fontSize: 13, fontWeight: '900', textAlign: 'center' },
   fishRouletteOrder: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, justifyContent: 'center', minHeight: 54 },
-  fishRouletteOrderItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#2A3346' },
+  fishRouletteOrderItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   fishRouletteOrderMine: { borderColor: colors.gold },
   fishRouletteOrderPlace: { color: colors.gold, fontSize: 10, fontWeight: '900', fontVariant: ['tabular-nums'] },
   fishRouletteOrderSlot: { color: '#C3CBD8', fontSize: 11, fontWeight: '800' },
   fishRoulettePrize: { fontSize: 18, fontWeight: '900', textAlign: 'center' },
-  fishingScreen: { flex: 1, backgroundColor: '#06202E' },
+  fishingScreen: { flex: 1, backgroundColor: colors.bg },
   fishingSea: { flex: 1, alignItems: 'center', justifyContent: 'space-evenly', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 22, backgroundColor: '#0A3247', borderWidth: 2, borderColor: '#1D5875', overflow: 'hidden' },
   fishingWaves: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 22 },
   fishingWave: { width: 22, height: 8, borderRadius: 4, backgroundColor: '#1D6A90' },
@@ -7644,7 +7775,7 @@ const styles = StyleSheet.create({
   fishStats: { color: '#A9C9D6', fontSize: 11, marginTop: 3 },
   fishOdds: { color: '#FFD75C', fontSize: 15, fontWeight: '900', textAlign: 'right' },
 
-  luckyFishScreen: { flex: 1, backgroundColor: '#071A2B' },
+  luckyFishScreen: { flex: 1, backgroundColor: colors.bg },
   luckyReef: { minHeight: 250, marginTop: 16, padding: 14, borderRadius: 20, backgroundColor: '#0C3350', borderWidth: 2, borderColor: '#1E6E96', position: 'relative' },
   luckyFishSwimmer: { position: 'absolute', zIndex: 3, marginLeft: -14 },
   luckyFishEmoji: { fontSize: 26 },
@@ -7696,7 +7827,7 @@ const styles = StyleSheet.create({
   sicboBetActive: { borderWidth: 3, borderColor: colors.goldLight, backgroundColor: '#53301A' },
   sicboBetTitle: { color: '#FFFFFF', fontSize: 12, fontWeight: '900', textAlign: 'center' },
   sicboOdds: { color: '#C9BDC2', fontSize: 8, marginTop: 4 },
-  videoPokerScreen: { flex: 1, backgroundColor: '#071A2A' },
+  videoPokerScreen: { flex: 1, backgroundColor: colors.bg },
   videoPokerPage: { padding: 18, paddingBottom: 48 },
   videoPokerCabinet: { justifyContent: 'center', borderRadius: 27, backgroundColor: '#6C1422', borderWidth: 4, borderColor: '#E2B84D', overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 14, elevation: 10 },
   videoPokerMarquee: { minHeight: 84, paddingHorizontal: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#A6202D', borderBottomWidth: 4, borderBottomColor: '#F0C35A' },
@@ -7738,7 +7869,7 @@ const styles = StyleSheet.create({
   baccaratSetupHero: { flexDirection: 'row', alignItems: 'center', padding: 17, borderRadius: 20, backgroundColor: '#0B302F', borderWidth: 1, borderColor: '#416B62' },
   crapsSetupHero: { alignItems: 'center', padding: 20, borderRadius: 20, backgroundColor: '#183324', borderWidth: 1, borderColor: '#53705E' },
   crapsHeroDice: { color: colors.goldLight, fontSize: 48, marginBottom: 8 },
-  crapsScreen: { flex: 1, backgroundColor: '#071A12' },
+  crapsScreen: { flex: 1, backgroundColor: colors.bg },
   crapsPage: { padding: 18, paddingBottom: 44 },
   crapsTable: { minHeight: 270, alignItems: 'center', justifyContent: 'center', marginTop: 18, padding: 20, borderRadius: 42, backgroundColor: '#0A422D', borderWidth: 3, borderColor: '#D0A441' },
   crapsPointLabel: { position: 'absolute', top: 17, color: colors.goldLight, fontSize: 14, fontWeight: '900', letterSpacing: 2 },
@@ -7763,7 +7894,7 @@ const styles = StyleSheet.create({
   baccaratStatusActions: { alignItems: 'flex-end', gap: 7 },
   rulesButton: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 11, backgroundColor: '#18303A', borderWidth: 1, borderColor: '#54717B' },
   rulesButtonText: { color: colors.text, fontSize: 11, fontWeight: '800' },
-  baccaratScreen: { flex: 1, backgroundColor: '#071D25' },
+  baccaratScreen: { flex: 1, backgroundColor: colors.bg },
   baccaratPage: { padding: 18, paddingBottom: 44 },
   // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
   baccaratSpotRow: { flexDirection: 'row', gap: 6, marginTop: 6, width: '100%', maxWidth: 214, marginBottom: 14, justifyContent: 'center' },
@@ -7891,7 +8022,7 @@ const styles = StyleSheet.create({
   // 화투도 마찬가지로 담요 위에서 하지 초록 펠트가 아닙니다.
   hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
   // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
-  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0E5636', justifyContent: 'space-between' },
+  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0C4A2E', justifyContent: 'space-between' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
   goStopSeat: { flex: 1, minHeight: 130, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
   goStopSeatActive: { borderColor: colors.gold },
@@ -8003,7 +8134,7 @@ const styles = StyleSheet.create({
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
   buildStamp: { color: '#4A5364', fontSize: 10, textAlign: 'center', marginTop: 10 },
   disclaimerBlock: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 22, padding: 14, borderRadius: 12, backgroundColor: '#0D1119' },
-  tabBar: { height: 52, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#0B0F17' },
+  tabBar: { height: 52, flexDirection: 'row', alignItems: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#1B1019' },
   // 누르는 자리가 막대를 꽉 채웁니다. 남는 자리를 두면 누를 곳은 좁은데 막대만 두꺼워집니다.
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   tabIcon: { color: '#707988', fontSize: 24, lineHeight: 26 },
