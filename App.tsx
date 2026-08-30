@@ -3062,6 +3062,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
   const [outcome,setOutcome]=useState('');
   const [winners,setWinners]=useState<number[]|null>(null);
   const reveal=useReveal();
+  const seatActions=useSeatActions();
   const [pending,setPending]=useState<{round:TableRound;winners:number[]}|null>(null);
 
   const start=()=>{
@@ -3069,7 +3070,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     setHands(dealSevenPokerTable(players));
     setRound(openTable(players,selectedBet));
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
-    setOutcome('');setWinners(null);setPending(null);reveal.reset();
+    setOutcome('');setWinners(null);setPending(null);reveal.reset();seatActions.clear();
   };
 
   /** 승부 없이 끝났을 때(한 명만 남음) 바로 정산합니다. */
@@ -3109,6 +3110,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
       const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
+      seatActions.show(seat,tableActionLabel(action.kind,toCall));
       if(next.closed)advance(next,hands); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
@@ -3141,6 +3143,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     if(action.kind==='raise'&&!onPlaceBet(toCall+action.amount))return;
     const next=applyTableAction(round,action);
     if(action.kind==='fold')setNote('내가 폴드했습니다');
+    seatActions.show(0,tableActionLabel(action.kind,toCall));
     if(next.closed)advance(next,hands); else setRound(next);
   };
 
@@ -3164,7 +3167,9 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     return hands[seat].slice(0,count).map((card,index)=>{
       const privateCard=index<2||index===6;
       const hide=seat!==0&&privateCard&&!(street===5&&openedHidden(index)&&!folded);
-      return <View key={card.id} style={[styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,index?(side?styles.tableCardStackDown:styles.sevenPokerCardOverlap):null]}><PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} hidden={hide} emphasis={emphasis(seat,card)}/></View>;
+      return <View key={card.id} style={[side?styles.tableSideCardBox:styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,
+        index?(side?styles.tableSideCardStack:styles.sevenPokerCardOverlap):null,spot==='mine'&&!privateCard&&styles.tableMyOpenCard]}>
+        <PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} sideways={side} hidden={hide} emphasis={emphasis(seat,card)}/></View>;
     });
   };
 
@@ -3174,40 +3179,44 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     const side=spot==='left'||spot==='right';
     return <View key={seat} style={[styles.tableSeatRow,side&&styles.tableSideSlot,info.folded&&styles.tableSeatDim]}>
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn]}>
-        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}{side?'':` · ${info.contributed.toLocaleString()} WC`}</Text>
+        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
+        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         {info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :winners?.includes(seat)?<Text style={styles.tableSeatWinner}>승리</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn]}>{seatCards(seat,spot)}</View>
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{seatCards(seat,spot)}</View>
+      {seatActions.actions[seat]?<View pointerEvents="none" style={styles.tableSeatActionWrap}><Text style={styles.tableSeatActionText}>{seatActions.actions[seat]}</Text></View>:null}
     </View>;
   };
 
   const spots=tableSeatSpots(players);
+  // 버튼은 판 가운데 앞쪽(팟과 내 자리 사이)에 놓습니다. 화면 맨 아래에 두면 눈에 안 띕니다.
+  const actionButtons=<View style={styles.holdemActions}>
+    <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
+    <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
+    <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
+  </View>;
 
   return <View style={styles.detailScreen}><ScreenHeader title="세븐 포커(Seven-card Poker)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
     {round?<>
       <View style={styles.tableTopRow}>{spots.top.map(seat=>seatRow(seat,'top'))}</View>
       <View style={styles.tableMiddleRow}>
-        <View style={styles.tableSideSlot}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
+        <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
           <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
         </View>
-        <View style={styles.tableSideSlot}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
+        <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
+      <View style={styles.tableFrontRow}>{myTurn?actionButtons:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
-      {note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}
-      {outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}
+      <View style={styles.tableOutcomeSlot}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}</View>
     </>:<Text style={styles.sevenPokerHint}>앞의 2장과 마지막 1장은 비공개입니다</Text>}
   </View>
-  {pending?<RevealButton opened={reveal.opened} total={3} onPress={openHidden} label="컴퓨터 비공개 카드 열기"/>
-    :!myTurn?<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{street===5?'다시 플레이':street===0?'처음 3장 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
-    :<View style={styles.holdemActions}>
-      <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
-      <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
-      <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
-    </View>}
+  <View style={styles.tableBottomSlot}>{pending?<RevealButton opened={reveal.opened} total={3} onPress={openHidden} label="컴퓨터 비공개 카드 열기"/>
+    :myTurn?<Text style={styles.tableBottomHint}>내 차례입니다 · 판 가운데 버튼으로 고르세요</Text>
+    :<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{street===5?'다시 플레이':street===0?'처음 3장 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}</View>
   <Text style={styles.sevenPokerLegend}>금색 테두리는 비공개, 초록 테두리는 모두가 보는 카드입니다 · {['대기','첫 3장','네 번째 카드','다섯 번째 카드','여섯 번째 카드','마지막 승부'][street]}{myTurn&&(round?.raises??0)>=MAX_RAISES_PER_STREET?' · 레이즈 한도':''}</Text>
   </View></View>;
 }
@@ -3225,6 +3234,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
   const [outcome,setOutcome]=useState('');
   const [table,setTable]=useState<HighLowTableResult|null>(null);
   const reveal=useReveal();
+  const seatActions=useSeatActions();
   const [pending,setPending]=useState<{round:TableRound;table:HighLowTableResult}|null>(null);
 
   const start=()=>{
@@ -3232,7 +3242,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     setHands(dealHighLowTable(players));
     setRound(openTable(players,selectedBet));
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
-    setOutcome('');setTable(null);setPending(null);reveal.reset();
+    setOutcome('');setTable(null);setPending(null);reveal.reset();seatActions.clear();
   };
 
   const finishWalkover=(done:TableRound,winner:number)=>{
@@ -3265,6 +3275,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
       const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
+      seatActions.show(seat,tableActionLabel(action.kind,toCall));
       if(next.closed)advance(next,hands); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
@@ -3296,6 +3307,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     if(action.kind==='raise'&&!onPlaceBet(toCall+action.amount))return;
     const next=applyTableAction(round,action);
     if(action.kind==='fold')setNote('내가 폴드했습니다');
+    seatActions.show(0,tableActionLabel(action.kind,toCall));
     if(next.closed)advance(next,hands); else setRound(next);
   };
 
@@ -3317,46 +3329,54 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     const label=table&&!info.folded?`${table.highWinners.includes(seat)?'하이 ':''}${table.lowWinners.includes(seat)?'로우 ':''}`.trim():'';
     return <View key={seat} style={[styles.tableSeatRow,side&&styles.tableSideSlot,info.folded&&styles.tableSeatDim]}>
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn]}>
-        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}{side?'':` · ${info.contributed.toLocaleString()} WC`}</Text>
+        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
+        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         {info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :label?<Text style={styles.tableSeatWinner}>{label} 승</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn]}>{hands[seat].slice(0,info.folded&&table?0:shown).map((card,index)=>{
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{hands[seat].slice(0,info.folded&&table?0:shown).map((card,index)=>{
         const privateCard=index<2||index===6;
         const hide=seat!==0&&privateCard&&!(street===5&&openedHidden(index)&&!info.folded);
-        return <View key={card.id} style={[styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,index?(side?styles.tableCardStackDown:styles.sevenPokerCardOverlap):null]}><PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} hidden={hide} emphasis={emphasis(seat,card)}/></View>;
+        return <View key={card.id} style={[side?styles.tableSideCardBox:styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,
+          index?(side?styles.tableSideCardStack:styles.sevenPokerCardOverlap):null,spot==='mine'&&!privateCard&&styles.tableMyOpenCard]}>
+          <PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} sideways={side} hidden={hide} emphasis={emphasis(seat,card)}/></View>;
       })}</View>
+      {seatActions.actions[seat]?<View pointerEvents="none" style={styles.tableSeatActionWrap}><Text style={styles.tableSeatActionText}>{seatActions.actions[seat]}</Text></View>:null}
     </View>;
   };
 
   const spots=tableSeatSpots(players);
   const myLow=hands&&street>=5?evaluateLow(hands[0]):null;
+  // 버튼은 판 가운데 앞쪽(팟과 내 자리 사이)에 놓습니다. 화면 맨 아래에 두면 눈에 안 띕니다.
+  const actionButtons=<View style={styles.holdemActions}>
+    <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
+    <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
+    <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
+  </View>;
 
   return <View style={styles.detailScreen}><ScreenHeader title="하이로우(High–Low)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
     {round&&hands?<>
       <View style={styles.tableTopRow}>{spots.top.map(seat=>seatRow(seat,'top'))}</View>
       <View style={styles.tableMiddleRow}>
-        <View style={styles.tableSideSlot}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
+        <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
           <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
         </View>
-        <View style={styles.tableSideSlot}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
+        <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
+      <View style={styles.tableFrontRow}>{myTurn?actionButtons:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
-      {street>=5&&<Text style={styles.pokerInlineResult}>내 하이 {evaluateHoldem(hands[0]).label} · 내 로우 {myLow?myLow.label:'없음'}</Text>}
-      {note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}
-      {outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}
+      <View style={[styles.tableOutcomeSlot,styles.tableOutcomeSlotTwo]}>
+        {street>=5?<Text style={styles.pokerInlineResult}>내 하이 {evaluateHoldem(hands[0]).label} · 내 로우 {myLow?myLow.label:'없음'}</Text>:null}
+        {outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}
+      </View>
     </>:<Text style={styles.sevenPokerHint}>하이와 로우가 팟을 절반씩 나눠 갖습니다</Text>}
   </View>
-  {pending?<RevealButton opened={reveal.opened} total={3} onPress={openHidden} label="컴퓨터 비공개 카드 열기"/>
-    :!myTurn?<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{street===5?'다시 플레이':street===0?'처음 3장 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
-    :<View style={styles.holdemActions}>
-      <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
-      <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
-      <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
-    </View>}
+  <View style={styles.tableBottomSlot}>{pending?<RevealButton opened={reveal.opened} total={3} onPress={openHidden} label="컴퓨터 비공개 카드 열기"/>
+    :myTurn?<Text style={styles.tableBottomHint}>내 차례입니다 · 판 가운데 버튼으로 고르세요</Text>
+    :<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{street===5?'다시 플레이':street===0?'처음 3장 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}</View>
   <Text style={styles.sevenPokerLegend}>로우는 8 이하 서로 다른 다섯 장이 있어야 만들어집니다 · {['대기','첫 3장','네 번째 카드','다섯 번째 카드','여섯 번째 카드','마지막 승부'][street]}</Text>
   </View></View>;
 }
@@ -3370,6 +3390,55 @@ function PokerSetupScreen(props: { mode:'holdem'|'omaha'; players:number; onPlay
 const MAX_RAISES_PER_STREET = maxRaisesPerStreet;
 
 const tableSeatName = (seat: number) => (seat === 0 ? '나' : `컴퓨터 ${seat}`);
+
+/** 자리에 띄운 행동 표시가 남아 있는 시간. 다음 사람이 두기 전에 지워집니다. */
+const SEAT_ACTION_MS = 1600;
+
+/**
+ * 누가 무엇을 했는지 그 자리에서 바로 보여 줍니다.
+ * 화면 아래 한 줄만으로는 네 명 판에서 누구 이야기인지 알 수 없습니다.
+ * 표시는 자리 위에 겹쳐 띄우므로 자리 크기는 바뀌지 않습니다.
+ */
+function useSeatActions() {
+  const [actions, setActions] = useState<Record<number, string>>({});
+  const timers = useRef<Record<number, ReturnType<typeof setTimeout>>>({});
+  useEffect(() => () => { Object.values(timers.current).forEach(clearTimeout); }, []);
+  const show = (seat: number, text: string) => {
+    setActions((prev) => ({ ...prev, [seat]: text }));
+    clearTimeout(timers.current[seat]);
+    timers.current[seat] = setTimeout(() => setActions((prev) => {
+      const next = { ...prev };
+      delete next[seat];
+      return next;
+    }), SEAT_ACTION_MS);
+  };
+  const clear = () => {
+    Object.values(timers.current).forEach(clearTimeout);
+    timers.current = {};
+    setActions({});
+  };
+  return { actions, show, clear };
+}
+
+/** 컴퓨터가 고른 행동을 자리에 띄울 짧은 말로 바꿉니다. 좌우 자리는 폭이 66뿐이라 금액은 빼고 씁니다. */
+const tableActionLabel = (kind: 'fold' | 'raise' | 'call' | 'check', toCall: number) =>
+  kind === 'fold' ? '폴드' : kind === 'raise' ? '레이즈' : toCall > 0 ? '콜' : '체크';
+
+const tableChipColors = ['#E4E4E4', '#C8402F', '#2F6BC8', '#2F9B5A', '#171107'];
+
+/**
+ * 자리 앞에 쌓인 칩. 낸 금액을 숫자로만 적으면 누가 얼마나 걸었는지 한눈에 안 들어옵니다.
+ * 베팅 단위로 나눠 다섯 개까지 쌓고, 그보다 많으면 다섯 개에서 멈추고 숫자로 읽습니다.
+ */
+function SeatChips({ amount, unit, compact = false }: { amount: number; unit: number; compact?: boolean }) {
+  if (amount <= 0) return null;
+  const count = Math.max(1, Math.min(5, Math.round(amount / Math.max(1, unit))));
+  return <View style={styles.tableChipStack}>
+    <View style={styles.tableChipPile}>{Array.from({ length: count }, (_, index) =>
+      <View key={index} style={[styles.tableChip, { backgroundColor: tableChipColors[index % tableChipColors.length] }, index ? styles.tableChipStacked : null]} />)}</View>
+    <Text style={compact ? styles.tableChipTextSmall : styles.tableChipText}>{amount.toLocaleString()}</Text>
+  </View>;
+}
 
 /**
  * 자리 배치. 나는 늘 아래에 앉고 상대는 위·좌·우로 갈라 앉습니다.
@@ -3405,6 +3474,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
   const [winners,setWinners]=useState<number[]|null>(null);
   // 보드에 실제로 뒤집어 놓은 장수. 플랍이 와도 여기서 한 장씩 눌러 열어야 올라갑니다.
   const [dealt,setDealt]=useState(0);
+  const seatActions=useSeatActions();
 
   const shownFor=(value:number)=>value===1?0:value===2?3:value===3?4:5;
   const boardTarget=stage>=1&&stage<=4?shownFor(stage):5;
@@ -3417,7 +3487,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
     const table=dealTable(mode,players);
     setHands(table.hands);setCommunity(table.community);
     setRound(openTable(players,selectedBet));
-    setStage(1);setDealt(0);setWinners(null);setOutcome('');
+    setStage(1);setDealt(0);setWinners(null);setOutcome('');seatActions.clear();
     setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
   };
 
@@ -3459,6 +3529,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:stage-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
+      seatActions.show(seat,tableActionLabel(action.kind,toCall));
       if(next.closed)advance(next); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
@@ -3474,6 +3545,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
     if(action.kind==='raise'&&!onPlaceBet(toCall+action.amount))return;
     const next=applyTableAction(round,action);
     if(action.kind==='fold')setNote('내가 폴드했습니다');
+    seatActions.show(0,tableActionLabel(action.kind,toCall));
     if(next.closed)advance(next); else setRound(next);
   };
 
@@ -3493,17 +3565,27 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
     const hide=seat!==0&&!(stage===5&&winners&&!info.folded);
     return <View key={seat} style={[styles.tableSeatRow,side&&styles.tableSideSlot,info.folded&&styles.tableSeatDim]}>
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn]}>
-        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}{side?'':` · ${info.contributed.toLocaleString()} WC`}</Text>
+        <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
+        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         {info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :winners?.includes(seat)?<Text style={styles.tableSeatWinner}>승리</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn]}>{hands[seat].map((card,index)=><View key={card.id} style={index?(side?styles.tableCardStackDown:styles.dealerCardFan):null}><PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} hidden={hide} emphasis={emphasis(card,seat)}/></View>)}</View>
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine]}>{hands[seat].map((card,index)=>
+        <View key={card.id} style={[side?styles.tableSideCardBox:null,index?(side?styles.tableSideCardStack:styles.dealerCardFan):null]}>
+          <PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} sideways={side} hidden={hide} emphasis={emphasis(card,seat)}/></View>)}</View>
+      {seatActions.actions[seat]?<View pointerEvents="none" style={styles.tableSeatActionWrap}><Text style={styles.tableSeatActionText}>{seatActions.actions[seat]}</Text></View>:null}
     </View>;
   };
 
   const spots=tableSeatSpots(players);
   const boardShown=stage===5?5:dealt;
+  // 버튼은 판 가운데 앞쪽(팟과 내 자리 사이)에 놓습니다. 화면 맨 아래에 두면 눈에 안 띕니다.
+  const actionButtons=<View style={styles.holdemActions}>
+    <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
+    <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
+    <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
+  </View>;
 
   return <View style={styles.detailScreen}><ScreenHeader title={omaha?'오마하(Omaha)':'텍사스 홀덤(Texas Hold’em)'} onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.pokerFixedTable]}>
     {round&&hands?<>
@@ -3511,24 +3593,20 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       <View style={styles.tableMiddleRow}>
         <View style={styles.tableSideSlot}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
-          <View style={styles.holdemCards}>{community.slice(0,boardShown).map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact emphasis={emphasis(card,'board')}/></View>)}{boardShown===0&&<Text style={styles.sevenPokerHint}>공용 카드는 플랍부터 열립니다</Text>}</View>
+          <View style={[styles.holdemCards,styles.pokerBoardRow]}>{community.slice(0,boardShown).map((card,index)=><View key={card.id} style={index?styles.pokerBoardFan:null}><PlayingCard card={card} compact emphasis={emphasis(card,'board')}/></View>)}{boardShown===0&&<Text style={styles.sevenPokerHint}>공용 카드는 플랍부터 열립니다</Text>}</View>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
           <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
         </View>
         <View style={styles.tableSideSlot}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
+      <View style={styles.tableFrontRow}>{myTurn?actionButtons:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
-      {note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}
-      {outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}
+      <View style={styles.tableOutcomeSlot}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}</View>
     </>:<Text style={styles.sevenPokerHint}>{omaha?'개인 카드 넉 장 중 두 장을 반드시 씁니다':'개인 카드 두 장과 공용 다섯 장으로 만듭니다'}</Text>}
   </View>
-  {needBoard?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} label={`${boardLabel} 열기`}/>
-    :!myTurn?<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':stage===0?'카드 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>
-    :<View style={styles.holdemActions}>
-      <Pressable style={styles.holdemFold} onPress={()=>act({kind:'fold'})}><Text style={styles.holdemActionText}>폴드</Text></Pressable>
-      <Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={()=>act(toCall>0?{kind:'call',amount:toCall}:{kind:'check'})}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable>
-      <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
-    </View>}
+  <View style={styles.tableBottomSlot}>{needBoard?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} label={`${boardLabel} 열기`}/>
+    :myTurn?<Text style={styles.tableBottomHint}>내 차례입니다 · 판 가운데 버튼으로 고르세요</Text>
+    :<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':stage===0?'카드 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}</View>
   <Text style={styles.sevenPokerLegend}>{['대기','프리플랍','플랍','턴','리버','승부'][stage]}{myTurn&&(round?.raises??0)>=MAX_RAISES_PER_STREET?' · 레이즈 한도':''}</Text>
   </View></View>;
 }
@@ -4918,17 +4996,24 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
 /**
  * tiny는 여러 명이 앉을 때 상대 카드에 씁니다.
  * 네 명이 7장씩 들면 compact로는 한 화면에 안 들어갑니다.
+ *
+ * sideways는 좌우 자리에 씁니다. 실제 판처럼 카드를 왼쪽으로 90도 눕혀 놓습니다.
+ * 글자까지 통째로 도니까 숫자는 읽기 어려워집니다. 그래서 무늬를 크게 그리고
+ * 무늬와 숫자를 오른쪽 끝(누우면 위쪽 끝)에 붙여, 겹쳐 쌓아도 무슨 패인지 보이게 합니다.
  */
-function PlayingCard({ card, hidden = false, compact = false, tiny = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
-  const size = [styles.playingCard, compact && styles.compactPlayingCard, tiny && styles.tinyPlayingCard];
+function PlayingCard({ card, hidden = false, compact = false, tiny = false, sideways = false, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; sideways?: boolean; emphasis?: 'winner'|'selected'|'dim' }) {
+  const size = [styles.playingCard, compact && styles.compactPlayingCard, tiny && styles.tinyPlayingCard, sideways && styles.sidewaysCard];
   if (hidden) {
-    return <View style={[...size, styles.hiddenCard]}><Text style={[styles.hiddenCardMark, tiny && styles.tinyCardMark]}>◆</Text></View>;
+    return <View style={[...size, styles.hiddenCard, sideways && styles.sidewaysHiddenCard]}><Text style={[styles.hiddenCardMark, tiny && styles.tinyCardMark]}>◆</Text></View>;
   }
   const red = card.suit === '♥' || card.suit === '♦';
+  // 강조 스타일은 transform을 통째로 바꿉니다. 눕힌 카드는 그러면 다시 일어서므로
+  // 회전을 넣은 같은 값을 뒤에 한 번 더 얹습니다.
   return (
-    <View style={[...size, emphasis==='winner'&&styles.cardWinner, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim]}>
-      <Text style={[styles.playingCardRank, tiny && styles.tinyCardText, red && styles.redCard]}>{card.rank}</Text>
-      <Text style={[styles.playingCardSuit, tiny && styles.tinyCardText, red && styles.redCard]}>{card.suit}</Text>
+    <View style={[...size, emphasis==='winner'&&styles.cardWinner, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim,
+      sideways&&emphasis==='winner'&&styles.sidewaysWinner, sideways&&emphasis==='selected'&&styles.sidewaysSelected, sideways&&emphasis==='dim'&&styles.sidewaysDim]}>
+      <Text style={[styles.playingCardRank, tiny && styles.tinyCardText, sideways && styles.sidewaysCardRank, red && styles.redCard]}>{card.rank}</Text>
+      <Text style={[styles.playingCardSuit, tiny && styles.tinyCardText, sideways && styles.sidewaysCardSuit, red && styles.redCard]}>{card.suit}</Text>
     </View>
   );
 }
@@ -6496,9 +6581,40 @@ const styles = StyleSheet.create({
   // 좌우 자리는 폭이 좁아 카드를 세로로 겹쳐 쌓습니다. 가로로 놓으면 가운데 자리가 없습니다.
   tableSeatCardsColumn: { flexDirection: 'column', alignItems: 'center', paddingTop: 6 },
   tableCardStackDown: { marginTop: -40 },
+  // 눕힌 카드가 들어가는 자리. 40×62 카드를 90도 돌리면 62×40이 되므로 가로세로를 바꿔 잡습니다.
+  // 안쪽에 2씩 남겨 비공개(금색)·공개(초록) 테두리가 보이게 합니다.
+  tableSideCardBox: { width: 66, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  // 22만 남기고 겹칩니다. 남는 22에 큰 무늬와 숫자가 들어갑니다.
+  tableSideCardStack: { marginTop: -22 },
+  // 좌우 자리 일곱 장(머리 27 + 44 + 6×22)을 늘 비워 둡니다. 카드가 늘어도 내 자리가 안 밀립니다.
+  tableSideSlotTall: { minHeight: 210 },
+  // 남에게 보이는 내 카드는 12만큼 들어 올립니다. 고스톱에서 낼 수 있는 패를 들어 올린 것과 같습니다.
+  tableMyOpenCard: { transform: [{ translateY: -12 }] },
+  // 들어 올린 카드와 이긴 카드(-16)가 바로 위 이름줄을 덮지 않게 비워 둡니다.
+  tableSeatCardsMine: { paddingTop: 22 },
+  // 일곱 장이 다 들어갈 폭을 처음부터 잡아 둡니다. 가운데 정렬이면 장수가 늘 때마다 카드가 왼쪽으로 밀립니다.
+  tableMyCardsSeven: { width: 302, alignSelf: 'center', justifyContent: 'flex-start' },
+  // 방금 한 행동은 자리 위에 겹쳐 띄웁니다. 자리 크기를 바꾸지 않아야 판이 안 흔들립니다.
+  tableSeatActionWrap: { position: 'absolute', left: 0, right: 0, top: 22, alignItems: 'center' },
+  tableSeatActionText: { color: '#FFF4C7', fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, overflow: 'hidden', backgroundColor: 'rgba(8,32,24,0.92)', borderWidth: 1, borderColor: '#F2C85B' },
+  tableChipStack: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // 칩이 늘어도 자리 높이가 안 바뀌게 다섯 개 높이(13 + 4×4)를 늘 잡아 둡니다.
+  tableChipPile: { flexDirection: 'column-reverse', alignItems: 'center', height: 29 },
+  tableChip: { width: 13, height: 13, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
+  tableChipStacked: { marginBottom: -9 },
+  tableChipText: { color: '#F8E6B0', fontSize: 11, fontWeight: '800' },
+  tableChipTextSmall: { color: '#F8E6B0', fontSize: 10, fontWeight: '800' },
+  // 판 가운데 앞쪽(팟과 내 자리 사이) 자리. 내 차례에는 버튼이, 아니면 방금 일어난 일이 들어갑니다.
+  // 높이를 늘 잡아 두어야 버튼이 나타났다 사라져도 내 카드가 안 움직입니다.
+  tableFrontRow: { width: '100%', minHeight: 56, justifyContent: 'center' },
+  tableBottomHint: { color: colors.muted, fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  tableBottomSlot: { width: '100%', minHeight: 52, justifyContent: 'center' },
+  tableOutcomeSlot: { width: '100%', minHeight: 24, justifyContent: 'center' },
+  // 하이로우는 승부 때 내 하이·로우 줄이 하나 더 붙습니다. 그 자리도 미리 비워 둡니다.
+  tableOutcomeSlotTwo: { minHeight: 48 },
   tableTopRow: { width: '100%', alignItems: 'center' },
   tableMiddleRow: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  tableSideSlot: { width: 62, alignItems: 'center' },
+  tableSideSlot: { width: 66, alignItems: 'center' },
   tableCenterSlot: { flex: 1, alignItems: 'center' },
   tableSideName: { color: '#D5EADF', fontSize: 10, fontWeight: '900', textAlign: 'center' },
   tableSeatDim: { opacity: 0.45 },
@@ -6511,6 +6627,10 @@ const styles = StyleSheet.create({
   holdemTable: { minHeight: 510, alignItems: 'center', justifyContent: 'space-around', padding: 18, borderRadius: 110, backgroundColor: '#075332', borderWidth: 8, borderColor: '#6B3E20', shadowColor: '#000', shadowOpacity: 0.7, shadowRadius: 12 },
   holdemSeat: { color: '#F8E6B0', fontSize: 14, fontWeight: '900' },
   holdemCards: { minHeight: 106, paddingTop: 16, flexDirection: 'row', justifyContent: 'center', gap: 7 },
+  // 공용 다섯 장이 좌우 자리를 덮지 않게 더 좁게 겹칩니다.
+  // 가운데에 쓸 수 있는 폭은 295 − 66×2 = 163이고, 이렇게 하면 58 + 4×24 = 154입니다.
+  pokerBoardRow: { gap: 0 },
+  pokerBoardFan: { marginLeft: -34 },
   pokerTable: { flex: 1, backgroundColor: '#052E22' },
   pokerPage: { flexGrow: 1, padding: 16, paddingBottom: 42, gap: 16, alignItems: 'center' },
   pokerSeat: { color: '#F8E6B0', fontSize: 16, fontWeight: '900', marginTop: 5 },
@@ -7026,6 +7146,15 @@ const styles = StyleSheet.create({
   compactPlayingCard: { width: 58, height: 88, padding: 6 },
   playingCardRank: { color: '#121212', fontSize: 21, fontWeight: '900' },
   playingCardSuit: { color: '#121212', fontSize: 29, alignSelf: 'center' },
+  // 왼쪽으로 90도 눕힌 카드. 오른쪽 끝에 붙인 글자가 누우면 위쪽 끝으로 가서,
+  // 아래를 겹쳐 쌓아도 숫자와 무늬가 그대로 보입니다.
+  sidewaysCard: { alignItems: 'flex-end', padding: 3, transform: [{ rotate: '-90deg' }] },
+  sidewaysCardRank: { fontSize: 12, lineHeight: 14 },
+  sidewaysCardSuit: { fontSize: 21, lineHeight: 23, alignSelf: 'flex-end' },
+  sidewaysHiddenCard: { alignItems: 'center', justifyContent: 'center' },
+  sidewaysWinner: { transform: [{ rotate: '-90deg' }, { scale: 1.06 }] },
+  sidewaysSelected: { transform: [{ rotate: '-90deg' }, { scale: 1.04 }] },
+  sidewaysDim: { transform: [{ rotate: '-90deg' }, { scale: 0.96 }] },
   redCard: { color: '#C43A40' },
   hiddenCard: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#172845', borderWidth: 3, borderColor: '#D4A93F' },
   hiddenCardMark: { color: colors.gold, fontSize: 30 },
