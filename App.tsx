@@ -1315,6 +1315,12 @@ function useReveal() {
  */
 const DEAL_MINE_MS = 200;
 const DEAL_THEIRS_MS = 100;
+/**
+ * 다 깔리기까지의 목표 시간. **장수가 많으면 도구가 스스로 간격을 줄여** 이 안에 끝냅니다.
+ * 차이니즈 포커는 네 명이 13장씩 52장이라 위 간격 그대로면 6.5초가 걸립니다.
+ * 세븐 포커 첫 거리(네 명 12장)는 1.5초라 줄일 것이 없어 그대로 갑니다.
+ */
+const DEAL_BUDGET_MS = 1600;
 
 /**
  * 카드를 한 장씩 깔아 놓는 상태. **게임마다 따로 만들지 않으려고 여기 하나만 둡니다.**
@@ -1339,12 +1345,16 @@ function useTableDeal(deal: unknown, seats: number, target: number) {
   // 새 판이면 그리기 전에 0으로 되돌립니다. 효과에서 되돌리면 다 깔린 판이 한 번 번쩍입니다.
   if (dealt.current !== deal) { dealt.current = deal; now = 0; if (laid !== 0) setLaid(0); }
   now = Math.min(now, total);
+  // 이 판을 그대로 깔면 얼마나 걸리는지 재서, 목표 시간을 넘기면 그만큼 줄입니다.
+  const plain = DEAL_MINE_MS * target + DEAL_THEIRS_MS * Math.max(0, total - target);
+  const rush = plain > DEAL_BUDGET_MS ? DEAL_BUDGET_MS / plain : 1;
   useEffect(() => {
     if (laid >= total) return;
     // 다음 장을 받을 자리. 0번이 나라서 내 카드만 천천히 놓입니다.
-    const timer = setTimeout(() => setLaid((value) => Math.min(total, value + 1)), laid % seats === 0 ? DEAL_MINE_MS : DEAL_THEIRS_MS);
+    const step = Math.max(16, Math.round((laid % seats === 0 ? DEAL_MINE_MS : DEAL_THEIRS_MS) * rush));
+    const timer = setTimeout(() => setLaid((value) => Math.min(total, value + 1)), step);
     return () => clearTimeout(timer);
-  }, [laid, total, seats]);
+  }, [laid, total, seats, rush]);
   return {
     dealing: now < total,
     countFor: (seat: number) => Math.min(target, Math.floor(now / seats) + (now % seats > seat ? 1 : 0)),
@@ -2001,16 +2011,19 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
   const reveal=useReveal();
   const [pending,setPending]=useState<{mine:number;theirs:number;result:'win'|'loss'|'push';detail:string}|null>(null);
   const revealing=!!pending&&!folded;
+  // 세 장씩 두 자리. 나(0)와 컴퓨터(1)에게 번갈아 한 장씩 놓습니다.
+  const deal=useTableDeal(round,2,round?3:0);
+  const dealing=deal.dealing;
   const start=()=>{if(!onPlaceBet(selectedBet))return;setPending(null);reveal.reset();setRound(dealTeenPatti());setMine(selectedBet);setTheirs(selectedBet);setResult(null);setFolded(false);};
-  const showdown=(raised=false)=>{if(!round||result||pending)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';reveal.reset();setPending({mine:myBet,theirs:opponentBet,result:next,detail:`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`});};
+  const showdown=(raised=false)=>{if(!round||result||pending||dealing)return;let myBet=mine,opponentBet=theirs;if(raised){if(!onPlaceBet(selectedBet))return;myBet+=selectedBet;opponentBet+=selectedBet;setMine(myBet);setTheirs(opponentBet);}const compared=compareTeenPatti(round.player,round.opponent),next=compared>0?'win':compared<0?'loss':'push';reveal.reset();setPending({mine:myBet,theirs:opponentBet,result:next,detail:`나 ${evaluateTeenPatti(round.player).label} · 컴퓨터 ${evaluateTeenPatti(round.opponent).label}`});};
   const openNext=()=>{if(!pending)return;const next=Math.min(3,reveal.opened+1);reveal.open(3);if(next<3)return;setResult(pending.result);onSettle(pending.mine,pending.theirs,pending.result,pending.detail);setPending(null);};
-  const fold=()=>{if(!round||result)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
+  const fold=()=>{if(!round||result||dealing)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
   return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>컴퓨터</Text><Text style={styles.dealerSeatNote}>{folded?'비공개':result?evaluateTeenPatti(round.opponent).label:`${reveal.opened}/3 공개`}</Text></View>
-      <View style={styles.dealerCardRow}>{round.opponent.map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View>
+      <View style={styles.dealerCardRow}>{round.opponent.slice(0,deal.countFor(1)).map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View>
       <Text style={styles.dealerFeltRule}>트레일 · 스트레이트 플러시 · 스트레이트 · 플러시 · 페어 순으로 셉니다</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>나</Text><Text style={styles.dealerSeatNote}>{evaluateTeenPatti(round.player).label}</Text></View>
-      <View style={styles.dealerCardRow}>{round.player.map(card=><PlayingCard key={card.id} card={card} compact emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>
+      <View style={styles.dealerCardRow}>{round.player.slice(0,deal.countFor(0)).map(card=><PlayingCard key={card.id} card={card} compact emphasis={result?(result==='win'?'winner':'dim'):undefined}/>)}</View>
       <DealerBetSpot amount={mine}/>
     </DealerTable>{result?<><Text style={styles.sicboResult}>{folded?'다이했습니다':result==='win'?'내가 이겼습니다':result==='push'?'무승부입니다':'컴퓨터가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>:revealing?<RevealButton opened={reveal.opened} total={3} onPress={openNext} label="컴퓨터 패 열기"/>:<View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={fold}><Text style={styles.secondaryButtonText}>다이</Text></Pressable><Pressable style={styles.secondaryButton} onPress={()=>showdown(false)}><Text style={styles.secondaryButtonText}>콜 · 공개</Text></Pressable><Pressable style={styles.primaryButton} onPress={()=>showdown(true)}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}</>}</View></View>;
 }
@@ -2023,6 +2036,9 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   // 승부를 눌러도 딜러 일곱 장이 한 장씩 열립니다. 다 열려야 결과와 정산이 나옵니다.
   const reveal=useReveal();
   const [pending,setPending]=useState<ReturnType<typeof resolvePaiGow>|null>(null);
+  // 일곱 장씩 두 자리. 나(0)와 딜러(1)에게 번갈아 한 장씩 놓습니다.
+  const deal=useTableDeal(round,2,round?7:0);
+  const dealing=deal.dealing;
   const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
   const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
   const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
@@ -2030,7 +2046,7 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   const chosenHigh=round?round.player.filter(card=>!lowIds.includes(card.id)):[];
   const valid=chosenLow.length===2&&isValidPaiGowSplit(chosenHigh,chosenLow);
   const playerSplit=valid?splitPaiGow(round!.player,lowIds):null;
-  const showdown=()=>{if(!round||!playerSplit||pending||outcome)return;const house=arrangePaiGow(round.dealer),resolved=resolvePaiGow(playerSplit,house);setDealerSplit(house);reveal.reset();setPending(resolved);};
+  const showdown=()=>{if(!round||!playerSplit||pending||outcome||dealing)return;const house=arrangePaiGow(round.dealer),resolved=resolvePaiGow(playerSplit,house);setDealerSplit(house);reveal.reset();setPending(resolved);};
   const openNext=()=>{
     if(!pending||!playerSplit)return;
     const next=Math.min(7,reveal.opened+1);
@@ -2045,10 +2061,10 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
-      <View style={styles.dealerCardRow}>{round.dealer.map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
+      <View style={styles.dealerCardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?styles.dealerCardFan:null}><PlayingCard card={card} compact hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
       <Text style={styles.dealerFeltRule}>하이 5장·로우 2장을 모두 이겨야 승리</Text>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
-      <View style={styles.dealerCardRow}>{round.player.map((card,index)=><Pressable key={card.id} style={index?styles.dealerCardFan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+      <View style={styles.dealerCardRow}>{round.player.slice(0,deal.countFor(0)).map((card,index)=><Pressable key={card.id} style={index?styles.dealerCardFan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
       <DealerBetSpot amount={selectedBet}/>
     </DealerTable>
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
@@ -2075,6 +2091,8 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
   // 승부를 눌러도 세 줄이 한꺼번에 갈리지 않고 앞줄부터 한 줄씩 열립니다.
   const reveal=useReveal();
   const [pending,setPending]=useState<ChineseTableResult|null>(null);
+  // 열세 장씩 여러 자리. 장수가 많아 도구가 간격을 알아서 줄입니다.
+  const deal=useTableDeal(round,players,round?13:0);
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
@@ -2084,7 +2102,8 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
   };
   const cardsOf=(key:ChineseRowKey):Card[]=>round?rows[key].flatMap(id=>{const found=round.player.find(card=>card.id===id);return found?[found]:[];}):[];
   const assigned=new Set([...rows.back,...rows.middle,...rows.front]);
-  const remaining=round?round.player.filter(card=>!assigned.has(card.id)):[];
+  // 아직 다 안 깔렸으면 깔린 만큼만 손에 보입니다.
+  const remaining=round?round.player.slice(0,deal.countFor(0)).filter(card=>!assigned.has(card.id)):[];
 
   const place=(id:string)=>{
     if(result)return;
@@ -2441,18 +2460,23 @@ function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}
   const [state,setState]=useState<BigTwoState|null>(null);
   const [picked,setPicked]=useState<string[]>([]);
   const settledRef=useRef(false);
+  // 판마다 새로 세는 번호. state는 한 장 낼 때마다 바뀌어 새 판을 가릴 수 없습니다.
+  const [dealKey,setDealKey]=useState(0);
+  // 열세 장씩 여러 자리. 남의 카드는 안 보이지만 같이 세야 내 카드가 고르게 들어옵니다.
+  const deal=useTableDeal(dealKey,players,state?13:0);
+  const dealing=deal.dealing;
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
-    settledRef.current=false;setPicked([]);setState(startBigTwo(players));
+    settledRef.current=false;setPicked([]);setDealKey(value=>value+1);setState(startBigTwo(players));
   };
 
-  // 컴퓨터 차례는 한 박자 쉬고 저절로 넘어갑니다.
+  // 컴퓨터 차례는 한 박자 쉬고 저절로 넘어갑니다. 카드가 다 깔리기 전에는 기다립니다.
   useEffect(()=>{
-    if(!state||state.winner!==null||state.turn===0)return;
+    if(!state||state.winner!==null||state.turn===0||dealing)return;
     const timer=setTimeout(()=>setState(current=>(current&&current.winner===null&&current.turn!==0)?stepBigTwo(current):current),750);
     return()=>clearTimeout(timer);
-  },[state]);
+  },[state,dealing]);
 
   useEffect(()=>{
     if(!state||state.winner===null||settledRef.current)return;
@@ -2462,7 +2486,7 @@ function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}
   },[state]);
 
   const myHand=state?state.hands[0]:[];
-  const myTurn=!!state&&state.winner===null&&state.turn===0;
+  const myTurn=!!state&&state.winner===null&&state.turn===0&&!dealing;
   const opening=state?bigTwoOpeningCard(state):undefined;
   const chosen=myHand.filter(card=>picked.includes(card.id));
   const combo=chosen.length?classifyBigTwo(chosen):null;
@@ -2509,7 +2533,7 @@ function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}
       {state.log.length>0&&<View style={styles.bigTwoLog}>{state.log.slice(-3).map((line,index)=><Text key={index} style={styles.bigTwoLogLine}>{line}</Text>)}</View>}
 
       <Text style={styles.sectionTitle}>내 패 {myHand.length}장</Text>
-      <View style={styles.chineseHandRow}>{myHand.map(card=><Pressable key={card.id} disabled={!myTurn} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+      <View style={styles.chineseHandRow}>{myHand.slice(0,deal.countFor(0)).map(card=><Pressable key={card.id} disabled={!myTurn} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
 
       {state.winner===null?<>
         <Text style={styles.tujeonAdvice}>{hint}</Text>
