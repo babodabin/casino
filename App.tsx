@@ -4052,6 +4052,8 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
    * 고스톱은 치는 맛이 재미인데 한 번에 처리하면 그게 안 보입니다.
    */
   const [slap,setSlap]=useState<{who:number;card:HwatuCard;next:GoStopRound}|null>(null);
+  /** 친 순간 잠깐 크게 보이게 하는 값입니다. 0.26초 뒤 원래 크기로 돌아옵니다. */
+  const [slapPop,setSlapPop]=useState(false);
   const title=mode==='matgo'?'맞고':'고스톱';
 
   const finish=(next:GoStopRound,force=false)=>{
@@ -4111,8 +4113,10 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   // 친 패를 잠깐 보여 준 뒤 저절로 가져갑니다. 누를 필요 없이 보이기만 하면 됩니다.
   useEffect(()=>{
     if(!slap)return;
+    setSlapPop(true);
+    const pop=setTimeout(()=>setSlapPop(false),260);
     const timer=setTimeout(()=>takeSlap(),1200);
-    return ()=>clearTimeout(timer);
+    return ()=>{clearTimeout(pop);clearTimeout(timer);};
   },[slap]);
 
   // 컴퓨터 차례면 잠깐 쉬었다 저절로 냅니다. 친 패를 보여 주는 시간과 합쳐
@@ -4201,10 +4205,10 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
           const hit=round.floor.filter((item)=>item.month===slap.card.month);
           return <View style={styles.goStopSlapOverlay}>
             <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`} · {slap.card.month}월</Text>
-            <View style={styles.goStopSlapRow}>
-              {hit.map((card)=><View key={card.id}><HwatuCardView card={card} size="small"/></View>)}
+            <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop?1.28:1}]}]}>
+              {hit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
               {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
-              <View style={hit.length?styles.goStopSlapOver:null}><HwatuCardView card={slap.card} size="small"/></View>
+              <View style={[styles.goStopSlapCard,hit.length&&styles.goStopSlapOver]}><HwatuCardView card={slap.card}/></View>
             </View>
           </View>;
         })():null}
@@ -6999,7 +7003,9 @@ const styles = StyleSheet.create({
   goStopSlapWho: { color: '#FFE9A8', fontSize: 13, fontWeight: '900' },
   goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
-  goStopSlapOver: { marginLeft: -24, marginTop: 10, transform: [{ rotate: '7deg' }] },
+  goStopSlapOver: { marginLeft: -30, marginTop: 12, transform: [{ rotate: '8deg' }] },
+  // 친 패에 금빛을 둘러 눈에 띄게 합니다.
+  goStopSlapCard: { borderRadius: 5, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 14, elevation: 12 },
   goStopTakenOverlap: { marginLeft: -18 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
