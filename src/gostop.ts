@@ -183,8 +183,15 @@ export function playGoStopTurn(round: GoStopRound, cardId: string, choice: Match
   return finishGoStopTurn(round, players, floor, deck, events);
 }
 
-/** 손에 같은 월 세 장, 바닥에 한 장이 있을 때 네 장을 한꺼번에 먹는 폭탄입니다. */
-export function playGoStopBomb(round: GoStopRound, month: number): GoStopRound {
+/**
+ * 손에 같은 월 세 장, 바닥에 한 장이 있을 때 네 장을 한꺼번에 먹는 폭탄입니다.
+ *
+ * 폭탄 뒤에도 더미에서 한 장을 뒤집습니다. 그 패가 바닥의 같은 월 두 장과 맞으면
+ * 어느 것을 가져갈지 골라야 하는데, 안 고르면 placeAndCapture가 예외를 던져
+ * 판이 통째로 멈췄습니다(2026-08-30에 실제로 '1번 차례'에서 멈추는 것을 봤습니다).
+ * choice를 안 주면 playGoStopTurn의 자동 선택과 같이 첫 장을 가져갑니다.
+ */
+export function playGoStopBomb(round: GoStopRound, month: number, choice: MatchChoice = {}): GoStopRound {
   if (round.finished) throw new Error('이미 끝난 판입니다.');
   const actor = round.turn;
   const handCards = sameMonth(round.players[actor].hand, month);
@@ -197,7 +204,7 @@ export function playGoStopBomb(round: GoStopRound, month: number): GoStopRound {
   const drawn = round.deck[drawIndex];
   let drawCapture: HwatuCard[] = [];
   if (drawn) {
-    const result = placeAndCapture(floor, drawn);
+    const result = placeAndCapture(floor, drawn, choice.drawnMatchId ?? sameMonth(floor, drawn.month)[0]?.id);
     floor = result.floor; drawCapture = result.captured;
   }
   const events = [...drawnBonuses.map((card) => `${card.bonus}피 보너스`), '폭탄'];
@@ -242,10 +249,25 @@ function stealPiFromOpponents(players: GoStopPlayer[], actor: number, times: num
   return next;
 }
 
+/**
+ * 패가 남은 다음 사람을 찾습니다.
+ *
+ * 폭탄은 한 번에 세 장을 내므로 그 사람만 먼저 손이 빕니다. 그대로 차례를 넘기면
+ * 낼 패가 없어 판이 그 자리에서 멈춥니다(2026-08-30에 실제로 멈췄습니다).
+ * 아무도 패가 없으면 판은 어차피 끝났으므로 바로 다음 자리를 돌려줍니다.
+ */
+function nextPlayerWithCards(players: GoStopPlayer[], from: number): number {
+  for (let step = 1; step <= players.length; step += 1) {
+    const seat = (from + step) % players.length;
+    if (players[seat].hand.length > 0) return seat;
+  }
+  return (from + 1) % players.length;
+}
+
 function finishGoStopTurn(round: GoStopRound, players: GoStopPlayer[], floor: HwatuCard[], deck: HwatuCard[], events: string[]) {
   const noCards = deck.length === 0 || players.every((item) => item.hand.length === 0);
   const actingPlayer = round.turn;
-  const nextTurn = (actingPlayer + 1) % players.length;
+  const nextTurn = nextPlayerWithCards(players, actingPlayer);
   const mayDecide = !noCards && scoreGoStop(players[actingPlayer].captured).total >= goStopThreshold(round.mode);
   return {
     ...round,
@@ -287,7 +309,7 @@ export function chooseGoOrStop(round: GoStopRound, action: 'go' | 'stop'): GoSto
   if (action === 'stop') return { ...round, finished: true, winner: round.turn, message: `${round.turn + 1}번이 스톱했습니다` };
   const players = round.players.map((player, index) => index === round.turn ? { ...player, goCount: player.goCount + 1 } : player);
   const actor = round.turn;
-  return { ...round, players, turn: (actor + 1) % players.length, pendingDecision: null, message: `${actor + 1}번이 고를 외쳤습니다` };
+  return { ...round, players, turn: nextPlayerWithCards(players, actor), pendingDecision: null, message: `${actor + 1}번이 고를 외쳤습니다` };
 }
 
 /** 기본 정산 배수: 1·2고는 추가점, 3고부터 두 배씩 증가합니다. */

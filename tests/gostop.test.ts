@@ -75,7 +75,8 @@ test('고스톱은 3점, 맞고는 7점부터 고·스톱을 고른다', () => {
 
 test('고를 하면 횟수가 늘고 스톱하면 현재 플레이어가 승리한다', () => {
   const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
-  const base: GoStopRound = { mode: 'gostop', players: [{ hand: [card(2)], captured: scoring, goCount: 0 }, { hand: [], captured: [], goCount: 0 }, { hand: [], captured: [], goCount: 0 }], floor: [], deck: [card(4)], turn: 0, finished: false, winner: null, pendingDecision: 0, message: '' };
+  // 다른 사람도 손패를 들고 있어야 차례가 넘어갑니다. 빈손이면 건너뛰고 나에게 다시 옵니다.
+  const base: GoStopRound = { mode: 'gostop', players: [{ hand: [card(2)], captured: scoring, goCount: 0 }, { hand: [card(5)], captured: [], goCount: 0 }, { hand: [card(6)], captured: [], goCount: 0 }], floor: [], deck: [card(4)], turn: 0, finished: false, winner: null, pendingDecision: 0, message: '' };
   const continued = chooseGoOrStop(base, 'go');
   assert.equal(continued.players[0].goCount, 1);
   assert.equal(continued.turn, 1);
@@ -130,6 +131,77 @@ test('마지막 바닥 패까지 먹으면 싹쓸이로 상대 피를 가져온�
   assert.equal(next.lastEvents?.includes('싹쓸이'), true);
   assert.equal(next.floor.length, 0);
   assert.equal(next.players[0].captured.some((item) => item.id === opponentPi.id), true);
+});
+
+test('300판을 끝까지 돌려도 멈추는 판이 없다', () => {
+  // App.tsx의 stepComputer와 같은 순서로 둡니다. 폭탄 때문에 손이 먼저 비는 사람이 생기는데,
+  // 그 자리에 차례가 가면 낼 패가 없어 판이 멈춥니다. 실제로 그 버그가 있었습니다.
+  const firstMatchId = (floor: HwatuCard[], month: number) => {
+    const matches = floor.filter((item) => item.month === month);
+    return matches.length === 2 ? matches[0].id : undefined;
+  };
+  const step = (round: GoStopRound): GoStopRound => {
+    if (round.pendingDecision === round.turn) return chooseGoOrStop(round, 'stop');
+    const hand = round.players[round.turn].hand;
+    const months = Array.from(new Set(hand.map((item) => item.month)));
+    const bomb = months.find((month) => hand.filter((item) => item.month === month).length === 3
+      && round.floor.filter((item) => item.month === month).length === 1);
+    if (bomb !== undefined) return playGoStopBomb(round, bomb);
+    const played = chooseComputerGoStopCard(round);
+    // 낸 패를 처리한 뒤의 바닥에서 뒤집은 패의 짝을 고릅니다. 화면이 하는 것과 같습니다.
+    const matches = round.floor.filter((item) => item.month === played.month);
+    const playedMatchId = firstMatchId(round.floor, played.month);
+    const afterPlay = matches.length === 0 ? [...round.floor, played]
+      : matches.length === 1 ? round.floor.filter((item) => item.id !== matches[0].id)
+      : matches.length === 2 ? round.floor.filter((item) => item.id !== playedMatchId)
+      : round.floor.filter((item) => item.month !== played.month);
+    const drawn = round.deck.find((item) => !item.bonus);
+    return playGoStopTurn(round, played.id, { playedMatchId, drawnMatchId: drawn ? firstMatchId(afterPlay, drawn.month) : undefined });
+  };
+  for (let game = 0; game < 300; game += 1) {
+    let round = dealGoStop('gostop');
+    let turns = 0;
+    while (!round.finished) {
+      const next = step(round);
+      assert.notEqual(next, round, `판이 멈췄습니다 · 차례 ${round.turn} · 손패 ${round.players[round.turn].hand.length}장`);
+      round = next;
+      turns += 1;
+      assert.equal(turns < 400, true, '판이 끝나지 않습니다');
+    }
+  }
+});
+
+test('폭탄 뒤 뒤집은 패가 바닥 두 장과 맞아도 판이 멈추지 않는다', () => {
+  // 2026-08-30에 실제로 터진 것입니다. 고를 패를 안 주면 예외가 나서 화면이 통째로 멈췄습니다.
+  const month = deck.filter((item) => item.month === 6);
+  const nine = deck.filter((item) => item.month === 9);
+  const round = roundFor(month.slice(0, 3), [month[3], nine[0], nine[1]], [nine[2]]);
+  const next = playGoStopBomb(round, 6);
+  assert.equal(next.lastEvents?.includes('폭탄'), true);
+  // 뒤집은 9월 패는 바닥 두 장 가운데 첫 장을 가져갑니다.
+  assert.equal(next.players[0].captured.filter((item) => item.month === 9).length, 2);
+  assert.equal(next.floor.filter((item) => item.month === 9).length, 1);
+});
+
+test('폭탄으로 손이 빈 사람은 차례를 건너뛴다', () => {
+  // 폭탄은 한 번에 세 장을 내므로 그 사람만 먼저 손이 빕니다.
+  // 빈손에 차례를 주면 낼 패가 없어 판이 그 자리에서 멈춥니다.
+  const month = deck.filter((item) => item.month === 6);
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: month.slice(0, 3), captured: [], goCount: 0 },
+      { hand: [], captured: [], goCount: 0 },
+      { hand: [card(2, '띠'), card(3, '피')], captured: [], goCount: 0 },
+    ],
+    floor: [month[3]], deck: [card(11, '광'), card(12, '피')], turn: 0, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopBomb(round, 6);
+  assert.equal(next.players[0].hand.length, 0);
+  assert.equal(next.finished, false);
+  // 1번은 손이 비었으므로 건너뛰고 패가 남은 2번에게 갑니다.
+  assert.equal(next.turn, 2);
+  assert.equal(next.players[next.turn].hand.length > 0, true);
 });
 
 test('폭탄은 손의 같은 월 세 장과 바닥 한 장을 모두 먹는다', () => {
