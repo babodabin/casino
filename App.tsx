@@ -4175,7 +4175,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
       <View style={styles.goStopActionArea}>
         {round.turn!==0&&!round.finished?<View style={styles.goStopTurnBox}>
-          {lastPlayed?<><Text style={styles.goStopMessage}>컴퓨터 {lastPlayed.who}이(가) 낸 패</Text>
+          {lastPlayed?<><Text style={styles.goStopMessage}>컴퓨터 {lastPlayed.who} · 방금 낸 패</Text>
             <HwatuCardView card={lastPlayed.card} size="small"/></>:null}
           <Pressable style={styles.goStopButton} onPress={runComputerStep}><Text style={styles.primaryButtonText}>컴퓨터 {round.turn} 차례 · 눌러서 진행</Text></Pressable>
         </View>:pendingPlay?<>
