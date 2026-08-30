@@ -4209,30 +4209,26 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
           const drawnHit=drawn?round.floor.filter((item)=>item.month===drawn.month):[];
           // 이번 차례에 실제로 가져간 패입니다. 판이 넘어가기 전과 뒤를 견줘서 구합니다.
           const had=new Set(round.players[slap.who].captured.map((card)=>card.id));
-          const took=slap.next.players[slap.who].captured.filter((card)=>!had.has(card.id));
+          const took=new Set(slap.next.players[slap.who].captured.filter((card)=>!had.has(card.id)).map((card)=>card.id));
           return <View style={styles.goStopSlapOverlay}>
             <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
                 <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop?1.28:1}]}]}>
-                  {hit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
+                  {hit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:null}><HwatuCardView card={card}/></View>)}
                   {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
-                  <View style={[styles.goStopSlapCard,hit.length?styles.goStopSlapOver:null]}><HwatuCardView card={slap.card}/></View>
+                  <View style={[hit.length?styles.goStopSlapOver:null,took.has(slap.card.id)?styles.goStopSlapTaken:null]}><HwatuCardView card={slap.card}/></View>
                 </View>
                 <Text style={styles.goStopSlapTag}>낸 패 · {slap.card.month}월</Text>
               </View>
               {drawn?<View style={styles.goStopSlapSide}>
                 <View style={styles.goStopSlapRow}>
-                  {drawnHit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
-                  <View style={[styles.goStopSlapCard,drawnHit.length?styles.goStopSlapOver:null]}><HwatuCardView card={drawn}/></View>
+                  {drawnHit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:null}><HwatuCardView card={card}/></View>)}
+                  <View style={[drawnHit.length?styles.goStopSlapOver:null,took.has(drawn.id)?styles.goStopSlapTaken:null]}><HwatuCardView card={drawn}/></View>
                 </View>
-                <Text style={styles.goStopSlapTag}>뒤집은 패 · {drawn.month}월</Text>
+                <Text style={styles.goStopSlapTag}>깐 패 · {drawn.month}월</Text>
               </View>:null}
             </View>
-            {took.length?<View style={styles.goStopSlapSide}>
-              <View style={styles.goStopSlapRow}>{took.map((card,index)=><View key={card.id} style={index?styles.goStopTakenOverlap:null}><HwatuCardView card={card} size="small"/></View>)}</View>
-              <Text style={styles.goStopSlapTook}>가져간 패 {took.length}장</Text>
-            </View>:<Text style={styles.goStopSlapTag}>가져간 패 없음 · 바닥에 놓습니다</Text>}
           </View>;
         })():null}
       </View>
@@ -7033,11 +7029,11 @@ const styles = StyleSheet.create({
   goStopSlapPair: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   goStopSlapSide: { alignItems: 'center', gap: 3 },
   goStopSlapTag: { color: '#9FC4B4', fontSize: 10, fontWeight: '800' },
-  goStopSlapTook: { color: '#FFD35F', fontSize: 11, fontWeight: '900' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
   goStopSlapOver: { marginLeft: -30, marginTop: 12, transform: [{ rotate: '8deg' }] },
   // 친 패에 금빛을 둘러 눈에 띄게 합니다.
-  goStopSlapCard: { borderRadius: 5, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 14, elevation: 12 },
+  // 이번에 가져가는 패에만 금테를 두릅니다. 무엇이 내 것이 되는지 이걸로 압니다.
+  goStopSlapTaken: { borderRadius: 5, borderWidth: 2, borderColor: colors.gold, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 14, elevation: 12 },
   goStopTakenOverlap: { marginLeft: -18 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
