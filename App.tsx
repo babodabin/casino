@@ -191,7 +191,6 @@ const gameCategories: GameCategory[] = [
     { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
     { name: '빅투', icon: '2♠', description: '손에 든 열세 장을 먼저 다 내려놓는 카드 게임', status: 'playable' },
     { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
-    { name: '공 어디에?', icon: '●', description: '빠르게 섞이는 컵 속 공의 위치를 찾는 게임', status: 'playable' },
   ]},
 ];
 
@@ -2782,12 +2781,12 @@ function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
 // 선수마다 반지름을 조금씩 다르게 줘서 서로 붙어 있어도 가려지지 않게 했습니다.
 /** 경륜장은 동그라미가 아니라 타원입니다. 가로로 길어야 한 바퀴가 길어져 오래 볼 수 있습니다. */
 const velodromeWidth = 344;
-const velodromeHeight = 250;
+const velodromeHeight = 424;
 const velodromeCenterX = velodromeWidth / 2;
 const velodromeCenterY = velodromeHeight / 2;
 /** 선수가 달리는 레인. 가로와 세로 반지름이 다릅니다. 안쪽 레인일수록 짧습니다. */
 const velodromeLaneOuterX = 150, velodromeLaneInnerX = 118;
-const velodromeLaneOuterY = 103, velodromeLaneInnerY = 71;
+const velodromeLaneOuterY = 190, velodromeLaneInnerY = 158;
 /** 선수 표시 크기. 트랙이 아니라 선수를 작게 해야 누가 앞선지 잘 보입니다. */
 const velodromeRiderSize = 20;
 
@@ -4047,8 +4046,12 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const [pendingPlay,setPendingPlay]=useState<HwatuCard|null>(null);
   const [carryMultiplier,setCarryMultiplier]=useState(1);
   const [lastOpponentCapture,setLastOpponentCapture]=useState<HwatuCard[]>([]);
-  /** 컴퓨터가 방금 낸 패. 무엇을 냈는지 보여 주려고 들고 있습니다. */
-  const [lastPlayed,setLastPlayed]=useState<{who:number;card:HwatuCard}|null>(null);
+  /**
+   * 방금 낸 패를 바닥의 맞은 패 위에 얹어 둔 상태입니다. 아직 가져가지 않았습니다.
+   * next에 계산은 끝나 있고, 한 번 더 눌러야 판에 반영합니다.
+   * 고스톱은 치는 맛이 재미인데 한 번에 처리하면 그게 안 보입니다.
+   */
+  const [slap,setSlap]=useState<{who:number;card:HwatuCard;next:GoStopRound}|null>(null);
   const title=mode==='matgo'?'맞고':'고스톱';
 
   const finish=(next:GoStopRound,force=false)=>{
@@ -4098,15 +4101,27 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(next===round)return;
     // 손에서 사라진 패가 방금 낸 패입니다. 뽑는 패는 손패에 들어오지 않으므로 이걸로 알 수 있습니다.
     const played=round.players[who].hand.find((card)=>!next.players[who].hand.some((left)=>left.id===card.id));
-    setLastPlayed(played?{who,card:played}:null);
+    // 패를 낸 차례면 치는 모습을 먼저 보여 줍니다. 폭탄이나 고·스톱 결정이면 바로 넘어갑니다.
+    if(played){setSlap({who,card:played,next});return;}
     setLastOpponentCapture(next.players.slice(1).flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
+    setRound(next);
+    if(next.finished)finish(next);
+  };
+
+  /** 얹어 둔 패를 실제로 가져갑니다. 이때 판이 넘어갑니다. */
+  const takeSlap=()=>{
+    if(!round||!slap)return;
+    const before=new Set(round.players.flatMap((player)=>player.captured.map((card)=>card.id)));
+    const next=slap.next;
+    setLastOpponentCapture(next.players.flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
+    setSlap(null);
     setRound(next);
     if(next.finished)finish(next);
   };
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
-    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setLastOpponentCapture([]);setLastPlayed(null);
+    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setLastOpponentCapture([]);setSlap(null);
     if(next.finished)finish(next,true);
   };
   const play=(card:HwatuCard,selectedMatchId?:string)=>{
@@ -4115,8 +4130,9 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(matches.length===2&&!selectedMatchId){setPendingPlay(card);return;}
     const next=playGoStopTurn(round,card.id,automaticGoStopChoice(round,card,selectedMatchId));
     setPendingPlay(null);
-    setLastOpponentCapture([]);setLastPlayed(null);
-    setRound(next);if(next.finished)finish(next);
+    setLastOpponentCapture([]);
+    // 내가 낸 것도 바닥에 얹은 모습을 먼저 보여 줍니다.
+    setSlap({who:0,card,next});
   };
   const bomb=(month:number)=>{
     if(!round||round.turn!==0||round.pendingDecision===0)return;
@@ -4174,10 +4190,19 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?{marginLeft:handStep-52}:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
 
       <View style={styles.goStopActionArea}>
-        {round.turn!==0&&!round.finished?<View style={styles.goStopTurnBox}>
-          {lastPlayed?<><Text style={styles.goStopMessage}>컴퓨터 {lastPlayed.who} · 방금 낸 패</Text>
-            <HwatuCardView card={lastPlayed.card} size="small"/></>:null}
-          <Pressable style={styles.goStopButton} onPress={runComputerStep}><Text style={styles.primaryButtonText}>컴퓨터 {round.turn} 차례 · 눌러서 진행</Text></Pressable>
+        {slap?(()=>{
+          const hit=round.floor.filter((item)=>item.month===slap.card.month);
+          return <View style={styles.goStopTurnBox}>
+            <Text style={styles.goStopMessage}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`} · {slap.card.month}월</Text>
+            <View style={styles.goStopSlapRow}>
+              {hit.map((card)=><View key={card.id}><HwatuCardView card={card} size="small"/></View>)}
+              {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
+              <View style={hit.length?styles.goStopSlapOver:null}><HwatuCardView card={slap.card} size="small"/></View>
+            </View>
+            <Pressable style={styles.goStopButton} onPress={takeSlap}><Text style={styles.primaryButtonText}>{hit.length?'가져가기':'바닥에 놓기'}</Text></Pressable>
+          </View>;
+        })():round.turn!==0&&!round.finished?<View style={styles.goStopTurnBox}>
+          <Pressable style={styles.goStopButton} onPress={runComputerStep}><Text style={styles.primaryButtonText}>컴퓨터 {round.turn} 차례 · 눌러서 보기</Text></Pressable>
         </View>:pendingPlay?<>
           <Text style={styles.goStopMessage}>{pendingPlay.month}월 바닥 패가 두 장입니다 · 가져갈 패를 고르세요</Text>
           <View style={styles.goStopChoiceRow}>{round.floor.filter((item)=>item.month===pendingPlay.month).map((card)=><Pressable key={card.id} onPress={()=>play(pendingPlay,card.id)}><HwatuCardView card={card} size="small"/></Pressable>)}
@@ -6250,8 +6275,8 @@ const styles = StyleSheet.create({
   cycleTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2' },
   // 원형 벨로드롬. 바깥 테두리가 관중석 난간, 안쪽 원이 인필드입니다.
   velodromeWrap: { width: '100%', alignItems: 'center', gap: 12 },
-  velodrome: { width: '100%', maxWidth: 344, height: 250, borderRadius: 125, backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2', alignItems: 'center', justifyContent: 'center' },
-  velodromeInfield: { width: 196, height: 92, borderRadius: 46, backgroundColor: '#1B3D53', borderWidth: 2, borderColor: '#4B7C9C', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  velodrome: { width: '100%', maxWidth: 344, height: 424, borderRadius: 172, backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2', alignItems: 'center', justifyContent: 'center' },
+  velodromeInfield: { width: 190, height: 254, borderRadius: 95, backgroundColor: '#1B3D53', borderWidth: 2, borderColor: '#4B7C9C', alignItems: 'center', justifyContent: 'center', gap: 2 },
   velodromeInfieldTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeInfieldSub: { color: '#9FC4DC', fontSize: 12, fontWeight: '700' },
   // 결승선은 12시 방향입니다. 선수도 여기서 출발해 한 바퀴 돌아 여기로 돌아옵니다.
@@ -6941,9 +6966,9 @@ const styles = StyleSheet.create({
   // 화투도 마찬가지로 담요 위에서 하지 초록 펠트가 아닙니다.
   hwatuHand: { flexDirection: 'row', flexWrap:'wrap', gap: 3, justifyContent: 'center', marginVertical: 6 },
   // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
-  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0E5636' },
+  goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0E5636', justifyContent: 'space-between' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
-  goStopSeat: { flex: 1, padding: 5, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 3, overflow: 'hidden' },
+  goStopSeat: { flex: 1, minHeight: 130, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
   goStopSeatActive: { borderColor: colors.gold },
   goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
@@ -6954,9 +6979,12 @@ const styles = StyleSheet.create({
   goStopTakenRow: { flexDirection: 'row', flexWrap: 'wrap', minHeight: 46, alignItems: 'center', gap: 8 },
   goStopTakenGroup: { flexDirection: 'row' },
   goStopTurnBox: { alignItems: 'center', gap: 6 },
+  goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
+  // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
+  goStopSlapOver: { marginLeft: -24, marginTop: 10, transform: [{ rotate: '7deg' }] },
   goStopTakenOverlap: { marginLeft: -18 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
-  goStopFloorArea: { flex: 1, justifyContent: 'center', maxHeight: 250 },
+  goStopFloorArea: { flex: 1, justifyContent: 'center' },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 80, alignItems: 'center' },
   goStopActionArea: { gap: 4 },
   goStopButtonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
