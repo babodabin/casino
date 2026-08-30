@@ -1308,6 +1308,49 @@ function useReveal() {
   };
 }
 
+/**
+ * 카드가 한 장씩 깔리는 간격. **내 카드는 천천히, 남의 카드는 빠르게**입니다.
+ * 내 카드는 눈으로 읽어야 하지만 남의 카드는 뒷면이라 읽을 것이 없습니다.
+ * ⚠️ 사람이 늘면 기다림이 곱해집니다. 네 명 판 첫 거리가 3×200 + 9×100 = 1.5초입니다.
+ */
+const DEAL_MINE_MS = 200;
+const DEAL_THEIRS_MS = 100;
+
+/**
+ * 카드를 한 장씩 깔아 놓는 상태. **게임마다 따로 만들지 않으려고 여기 하나만 둡니다.**
+ *
+ * 지금까지는 상태를 한 번에 바꿔서 카드가 눈에 안 보이게 순식간에 나타났습니다.
+ * 이 도구는 목표 장수(`target`)까지 한 장씩 채웁니다. 자리 수만큼 **돌아가며** 한 장씩
+ * 놓으므로 실제로 딜러가 나눠 주는 것처럼 보입니다(0번 자리가 나).
+ *
+ * - `countFor(seat)` — 그 자리에 지금 몇 장이 놓였는지. 화면은 이 수만큼만 그립니다
+ * - `dealing` — 아직 나눠 주는 중인지. **컴퓨터 차례와 내 차례를 이때는 막아야** 합니다.
+ *   안 막으면 카드가 깔리는 중에 컴퓨터가 먼저 두어 버립니다
+ *
+ * `deal`에는 판마다 새로 만들어지는 것(대개 `hands` 배열)을 넘깁니다. 그것이 바뀌면
+ * 처음부터 다시 나눠 줍니다. 장수만 보고 판단하면 같은 장수로 새 판을 시작할 때(홀덤은 늘
+ * 두 장입니다) 다시 안 깔립니다.
+ */
+function useTableDeal(deal: unknown, seats: number, target: number) {
+  const [laid, setLaid] = useState(0);
+  const dealt = useRef(deal);
+  const total = Math.max(0, seats * Math.max(0, target));
+  let now = laid;
+  // 새 판이면 그리기 전에 0으로 되돌립니다. 효과에서 되돌리면 다 깔린 판이 한 번 번쩍입니다.
+  if (dealt.current !== deal) { dealt.current = deal; now = 0; if (laid !== 0) setLaid(0); }
+  now = Math.min(now, total);
+  useEffect(() => {
+    if (laid >= total) return;
+    // 다음 장을 받을 자리. 0번이 나라서 내 카드만 천천히 놓입니다.
+    const timer = setTimeout(() => setLaid((value) => Math.min(total, value + 1)), laid % seats === 0 ? DEAL_MINE_MS : DEAL_THEIRS_MS);
+    return () => clearTimeout(timer);
+  }, [laid, total, seats]);
+  return {
+    dealing: now < total,
+    countFor: (seat: number) => Math.min(target, Math.floor(now / seats) + (now % seats > seat ? 1 : 0)),
+  };
+}
+
 /** 비디오 포커에서 바꾸는 카드가 좌우로 도는 시간. 네 번 돌고 멈춥니다. */
 const VIDEO_POKER_FLIP_MS = 820;
 
@@ -3090,6 +3133,10 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
   const seatActions=useSeatActions();
   const stacks=useSeatStacks(players,selectedBet);
   const [pending,setPending]=useState<{round:TableRound;winners:number[]}|null>(null);
+  // 거리마다 늘어나는 장수. 대기 0 · 첫 거리 3장에서 한 장씩 늘어 마지막에 7장입니다.
+  const dealTarget=street===0?0:street===5?7:Math.min(7,street+2);
+  const deal=useTableDeal(hands,players,dealTarget);
+  const dealing=deal.dealing;
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
@@ -3122,9 +3169,9 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     startShowdown(done,dealt);
   };
 
-  // 컴퓨터 차례는 한 박자 쉬고 저절로 둡니다.
+  // 컴퓨터 차례는 한 박자 쉬고 저절로 둡니다. 카드가 다 깔리기 전에는 기다립니다.
   useEffect(()=>{
-    if(!round||!hands||round.closed||round.actor<=0)return;
+    if(!round||!hands||round.closed||round.actor<=0||dealing)return;
     const seat=round.actor;
     const timer=setTimeout(()=>{
       const visible=Math.min(7,street+2);
@@ -3140,7 +3187,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
       if(next.closed)advance(next,hands); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
-  },[round,hands,street]);
+  },[round,hands,street,dealing]);
 
   /** 컴퓨터가 덮어 둔 세 장(첫 두 장과 마지막 장)을 한 번에 다 엽니다. */
   const openHidden=()=>{
@@ -3157,7 +3204,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     setPending(null);
   };
 
-  const myTurn=!!round&&!round.closed&&round.actor===0&&street>=1&&street<=4;
+  const myTurn=!!round&&!round.closed&&round.actor===0&&street>=1&&street<=4&&!dealing;
   // 판이 도는 중에는 시작 버튼을 잠급니다. 안 그러면 컴퓨터 차례에 눌러 판이 새로 시작됩니다.
   const busy=street>=1&&street<=4;
   const toCall=round?tableToCall(round,0):0;
@@ -3171,8 +3218,6 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
     if(next.closed)advance(next,hands); else setRound(next);
   };
 
-  const visible=street===0?0:street===5&&!pending&&!winners?.includes(0)&&!hands?7:Math.min(7,street+2);
-  const shown=street===5?7:visible;
   // 비공개 카드는 첫 두 장과 마지막 장입니다. 이 순서로 한 장씩 열립니다.
   const hiddenOrder=[0,1,6];
   const openedHidden=(index:number)=>hiddenOrder.indexOf(index)<reveal.opened;
@@ -3186,7 +3231,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
   const seatCards=(seat:number,spot:TableSpot)=>{
     if(!hands||!round)return null;
     const folded=round.seats[seat].folded;
-    const count=street===5&&!pending&&winners&&!winners.includes(seat)&&folded?0:shown;
+    const count=street===5&&!pending&&winners&&!winners.includes(seat)&&folded?0:deal.countFor(seat);
     const side=spot==='left'||spot==='right';
     return hands[seat].slice(0,count).map((card,index)=>{
       const privateCard=index<2||index===6;
@@ -3267,6 +3312,10 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
   const seatActions=useSeatActions();
   const stacks=useSeatStacks(players,selectedBet);
   const [pending,setPending]=useState<{round:TableRound;table:HighLowTableResult}|null>(null);
+  // 세븐 포커와 같습니다. 대기 0 · 첫 거리 3장에서 한 장씩 늘어 마지막에 7장.
+  const dealTarget=street===0?0:street===5?7:Math.min(7,street+2);
+  const deal=useTableDeal(hands,players,dealTarget);
+  const dealing=deal.dealing;
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
@@ -3293,8 +3342,9 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     setPending({round:done,table:result});
   };
 
+  // 카드가 다 깔리기 전에는 컴퓨터도 기다립니다.
   useEffect(()=>{
-    if(!round||!hands||round.closed||round.actor<=0)return;
+    if(!round||!hands||round.closed||round.actor<=0||dealing)return;
     const seat=round.actor;
     const timer=setTimeout(()=>{
       const visible=Math.min(7,street+2);
@@ -3310,7 +3360,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
       if(next.closed)advance(next,hands); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
-  },[round,hands,street]);
+  },[round,hands,street,dealing]);
 
   /** 컴퓨터가 덮어 둔 세 장을 한 번에 다 엽니다. */
   const openHidden=()=>{
@@ -3327,7 +3377,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     setPending(null);
   };
 
-  const myTurn=!!round&&!round.closed&&round.actor===0&&street>=1&&street<=4;
+  const myTurn=!!round&&!round.closed&&round.actor===0&&street>=1&&street<=4&&!dealing;
   // 판이 도는 중에는 시작 버튼을 잠급니다. 안 그러면 컴퓨터 차례에 눌러 판이 새로 시작됩니다.
   const busy=street>=1&&street<=4;
   const toCall=round?tableToCall(round,0):0;
@@ -3341,7 +3391,6 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
     if(next.closed)advance(next,hands); else setRound(next);
   };
 
-  const shown=street===5?7:Math.min(7,street+2);
   const hiddenOrder=[0,1,6];
   const openedHidden=(index:number)=>hiddenOrder.indexOf(index)<reveal.opened;
   const wonSomething=(seat:number)=>!!table&&table.shares[seat]>0;
@@ -3366,7 +3415,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
           :label?<Text style={styles.tableSeatWinner}>{label} 승</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{hands[seat].slice(0,info.folded&&table?0:shown).map((card,index)=>{
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{hands[seat].slice(0,info.folded&&table?0:deal.countFor(seat)).map((card,index)=>{
         const privateCard=index<2||index===6;
         const hide=seat!==0&&privateCard&&!(street===5&&openedHidden(index)&&!info.folded);
         return <View key={card.id} style={[styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,
@@ -3546,6 +3595,10 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
   const [dealt,setDealt]=useState(0);
   const seatActions=useSeatActions();
   const stacks=useSeatStacks(players,selectedBet);
+  // 개인 카드는 프리플랍에 한 번만 깔립니다(홀덤 두 장 · 오마하 넉 장).
+  // 공용 카드는 여기 안 넣습니다 — 플랍·턴·리버는 눌러서 여는 것이 원래 규칙입니다.
+  const deal=useTableDeal(hands,players,hands?(omaha?4:2):0);
+  const dealing=deal.dealing;
 
   const shownFor=(value:number)=>value===1?0:value===2?3:value===3?4:5;
   const boardTarget=stage>=1&&stage<=4?shownFor(stage):5;
@@ -3588,9 +3641,9 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
     finishShowdown(done,hands,community);
   };
 
-  // 컴퓨터 차례는 한 박자 쉬고 저절로 둡니다. 보드를 아직 안 열었으면 기다립니다.
+  // 컴퓨터 차례는 한 박자 쉬고 저절로 둡니다. 보드를 아직 안 열었거나 카드가 깔리는 중이면 기다립니다.
   useEffect(()=>{
-    if(!round||!hands||round.closed||round.actor<=0||needBoard)return;
+    if(!round||!hands||round.closed||round.actor<=0||needBoard||dealing)return;
     const seat=round.actor;
     const timer=setTimeout(()=>{
       const board=community.slice(0,shownFor(stage));
@@ -3604,9 +3657,9 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       if(next.closed)advance(next); else setRound(next);
     },TABLE_THINK_MS);
     return()=>clearTimeout(timer);
-  },[round,hands,stage,needBoard,community]);
+  },[round,hands,stage,needBoard,community,dealing]);
 
-  const myTurn=!!round&&!round.closed&&round.actor===0&&stage>=1&&stage<=4&&!needBoard;
+  const myTurn=!!round&&!round.closed&&round.actor===0&&stage>=1&&stage<=4&&!needBoard&&!dealing;
   // 판이 도는 중에는 시작 버튼을 잠급니다. 안 그러면 컴퓨터 차례에 눌러 판이 새로 시작됩니다.
   const busy=stage>=1&&stage<=4;
   const toCall=round?tableToCall(round,0):0;
@@ -3643,7 +3696,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
           :winners?.includes(seat)?<Text style={styles.tableSeatWinner}>승리</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine]}>{hands[seat].map((card,index)=>
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine]}>{hands[seat].slice(0,deal.countFor(seat)).map((card,index)=>
         <View key={card.id} style={index?(side?styles.tableCardStackDown:spot==='mine'?styles.tableMyCardOverlap:styles.tableTopCardOverlap):null}>
           <PlayingCard card={card} compact={spot==='mine'} tiny={spot!=='mine'} stacked={side} hidden={hide} emphasis={emphasis(card,seat)}/></View>)}</View>
       {seatActions.actions[seat]?<View pointerEvents="none" style={styles.tableSeatActionWrap}><Text style={styles.tableSeatActionText}>{seatActions.actions[seat]}</Text></View>:null}
