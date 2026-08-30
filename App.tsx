@@ -89,7 +89,7 @@ import { bigTwoMultiplier, bigTwoOpeningCard, bigTwoValue, bigTwoWinPayout, canB
 import { throwYut, throwYutSticks, yutDescription, yutMultiplier, yutOutcomes, yutPayout, yutProbability, type YutFace, type YutOutcome } from './src/yutbet';
 import { createShellRound, shellLayoutAfter, shellMultiplier, shellPayout, type ShellRound } from './src/shellgame';
 import { createFishField, fishEventText, fishRaceLaps, simulateFishRace, type FishRaceResult, type FishTicket, type RaceFish } from './src/fishrace';
-import { createFishRouletteField, fishPositionAt, fishRouletteBetDetails, fishRouletteBetLabels, fishRouletteCovers, fishRouletteMultiplier, fishRouletteOdds, fishRouletteSummary, fishRouletteWins, nextSlot, roundMs as fishRouletteRoundMs, slotAngle, slotCount as fishRouletteSlotCount, spinFishRoulette, type FishRouletteBet, type FishRouletteBetType, type FishRouletteResult } from './src/fishroulette';
+import { createFishRouletteField, fishPositionAt, fishRouletteBetDetails, fishRouletteBetLabels, fishRouletteCovers, fishRouletteMultiplier, fishRouletteOdds, fishRouletteSummary, fishRouletteWins, nextSlot, octopusPositionAt, roundMs as fishRouletteRoundMs, slotAngle, slotCount as fishRouletteSlotCount, spinFishRoulette, type FishRouletteBet, type FishRouletteBetType, type FishRouletteResult } from './src/fishroulette';
 import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
 import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
@@ -166,7 +166,7 @@ const gameCategories: GameCategory[] = [
     { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
     { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
     { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
-    { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
+    { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
   ]},
   { name: '딜러', icon: '◆', detail: '블랙잭 · 바카라 · 비디오 포커', eyebrow: 'DEALER GAMES', games: [
     { name: '블랙잭', icon: 'A♠', description: '카드 합계 21에 도전하는 테이블 게임', status: 'playable' },
@@ -1100,7 +1100,7 @@ function CasinoApp() {
         {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
         {appScreen === 'fishingSetup' && <SimpleSetupScreen title="스크린낚시 준비" hero="🎣 바다" lead="던지고 · 기다리고 · 챔질하고 · 건져 올리기" rules={['1. 갯바위 · 방파제 · 먼바다 중 한 곳을 고릅니다. 깊을수록 큰 고기가 나오지만 어렵습니다.','2. 던진 뒤 찌를 보다가 입질이 오면 곧바로 챔질을 누릅니다. 너무 이르거나 늦으면 놓칩니다.','3. 챔질에 성공하면 릴 싸움입니다. 감기로 당겨 오고, 줄이 팽팽하면 버티기로 늦춥니다.','4. 장력이 끝까지 차면 줄이 끊어져 한 푼도 못 받습니다.','5. 불가사리 · 복어 · 해파리도 뭅니다. 잡아도 값이 안 나갑니다.']} startLabel="바다로 나가기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishingGame')}/>}
         {appScreen === 'fishingGame' && <ScreenFishingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishingSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('스크린낚시',stake,multiplier,detail)}/>}
-        {appScreen === 'fishRouletteSetup' && <SimpleSetupScreen title="물고기 룰렛 준비" hero="🐟 ① ~ ⑫" lead="열두 마리가 어느 자리로 들어가는지 지켜봅니다" rules={["1. 둥근 바다 둘레에 자리 12곳이 있습니다. 시작하면 물고기 12마리를 풀어 놓습니다.","2. 물고기는 헤엄쳐 다니다 자리 하나로 들어갑니다. 한 번 들어가면 다시 안 나옵니다.","3. 20초가 지나면 판이 끝납니다. 그때까지 못 들어간 물고기는 세지 않습니다.","4. 먼저 · 많이 · 없음 · 이웃 두 자리 · 홀짝 · 앞뒤 절반 중에 골라 겁니다.","5. 많이에서 같은 마릿수면 먼저 받은 자리가 이깁니다. 그래서 동점이 안 생깁니다."]} startLabel="바다에 물고기 풀기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishRouletteGame')}/>}
+        {appScreen === 'fishRouletteSetup' && <SimpleSetupScreen title="물고기 룰렛 준비" hero="🐟 ① ~ ⑫" lead="열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜봅니다" rules={["1. 둥근 바다 둘레에 자리 12곳이 있습니다. 시작하면 물고기 12마리와 문어 한 마리를 풀어 놓습니다.","2. 물고기는 헤엄쳐 다니다 자리 하나로 들어갑니다. 한 번 들어가면 다시 안 나옵니다.","3. 문어는 느립니다. 앉은 자리와 시계 방향 옆 칸까지 두 칸을 막고, 그 두 칸에는 물고기가 못 들어갑니다.","4. 20초가 지나면 판이 끝납니다. 그때까지 못 들어간 물고기와 문어는 세지 않습니다.","5. 먼저 · 많이 · 없음 · 이웃 두 자리 · 문어 자리 · 홀짝 · 앞뒤 절반 중에 골라 겁니다.","6. 많이에서 같은 마릿수면 먼저 받은 자리가 이깁니다. 그래서 동점이 안 생깁니다."]} startLabel="바다에 물고기 풀기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishRouletteGame')}/>}
         {appScreen === 'fishRouletteGame' && <FishRouletteGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishRouletteSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('물고기 룰렛',stake,multiplier,detail)}/>}
         {appScreen === 'predictSportsSetup' && <SimpleSetupScreen title="예측 마켓 · 스포츠 준비" hero="YES · NO" lead="이미 끝난 실제 경기의 승패를 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 경기입니다.','2. 축구·테니스·야구처럼 승패가 이미 갈린 경기가 나옵니다. 예인지 아니오인지 고르세요.','3. 배당은 그 경기가 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictSportsGame')}/>}
         {appScreen === 'predictSportsGame' && <PredictGameScreen group="스포츠" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSportsSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 스포츠',stake,multiplier,detail)}/>}
@@ -5429,19 +5429,32 @@ function objectParticle(word:string){
 
 // 스크린낚시. 오락실 낚시 기계처럼 던지기 → 입질 → 챔질 → 릴 싸움으로 이어집니다.
 // 판정은 전부 src/screenfishing.ts에 있고 이 화면은 누른 시각과 상태만 다룹니다.
-/** 판 크기. 아이폰 세로 폭(375 - 좌우 여백 28)에 들어가야 합니다. */
+/**
+ * 자리를 잡는 데 쓰는 네모 틀입니다. **눈에 보이는 원이 아닙니다.**
+ * 아이폰 세로 폭(375 - 좌우 여백 28 = 347) 안에 들어가야 합니다.
+ * 보이는 원은 물 하나뿐이고 자리 12곳은 그 바깥에 붙습니다.
+ */
 const fishRouletteBoard = 320;
 const fishRouletteCenter = fishRouletteBoard / 2;
-/** 자리 12곳이 놓이는 둘레. 판 가장자리에 붙여 원을 크게 씁니다. */
-const fishRouletteRing = 134;
+/** 보이는 원 — 물. 지름 248(반지름 124)이고 자리 안쪽 지름과 맞춰 두었습니다. */
+const fishRouletteWaterSize = 248;
 /**
- * 물고기가 자리로 들어갔을 때 서는 둘레. **자리보다 안쪽입니다.**
- * 예전에는 자리 바깥에 세웠는데 그러면 원이 둘로 보였습니다. 안쪽에 모이게 하면
- * 원은 하나로 보이고 자리 번호와 마릿수도 안 가립니다.
+ * 자리 12곳의 둘레. **물 바깥입니다.**
+ * 반지름 140에 지름 36짜리 자리를 놓으면 안쪽 끝이 122라 물 테두리(124)에 2만큼 물립니다.
+ * 바깥 끝은 158이라 틀(160) 안에 들어옵니다. 이 셋 중 하나를 바꾸면 나머지도 같이 봐야 합니다.
  */
-const fishRouletteFishRing = 106;
+const fishRouletteRing = 140;
+/**
+ * 물고기가 자리로 들어갔을 때 서는 둘레. **물 테두리에 걸칩니다.**
+ * 118에 지름 22로 서면 바깥 끝이 129라 물(124)을 조금 넘어 자리 밑에 파고듭니다.
+ * 자리 번호는 140에 있어 안 가립니다. 헤엄치는 동안에는 이 값의 0.46~0.70(54~83)이라
+ * 물 안에서만 돕니다.
+ */
+const fishRouletteFishRing = 118;
 const fishRouletteSlotSize = 36;
 const fishRouletteFishSize = 22;
+/** 문어는 큰 놈이라 보통 물고기보다 크게 그립니다. 자리 두 칸 사이(약 37)에 겨우 들어갑니다. */
+const fishRouletteOctopusSize = 34;
 
 /** 각도(도)와 중심에서의 거리로 판 위의 자리를 잡습니다. Velodrome과 같은 방식입니다. */
 const fishRoulettePoint = (angle: number, radius: number, size: number) => {
@@ -5449,13 +5462,13 @@ const fishRoulettePoint = (angle: number, radius: number, size: number) => {
   return { left: fishRouletteCenter + Math.cos(radian) * radius - size / 2, top: fishRouletteCenter + Math.sin(radian) * radius - size / 2 };
 };
 
-const fishRouletteBetTypes: FishRouletteBetType[] = ['first', 'most', 'none', 'neighbour', 'parity', 'half'];
+const fishRouletteBetTypes: FishRouletteBetType[] = ['first', 'most', 'none', 'neighbour', 'octopus', 'parity', 'half'];
 const fishRouletteSlots = Array.from({ length: fishRouletteSlotCount }, (_, index) => index + 1);
 /** 무엇에 걸었는지 한 마디로. 경주권과 기록에 씁니다. */
 const fishRoulettePick = (bet: FishRouletteBet): string =>
   bet.type === 'parity' ? (bet.parity === 'odd' ? '홀' : '짝')
   : bet.type === 'half' ? (bet.half === 'front' ? '앞 1~6' : '뒤 7~12')
-  : bet.type === 'neighbour' ? `${bet.slot}·${nextSlot(bet.slot)}번`
+  : bet.type === 'neighbour' || bet.type === 'octopus' ? `${bet.slot}·${nextSlot(bet.slot)}번`
   : `${bet.slot}번`;
 
 function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
@@ -5482,6 +5495,7 @@ function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
       case 'most':return {type:'most',slot};
       case 'none':return {type:'none',slot};
       case 'neighbour':return {type:'neighbour',slot};
+      case 'octopus':return {type:'octopus',slot};
       default:return {type:'first',slot};
     }
   },[betType,slot,parity,half]);
@@ -5515,6 +5529,13 @@ function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
   const counts=fishRouletteSlots.map(item=>entered.filter(fish=>fish.slot===item).length);
   const left=Math.max(0,Math.ceil((fishRouletteRoundMs-elapsed)/1000));
   const won=phase==='finished'&&result&&ticket?fishRouletteWins(ticket.bet,result):false;
+  // 문어. 판이 없으면 베팅 중이라 혼자 맴돕니다.
+  const octoAt=result?octopusPositionAt(result.octopus,elapsed):null;
+  const octoSpot=octoAt
+    ?fishRoulettePoint(octoAt.angle,octoAt.radius*fishRouletteFishRing,fishRouletteOctopusSize)
+    :fishRoulettePoint(tick*0.8,0.62*fishRouletteFishRing,fishRouletteOctopusSize);
+  // 막힌 두 칸은 **문어가 앉은 뒤에만** 보여 줍니다. 미리 칠하면 '문어 자리'의 답이 새 나갑니다.
+  const blocked=octoAt?.settled&&result?result.blocked:[];
 
   return <View style={styles.fishRouletteScreen}><ScreenHeader title="물고기 룰렛" onBack={onBack}/><View style={styles.fixedTableArea}>
     <View style={styles.rouletteStatusRow}>
@@ -5533,9 +5554,10 @@ function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
         const spot=fishRoulettePoint(slotAngle(item),fishRouletteRing,fishRouletteSlotSize);
         const count=counts[item-1];
         const isFirst=phase!=='betting'&&entered.length>0&&entered[0].slot===item;
-        return <View key={item} style={[styles.fishRouletteSlot,spot,count>0&&styles.fishRouletteSlotFilled,isFirst&&styles.fishRouletteSlotFirst,covered.includes(item)&&styles.fishRouletteSlotPicked]}>
+        const shut=blocked.includes(item);
+        return <View key={item} style={[styles.fishRouletteSlot,spot,count>0&&styles.fishRouletteSlotFilled,shut&&styles.fishRouletteSlotBlocked,isFirst&&styles.fishRouletteSlotFirst,covered.includes(item)&&styles.fishRouletteSlotPicked]}>
           <Text style={styles.fishRouletteSlotNumber}>{item}</Text>
-          <Text style={styles.fishRouletteSlotCount}>{count>0?`${count}마리`:''}</Text>
+          <Text style={[styles.fishRouletteSlotCount,shut&&styles.fishRouletteSlotShutText]}>{shut?'문어':count>0?`${count}마리`:''}</Text>
         </View>;
       })}
 
@@ -5549,6 +5571,9 @@ function FishRouletteGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{
         const spot=fishRoulettePoint(index*30+tick*1.1,(0.55+Math.sin(tick*0.3+index)*0.05)*fishRouletteFishRing,fishRouletteFishSize);
         return <Text key={fish.id} style={[styles.fishRouletteFish,spot,{color:fish.color}]}>{fish.emoji}</Text>;
       })}
+
+      {/* 문어. 자리 두 칸 한가운데로 들어가 앉고, 시간 안에 못 앉으면 흐려집니다. */}
+      <Text style={[styles.fishRouletteOctopus,octoSpot,octoAt?.settled&&styles.fishRouletteOctopusSettled,phase==='finished'&&octoAt&&!octoAt.settled&&styles.fishRouletteFishMissed]}>🐙</Text>
     </View></View>
 
     {phase==='betting'?<View style={styles.fishRouletteBetArea}>
@@ -7404,25 +7429,32 @@ const styles = StyleSheet.create({
   fishWeedText: { fontSize: 15, opacity: .5 },
   fishRouletteScreen: { flex: 1, backgroundColor: '#06202E' },
   fishRouletteBoardWrap: { width: '100%', alignItems: 'center' },
-  fishRouletteBoard: { width: fishRouletteBoard, height: fishRouletteBoard, borderRadius: fishRouletteCenter, backgroundColor: '#0A3247', borderWidth: 3, borderColor: '#1D5875', alignItems: 'center', justifyContent: 'center' },
-  // 물고기가 헤엄치는 안쪽 바다. 자리 12곳은 이 밖에 둘러 놓습니다.
-  // 자리 안쪽을 꽉 채웁니다. 작게 두면 자리와 물 사이에 틈이 생겨 원이 둘로 보입니다.
-  fishRouletteWater: { width: 232, height: 232, borderRadius: 116, backgroundColor: '#0E4A68', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  // 자리를 잡는 틀입니다. **아무것도 그리지 않습니다.**
+  // 예전에는 여기에 남색 판을 깔았는데 물과 겹쳐 원이 둘로 보였습니다.
+  fishRouletteBoard: { width: fishRouletteBoard, height: fishRouletteBoard, alignItems: 'center', justifyContent: 'center' },
+  // 보이는 원은 이것 하나뿐입니다. 물고기는 이 안에서만 헤엄치고 자리 12곳은 이 밖에 붙습니다.
+  fishRouletteWater: { width: fishRouletteWaterSize, height: fishRouletteWaterSize, borderRadius: fishRouletteWaterSize / 2, backgroundColor: '#0E4A68', borderWidth: 3, borderColor: '#1D5875', alignItems: 'center', justifyContent: 'center', gap: 2 },
   fishRouletteWaterTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
   fishRouletteWaterSub: { color: '#9FC4DC', fontSize: 12, fontWeight: '700' },
   fishRouletteSlot: { position: 'absolute', width: fishRouletteSlotSize, height: fishRouletteSlotSize, borderRadius: fishRouletteSlotSize / 2, backgroundColor: '#062432', borderWidth: 2, borderColor: '#2A7396', alignItems: 'center', justifyContent: 'center' },
   // 물고기를 받은 자리는 밝아지고, 제일 먼저 받은 자리는 흰 테로 표시합니다.
   fishRouletteSlotFilled: { backgroundColor: '#12617F', borderColor: '#7FD4EE' },
+  // 문어가 막은 두 칸. 물이 아니라 문어 색이라 한눈에 다른 칸으로 읽힙니다.
+  fishRouletteSlotBlocked: { backgroundColor: '#3B1F5E', borderColor: '#B78CF0' },
+  fishRouletteSlotShutText: { color: '#DCC2FF' },
   fishRouletteSlotFirst: { borderColor: '#FFFFFF', borderWidth: 3 },
   // 내가 건 자리는 금테입니다. 위 두 가지보다 뒤에 놓아 항상 이깁니다.
   fishRouletteSlotPicked: { borderColor: colors.gold, borderWidth: 3 },
   fishRouletteSlotNumber: { color: '#EAF4FA', fontSize: 14, fontWeight: '900', fontVariant: ['tabular-nums'] },
   fishRouletteSlotCount: { color: '#FFE28A', fontSize: 8, fontWeight: '800' },
   fishRouletteFish: { position: 'absolute', width: fishRouletteFishSize, height: fishRouletteFishSize, fontSize: 17, lineHeight: 22, textAlign: 'center' },
-  // 자리에 들어간 물고기는 자리 바깥 테두리에 조금 작게 붙어 있습니다.
+  // 자리에 들어간 물고기는 물 테두리에 조금 작게 붙어 있습니다.
   fishRouletteFishSettled: { fontSize: 14, opacity: 0.92 },
-  // 시간 안에 못 들어간 물고기. 안 세는 것이라 흐리게 둡니다.
+  // 시간 안에 못 들어간 물고기. 안 세는 것이라 흐리게 둡니다. 문어도 같이 씁니다.
   fishRouletteFishMissed: { opacity: 0.35 },
+  // 문어. 큰 놈이라 물고기보다 크게 그리고, 앉으면 두 칸 사이에 자리를 잡습니다.
+  fishRouletteOctopus: { position: 'absolute', width: fishRouletteOctopusSize, height: fishRouletteOctopusSize, fontSize: 26, lineHeight: 34, textAlign: 'center' },
+  fishRouletteOctopusSettled: { fontSize: 22, opacity: 0.95 },
   fishRouletteBetArea: { width: '100%', gap: 7 },
   fishRouletteTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   fishRouletteType: { flexGrow: 1, flexBasis: '30%', paddingVertical: 7, borderRadius: 11, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center', gap: 1 },
