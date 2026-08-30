@@ -4203,12 +4203,27 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
         <HwatuFloor cards={round.floor} deckCount={round.deck.length} compact/>
         {slap?(()=>{
           const hit=round.floor.filter((item)=>item.month===slap.card.month);
+          // 낸 패를 처리한 뒤 더미에서 한 장을 뒤집습니다. 그 패도 바닥을 칠 수 있습니다.
+          const drawn=round.deck[0];
+          const drawnHit=drawn?round.floor.filter((item)=>item.month===drawn.month&&item.month!==slap.card.month):[];
           return <View style={styles.goStopSlapOverlay}>
-            <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`} · {slap.card.month}월</Text>
-            <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop?1.28:1}]}]}>
-              {hit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
-              {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
-              <View style={[styles.goStopSlapCard,hit.length?styles.goStopSlapOver:null]}><HwatuCardView card={slap.card}/></View>
+            <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
+            <View style={styles.goStopSlapPair}>
+              <View style={styles.goStopSlapSide}>
+                <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop?1.28:1}]}]}>
+                  {hit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
+                  {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
+                  <View style={[styles.goStopSlapCard,hit.length?styles.goStopSlapOver:null]}><HwatuCardView card={slap.card}/></View>
+                </View>
+                <Text style={styles.goStopSlapTag}>낸 패 · {slap.card.month}월</Text>
+              </View>
+              {drawn?<View style={styles.goStopSlapSide}>
+                <View style={styles.goStopSlapRow}>
+                  {drawnHit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
+                  <View style={[styles.goStopSlapCard,drawnHit.length?styles.goStopSlapOver:null]}><HwatuCardView card={drawn}/></View>
+                </View>
+                <Text style={styles.goStopSlapTag}>뒤집은 패 · {drawn.month}월</Text>
+              </View>:null}
             </View>
           </View>;
         })():null}
@@ -4219,7 +4234,12 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       {takenRow(round.players[0].captured)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
-      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?{marginLeft:handStep-52}:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
+      {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
+      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=>{
+        const myTurn=round.turn===0&&!round.finished&&round.pendingDecision!==0&&!slap;
+        const canHit=myTurn&&round.floor.some((item)=>item.month===card.month);
+        return <Pressable key={card.id} style={[index?{marginLeft:handStep-52}:null,canHit&&styles.goStopHandHit]} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>;
+      })}</View>
 
       <View style={styles.goStopActionArea}>
         {pendingPlay?<>
@@ -7002,6 +7022,9 @@ const styles = StyleSheet.create({
   goStopSlapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4 },
   goStopSlapWho: { color: '#FFE9A8', fontSize: 13, fontWeight: '900' },
   goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
+  goStopSlapPair: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
+  goStopSlapSide: { alignItems: 'center', gap: 3 },
+  goStopSlapTag: { color: '#9FC4B4', fontSize: 10, fontWeight: '800' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
   goStopSlapOver: { marginLeft: -30, marginTop: 12, transform: [{ rotate: '8deg' }] },
   // 친 패에 금빛을 둘러 눈에 띄게 합니다.
@@ -7009,7 +7032,9 @@ const styles = StyleSheet.create({
   goStopTakenOverlap: { marginLeft: -18 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
-  goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 80, alignItems: 'center' },
+  goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 96, paddingTop: 14, alignItems: 'center' },
+  // 칠 수 있는 패는 살짝 들어 올리고 금빛을 둘러 눈에 띄게 합니다.
+  goStopHandHit: { transform: [{ translateY: -12 }], borderRadius: 5, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 10, elevation: 10 },
   goStopActionArea: { gap: 4 },
   goStopButtonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   goStopButton: { flex: 1, minWidth: 120, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#1D6B45', borderWidth: 1, borderColor: colors.gold },
