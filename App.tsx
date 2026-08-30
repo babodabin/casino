@@ -4045,7 +4045,6 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const [settled,setSettled]=useState(false);
   const [pendingPlay,setPendingPlay]=useState<HwatuCard|null>(null);
   const [carryMultiplier,setCarryMultiplier]=useState(1);
-  const [lastOpponentCapture,setLastOpponentCapture]=useState<HwatuCard[]>([]);
   /**
    * 방금 낸 패를 바닥의 맞은 패 위에 얹어 둔 상태입니다. 아직 가져가지 않았습니다.
    * next에 계산은 끝나 있고, 한 번 더 눌러야 판에 반영합니다.
@@ -4098,14 +4097,12 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const runComputerStep=()=>{
     if(!round||round.finished||round.turn===0)return;
     const who=round.turn;
-    const before=new Set(round.players.slice(1).flatMap((player)=>player.captured.map((card)=>card.id)));
     const next=stepComputer(round);
     if(next===round)return;
     // 손에서 사라진 패가 방금 낸 패입니다. 뽑는 패는 손패에 들어오지 않으므로 이걸로 알 수 있습니다.
     const played=round.players[who].hand.find((card)=>!next.players[who].hand.some((left)=>left.id===card.id));
     // 패를 낸 차례면 치는 모습을 먼저 보여 줍니다. 폭탄이나 고·스톱 결정이면 바로 넘어갑니다.
     if(played){setSlap({who,card:played,next});return;}
-    setLastOpponentCapture(next.players.slice(1).flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
     setRound(next);
     if(next.finished)finish(next);
   };
@@ -4130,9 +4127,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   /** 얹어 둔 패를 실제로 가져갑니다. 이때 판이 넘어갑니다. */
   const takeSlap=()=>{
     if(!round||!slap)return;
-    const before=new Set(round.players.flatMap((player)=>player.captured.map((card)=>card.id)));
     const next=slap.next;
-    setLastOpponentCapture(next.players.flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
     setSlap(null);
     setRound(next);
     if(next.finished)finish(next);
@@ -4140,7 +4135,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
-    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setLastOpponentCapture([]);setSlap(null);
+    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);
     if(next.finished)finish(next,true);
   };
   const play=(card:HwatuCard,selectedMatchId?:string)=>{
@@ -4149,7 +4144,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(matches.length===2&&!selectedMatchId){setPendingPlay(card);return;}
     const next=playGoStopTurn(round,card.id,automaticGoStopChoice(round,card,selectedMatchId));
     setPendingPlay(null);
-    setLastOpponentCapture([]);
+    
     // 내가 낸 것도 바닥에 얹은 모습을 먼저 보여 줍니다.
     setSlap({who:0,card,next});
   };
@@ -4170,15 +4165,13 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   // 실제 고스톱 판처럼 한 화면에 고정합니다. 위가 상대 자리, 가운데가 바닥,
   // 아래가 내 자리와 손패입니다. 스크롤이 없어 판 전체가 한눈에 들어옵니다.
-  const takenRow=(cards:HwatuCard[],fresh?:Set<string>)=><View style={styles.goStopTakenRow}>{goStopTakenOrder.map((kind)=>{
+  const takenRow=(cards:HwatuCard[])=><View style={styles.goStopTakenRow}>{goStopTakenOrder.map((kind)=>{
     const group=cards.filter((card)=>goStopTakenKind(card)===kind);
     if(!group.length)return null;
     // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
     if(kind==='띠')group.sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣'));
-    return <View key={kind} style={styles.goStopTakenGroup}>{group.map((card,index)=><View key={card.id} style={[index?styles.goStopTakenOverlap:null,fresh?.has(card.id)&&styles.goStopTakenNew]}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
+    return <View key={kind} style={styles.goStopTakenGroup}>{group.map((card,index)=><View key={card.id} style={index?styles.goStopTakenOverlap:null}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
   })}</View>;
-  // 방금 가져간 패. 상대 것뿐 아니라 내 것도 금색으로 표시합니다.
-  const freshIds=new Set(lastOpponentCapture.map((card)=>card.id));
   // 손패 한 줄에 다 들어오도록 장수에 맞춰 겹치는 정도를 정합니다. 적을 때는 겹치지 않습니다.
   const handCount=round?round.players[0].hand.length:0;
   const handStep=Math.min(55,handCount>1?(335-52)/(handCount-1):55);
@@ -4195,7 +4188,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
         return <View key={index} style={[styles.goStopSeat,round.turn===index+1&&!round.finished&&styles.goStopSeatActive]}>
           <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
           <View style={styles.goStopBackRow}>{player.hand.map((card)=><View key={card.id} style={styles.goStopBack}/>)}</View>
-          {takenRow(player.captured,freshIds)}
+          {takenRow(player.captured)}
         </View>;
       })}</View>
 
@@ -4235,7 +4228,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
       {/* 내 자리 */}
       <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
-      {takenRow(round.players[0].captured,freshIds)}
+      {takenRow(round.players[0].captured)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
       {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
@@ -7035,7 +7028,6 @@ const styles = StyleSheet.create({
   // 이번에 가져가는 패에만 금테를 두릅니다. 무엇이 내 것이 되는지 이걸로 압니다.
   goStopSlapTaken: { borderRadius: 5, borderWidth: 2, borderColor: colors.gold, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 14, elevation: 12 },
   goStopTakenOverlap: { marginLeft: -18 },
-  goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 96, paddingTop: 14, alignItems: 'center' },
   // 칠 수 있는 패는 살짝 들어 올리고 금빛을 둘러 눈에 띄게 합니다.
