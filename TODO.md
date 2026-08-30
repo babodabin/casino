@@ -83,9 +83,25 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 
 화면 쪽:
 
+- **자리를 위·좌·우로 나눠 앉힙니다**(`tableSeatSpots`). 둘이면 마주 보고, 셋이면 좌우,
+  넷이면 좌·위·우입니다. 나는 늘 아래입니다
+- 좌우 자리는 폭이 62뿐이라 **카드를 세로로 겹쳐 쌓고**(`tableSeatCardsColumn`)
+  이름줄도 세로로 놓습니다(`tableSeatHeadColumn`). 가로로 두면 "컴퓨터 폴/1 드"처럼 쪼개집니다
 - 상대는 `tiny` 카드(40×62), 나만 큰 카드입니다. 네 명이 7장씩 들면 안 그러면 안 들어갑니다
 - 아이폰(375×812)에서 네 명 승부까지 스크롤 없이 들어가는 것을 실제로 눌러 확인했습니다
 - 폴드한 사람은 흐려지고 승부 때 카드를 안 엽니다
+
+### 0-2-1. 고친 버그 — 판이 저절로 새로 시작되던 것 (8월 30일)
+
+**증상**: 텍사스 홀덤에서 결과가 안 나오고 카드만 돌았습니다. 중간에 카드가 바뀌고
+공용 카드가 사라지기도 했습니다.
+
+**원인**: 시작 버튼이 컴퓨터 차례에도 눌렸습니다. "진행 중"이라고 적혀만 있고 실제로는
+`start()`가 걸려 있어서, 누르면 판이 통째로 새로 시작됐습니다. 세븐 포커·하이로우도
+같은 코드라 똑같았습니다.
+
+**고친 것**: `busy`(판이 도는 중)를 만들어 그동안 버튼을 잠갔습니다.
+세 화면 모두 `disabled={busy||...}`이고 `onPress`도 막았습니다.
 
 ⚠️ 인원을 늘리면 **한 판이 길어집니다.** 컴퓨터 한 명당 0.7초씩 쉽니다(`TABLE_THINK_MS`).
 네 명이면 한 라운드에 2초가 더 듭니다. 0-3(속도)을 할 때 같이 보세요.
@@ -165,8 +181,10 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
   자리 12곳을 따로 세어 봐도 먼저·많이 모두 8.30~8.38%로 고르게 나옵니다
 - "없음"이 처음 계산한 35.2%보다 높은 것은 못 들어가는 물고기 5%때문입니다.
   12마리가 다 들어간다면 (11/12)^12 = 35.2%가 됩니다
-- 화면에서 **물고기는 자리 안이 아니라 자리 바깥 테두리에 붙습니다**(`fishRouletteFishRing` 134 ·
-  자리는 `fishRouletteRing` 112). 자리 안에 세우면 물고기가 번호와 마릿수를 덮습니다
+- **8월 30일에 원을 하나로 키웠습니다.** 예전에는 물고기가 자리 바깥(134)에 붙어서
+  원이 둘로 보였습니다. 지금은 판을 320으로 키우고 자리를 가장자리(134)로 밀어낸 뒤,
+  **물고기는 자리 안쪽(106)에 모입니다.** 물(`fishRouletteWater`)도 232로 키워
+  자리 안쪽을 꽉 채웁니다. 작게 두면 자리와 물 사이에 틈이 생겨 다시 원이 둘로 보입니다
 - 헤엄치는 띠도 판 한가운데 글자를 안 가리게 바깥쪽으로 잡았습니다(`startRadius` 0.46~0.70)
 - 아이폰(375×812)에서 스크롤 없이 들어갑니다. 버튼 아래가 802에서 끝납니다
 
@@ -283,7 +301,7 @@ main에 푸시하면 GitHub Actions가 자동 배포합니다. **푸시 = 라이
 
 | 할 일 | 화면 함수 | 손댈 스타일 · 값 |
 | --- | --- | --- |
-| 물고기 룰렛 | `FishRouletteGameScreen` | `fishRouletteBoard` 300 · `fishRouletteRing` 112(자리) · `fishRouletteFishRing` 134(물고기) · `fishRouletteSlotSize` 36, 로직은 `src/fishroulette.ts` |
+| 물고기 룰렛 | `FishRouletteGameScreen` | `fishRouletteBoard` 320 · `fishRouletteRing` 134(자리) · `fishRouletteFishRing` 106(물고기, **자리 안쪽**) · 물 `fishRouletteWater` 232, 로직은 `src/fishroulette.ts` |
 | 개인 카드 인원 | `PlayerCountRow` · 상태는 `tablePlayers` | 베팅 한 라운드는 `src/table.ts`(`applyTableAction`) · 자리 줄은 `tableSeatRow` · 상대 카드 크기는 `tinyPlayingCard` |
 | 파치슬롯 | `PachislotGameScreen` | 로직은 `src/pachislot.ts`(천장 `pachiCeiling` · 찬스존 `pachiZoneEvery` · 환급률은 `pachiAtContinue`로 맞춤) · 상태판은 `pachiStatusPanel` |
 | 예측 마켓 두 갈래 | `PredictGameScreen`(`group`으로 갈래를 받음) | 로직은 `src/predict.ts`의 `predictGroupOf` · 문제는 `src/predictdata.ts` |
