@@ -4208,7 +4208,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
             <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop?1.28:1}]}]}>
               {hit.map((card)=><View key={card.id}><HwatuCardView card={card}/></View>)}
               {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
-              <View style={[styles.goStopSlapCard,hit.length&&styles.goStopSlapOver]}><HwatuCardView card={slap.card}/></View>
+              <View style={[styles.goStopSlapCard,hit.length?styles.goStopSlapOver:null]}><HwatuCardView card={slap.card}/></View>
             </View>
           </View>;
         })():null}
