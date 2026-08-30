@@ -2494,7 +2494,9 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   </ScrollView></View>;
 }
 
-const shellCupColors=['#B4552F','#2F6D8C','#6A4E8F'];
+// 컵 세 개는 똑같이 생겨야 합니다. 색이 다르면 공이 든 컵을 색으로 따라가면 그만이라
+// 섞는 걸 볼 필요가 없어집니다. 실제 야바위가 똑같은 컵을 쓰는 이유입니다.
+const shellCupColor='#B4552F';
 const fishName=(field:RaceFish[],id:number)=>{const fish=field.find(item=>item.id===id);return fish?`${fish.id}. ${fish.name}`:`${id}번`;};
 
 function YutStickView({face,tumbling}:{face:YutFace;tumbling:boolean}){
@@ -2577,7 +2579,7 @@ function ShellGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:n
       <View style={styles.shellCupRow}>{[0,1,2].map(position=>{
         const cup=layout[position],hasBall=showBall&&ballPosition===position;
         return <Pressable key={position} disabled={phase!=='pick'} onPress={()=>pick(position)} style={[styles.shellCupSlot,phase==='pick'&&styles.shellCupSlotPickable,choice===position&&styles.shellCupSlotChosen]}>
-          <View style={[styles.shellCup,{backgroundColor:shellCupColors[cup]},hasBall&&styles.shellCupLifted]}><Text style={styles.shellCupLabel}>{position+1}</Text></View>
+          <View style={[styles.shellCup,{backgroundColor:shellCupColor},hasBall&&styles.shellCupLifted]}><Text style={styles.shellCupLabel}>{position+1}</Text></View>
           <View style={styles.shellBallSlot}>{hasBall?<View style={styles.shellBall}/>:<View style={styles.shellBallShadow}/>}</View>
         </Pressable>;
       })}</View>
@@ -2778,11 +2780,16 @@ function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
 // 경륜은 벨로드롬이라는 타원 트랙을 도는 경기입니다. 가로 막대 대신 실제처럼 원을 그립니다.
 // 한 바퀴만 돌기 때문에 겹치는 선수가 없고, 원 위의 각도가 곧 순위입니다.
 // 선수마다 반지름을 조금씩 다르게 줘서 서로 붙어 있어도 가려지지 않게 했습니다.
-const velodromeSize = 268;
-const velodromeCenter = velodromeSize / 2;
-/** 선수가 달리는 레인의 바깥·안쪽 반지름. 트랙 띠(인필드 75 ~ 바깥 134) 안에 들어갑니다. */
-const velodromeLaneOuter = 112;
-const velodromeLaneInner = 84;
+/** 경륜장은 동그라미가 아니라 타원입니다. 가로로 길어야 한 바퀴가 길어져 오래 볼 수 있습니다. */
+const velodromeWidth = 344;
+const velodromeHeight = 250;
+const velodromeCenterX = velodromeWidth / 2;
+const velodromeCenterY = velodromeHeight / 2;
+/** 선수가 달리는 레인. 가로와 세로 반지름이 다릅니다. 안쪽 레인일수록 짧습니다. */
+const velodromeLaneOuterX = 150, velodromeLaneInnerX = 118;
+const velodromeLaneOuterY = 103, velodromeLaneInnerY = 71;
+/** 선수 표시 크기. 트랙이 아니라 선수를 작게 해야 누가 앞선지 잘 보입니다. */
+const velodromeRiderSize = 20;
 
 function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished'}){
   const lap=(rider:Cyclist)=>race?Math.min(1,progress*winnerTime/race.times[rider.id]):0;
@@ -2798,12 +2805,13 @@ function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclis
       {riders.map((rider,index)=>{
         const angle=(-90+lap(rider)*360)*Math.PI/180;
         // 트랙 폭 안에 선수 수만큼 레인을 나눠 넣습니다. 안쪽 인필드를 넘지 않게 합니다.
-        const radius=velodromeLaneOuter-(riders.length>1?index*(velodromeLaneOuter-velodromeLaneInner)/(riders.length-1):0);
-        const left=velodromeCenter+Math.cos(angle)*radius-15;
-        const top=velodromeCenter+Math.sin(angle)*radius-15;
-        return <View key={rider.id} style={[styles.velodromeRider,{left,top,backgroundColor:rider.color},chosen.includes(rider.id)&&styles.velodromeRiderMine]}>
-          <Text style={[styles.velodromeRiderText,rider.id===2&&{color:'#FFF'}]}>{rider.id}</Text>
-        </View>;
+        const inward=riders.length>1?index/(riders.length-1):0;
+        const radiusX=velodromeLaneOuterX-inward*(velodromeLaneOuterX-velodromeLaneInnerX);
+        const radiusY=velodromeLaneOuterY-inward*(velodromeLaneOuterY-velodromeLaneInnerY);
+        const left=velodromeCenterX+Math.cos(angle)*radiusX-velodromeRiderSize/2;
+        const top=velodromeCenterY+Math.sin(angle)*radiusY-velodromeRiderSize/2;
+        // 경기 중에는 번호를 적지 않습니다. 색만으로 알아보고, 번호는 아래 순위줄에서 봅니다.
+        return <View key={rider.id} style={[styles.velodromeRider,{left,top,backgroundColor:rider.color},chosen.includes(rider.id)&&styles.velodromeRiderMine]}/>;
       })}
     </View>
     <View style={styles.velodromeStanding}>
@@ -4039,6 +4047,8 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const [pendingPlay,setPendingPlay]=useState<HwatuCard|null>(null);
   const [carryMultiplier,setCarryMultiplier]=useState(1);
   const [lastOpponentCapture,setLastOpponentCapture]=useState<HwatuCard[]>([]);
+  /** 컴퓨터가 방금 낸 패. 무엇을 냈는지 보여 주려고 들고 있습니다. */
+  const [lastPlayed,setLastPlayed]=useState<{who:number;card:HwatuCard}|null>(null);
   const title=mode==='matgo'?'맞고':'고스톱';
 
   const finish=(next:GoStopRound,force=false)=>{
@@ -4078,23 +4088,25 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     return playGoStopTurn(shaken,played.id,automaticGoStopChoice(shaken,played));
   };
 
-  // 컴퓨터 차례면 잠깐 쉬었다 한 명만 둡니다. 그다음 차례는 이 효과가 다시 돌면서 이어집니다.
-  useEffect(()=>{
+  // 컴퓨터는 저절로 두지 않습니다. 무엇을 냈는지 보고 내가 눌러야 다음으로 넘어갑니다.
+  // 저절로 넘어가면 뭘 냈는지 볼 새가 없다고 하셔서 이렇게 바꿨습니다.
+  const runComputerStep=()=>{
     if(!round||round.finished||round.turn===0)return;
-    const timer=setTimeout(()=>{
-      const before=new Set(round.players.slice(1).flatMap((player)=>player.captured.map((card)=>card.id)));
-      const next=stepComputer(round);
-      if(next===round)return;
-      setLastOpponentCapture(next.players.slice(1).flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
-      setRound(next);
-      if(next.finished)finish(next);
-    },800);
-    return ()=>clearTimeout(timer);
-  },[round]);
+    const who=round.turn;
+    const before=new Set(round.players.slice(1).flatMap((player)=>player.captured.map((card)=>card.id)));
+    const next=stepComputer(round);
+    if(next===round)return;
+    // 손에서 사라진 패가 방금 낸 패입니다. 뽑는 패는 손패에 들어오지 않으므로 이걸로 알 수 있습니다.
+    const played=round.players[who].hand.find((card)=>!next.players[who].hand.some((left)=>left.id===card.id));
+    setLastPlayed(played?{who,card:played}:null);
+    setLastOpponentCapture(next.players.slice(1).flatMap((player)=>player.captured).filter((card)=>!before.has(card.id)));
+    setRound(next);
+    if(next.finished)finish(next);
+  };
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
-    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setLastOpponentCapture([]);
+    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setLastOpponentCapture([]);setLastPlayed(null);
     if(next.finished)finish(next,true);
   };
   const play=(card:HwatuCard,selectedMatchId?:string)=>{
@@ -4103,7 +4115,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     if(matches.length===2&&!selectedMatchId){setPendingPlay(card);return;}
     const next=playGoStopTurn(round,card.id,automaticGoStopChoice(round,card,selectedMatchId));
     setPendingPlay(null);
-    setLastOpponentCapture([]);
+    setLastOpponentCapture([]);setLastPlayed(null);
     setRound(next);if(next.finished)finish(next);
   };
   const bomb=(month:number)=>{
@@ -4162,7 +4174,11 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=><Pressable key={card.id} style={index?{marginLeft:handStep-52}:null} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>)}</View>
 
       <View style={styles.goStopActionArea}>
-        {pendingPlay?<>
+        {round.turn!==0&&!round.finished?<View style={styles.goStopTurnBox}>
+          {lastPlayed?<><Text style={styles.goStopMessage}>컴퓨터 {lastPlayed.who}이(가) 낸 패</Text>
+            <HwatuCardView card={lastPlayed.card} size="small"/></>:null}
+          <Pressable style={styles.goStopButton} onPress={runComputerStep}><Text style={styles.primaryButtonText}>컴퓨터 {round.turn} 차례 · 눌러서 진행</Text></Pressable>
+        </View>:pendingPlay?<>
           <Text style={styles.goStopMessage}>{pendingPlay.month}월 바닥 패가 두 장입니다 · 가져갈 패를 고르세요</Text>
           <View style={styles.goStopChoiceRow}>{round.floor.filter((item)=>item.month===pendingPlay.month).map((card)=><Pressable key={card.id} onPress={()=>play(pendingPlay,card.id)}><HwatuCardView card={card} size="small"/></Pressable>)}
             <Pressable style={styles.goStopCancel} onPress={()=>setPendingPlay(null)}><Text style={styles.holdemActionText}>취소</Text></Pressable></View>
@@ -6234,13 +6250,13 @@ const styles = StyleSheet.create({
   cycleTrack: { paddingVertical: 8, borderRadius: 24, overflow: 'hidden', backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2' },
   // 원형 벨로드롬. 바깥 테두리가 관중석 난간, 안쪽 원이 인필드입니다.
   velodromeWrap: { width: '100%', alignItems: 'center', gap: 12 },
-  velodrome: { width: 268, height: 268, borderRadius: 134, backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2', alignItems: 'center', justifyContent: 'center' },
-  velodromeInfield: { width: 150, height: 150, borderRadius: 75, backgroundColor: '#1B3D53', borderWidth: 2, borderColor: '#4B7C9C', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  velodrome: { width: '100%', maxWidth: 344, height: 250, borderRadius: 125, backgroundColor: '#326A91', borderWidth: 6, borderColor: '#B8C7D2', alignItems: 'center', justifyContent: 'center' },
+  velodromeInfield: { width: 196, height: 92, borderRadius: 46, backgroundColor: '#1B3D53', borderWidth: 2, borderColor: '#4B7C9C', alignItems: 'center', justifyContent: 'center', gap: 2 },
   velodromeInfieldTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeInfieldSub: { color: '#9FC4DC', fontSize: 12, fontWeight: '700' },
   // 결승선은 12시 방향입니다. 선수도 여기서 출발해 한 바퀴 돌아 여기로 돌아옵니다.
-  velodromeFinish: { position: 'absolute', top: 2, left: 130, width: 8, height: 52, borderRadius: 2, backgroundColor: '#F3F6F8' },
-  velodromeRider: { position: 'absolute', width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: '#D7E2E9', alignItems: 'center', justifyContent: 'center' },
+  velodromeFinish: { position: 'absolute', top: 2, left: 168, width: 8, height: 44, borderRadius: 2, backgroundColor: '#F3F6F8' },
+  velodromeRider: { position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D7E2E9' },
   velodromeRiderMine: { borderColor: colors.gold, borderWidth: 3 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
   velodromeStanding: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
@@ -6935,11 +6951,12 @@ const styles = StyleSheet.create({
   // 상대 손패는 뒷면 장수만 보여 줍니다. 무슨 패인지는 알 수 없으니까요.
   goStopBackRow: { flexDirection: 'row', gap: 2, minHeight: 22 },
   goStopBack: { width: 13, height: 21, borderRadius: 2, backgroundColor: '#1A2233', borderWidth: 1, borderColor: '#D12B32' },
-  goStopTakenRow: { flexDirection: 'row', minHeight: 30, alignItems: 'center', gap: 8 },
+  goStopTakenRow: { flexDirection: 'row', flexWrap: 'wrap', minHeight: 46, alignItems: 'center', gap: 8 },
   goStopTakenGroup: { flexDirection: 'row' },
-  goStopTakenOverlap: { marginLeft: -12 },
+  goStopTurnBox: { alignItems: 'center', gap: 6 },
+  goStopTakenOverlap: { marginLeft: -18 },
   goStopTakenNew: { borderRadius: 3, borderWidth: 1, borderColor: colors.gold },
-  goStopFloorArea: { flex: 1, justifyContent: 'center' },
+  goStopFloorArea: { flex: 1, justifyContent: 'center', maxHeight: 250 },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 80, alignItems: 'center' },
   goStopActionArea: { gap: 4 },
   goStopButtonRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
@@ -6950,7 +6967,7 @@ const styles = StyleSheet.create({
   goStopMessage: { color: '#CFE0D6', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   // 바닥에 깔 작은 패와, 모은 패를 겹쳐 쌓을 때 쓰는 아주 작은 패입니다.
   hwatuCardSmall: { width: 40, height: 60, borderRadius: 3 },
-  hwatuCardTiny: { width: 20, height: 30, borderRadius: 2 },
+  hwatuCardTiny: { width: 28, height: 42, borderRadius: 3 },
   hwatuFloorBoardCompact: { minHeight: 150, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0, paddingVertical: 4, marginVertical: 0 },
   hwatuFloorRowCompact: { minHeight: 61, gap: 2 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
