@@ -314,3 +314,42 @@ test('더미에서 보너스가 나오면 획득하고 다음 일반 패를 한 
   assert.equal(next.floor.some((item)=>item.id===draw.id),true);
   assert.equal(next.lastEvents?.includes('2피 보너스'),true);
 });
+
+test('고를 외친 뒤 점수가 안 오르면 고·스톱을 다시 묻지 않는다', () => {
+  // 삼광 3점으로 이미 고를 한 번 외친 자리입니다. 그때 점수를 decidedAtScore에 적어 둡니다.
+  const captured = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const base = (hand: HwatuCard[], floor: HwatuCard[]): GoStopRound => ({
+    mode: 'gostop',
+    players: [
+      { hand, captured, goCount: 1, decidedAtScore: 3 },
+      { hand: [card(5)], captured: [], goCount: 0 },
+      { hand: [card(6)], captured: [], goCount: 0 },
+    ],
+    floor, deck: [card(4), card(7), card(9)], turn: 0, finished: false, winner: null, pendingDecision: null, message: '',
+  });
+
+  // 한 장도 못 먹은 차례. 3점 그대로라 묻지 않고 다음 사람에게 넘어갑니다.
+  const missed = playGoStopTurn(base([card(2)], []), card(2).id);
+  assert.equal(scoreGoStop(missed.players[0].captured).total, 3);
+  assert.equal(missed.pendingDecision, null);
+  assert.equal(missed.turn, 1);
+
+  // 12월 광을 먹어 사광 4점. 점수가 올랐으니 다시 묻습니다.
+  const gained = playGoStopTurn(base([card(12, '피')], [card(12, '광')]), card(12, '피').id);
+  assert.equal(scoreGoStop(gained.players[0].captured).total, 4);
+  assert.equal(gained.pendingDecision, 0);
+});
+
+test('고를 외치면 그때의 점수를 적어 둔다', () => {
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const base: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(2)], captured: scoring, goCount: 0 },
+      { hand: [card(5)], captured: [], goCount: 0 },
+      { hand: [card(6)], captured: [], goCount: 0 },
+    ],
+    floor: [], deck: [card(4)], turn: 0, finished: false, winner: null, pendingDecision: 0, message: '',
+  };
+  assert.equal(chooseGoOrStop(base, 'go').players[0].decidedAtScore, 3);
+});

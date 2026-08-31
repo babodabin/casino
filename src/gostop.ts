@@ -17,6 +17,12 @@ export type GoStopPlayer = {
   hand: HwatuCard[];
   captured: HwatuCard[];
   goCount: number;
+  /**
+   * 마지막으로 고를 외쳤을 때의 점수.
+   * 고·스톱은 **점수가 오른 차례에만** 묻습니다. 3점에서 고를 외쳤으면 4점이 되어야
+   * 다시 묻습니다. 이 값이 없으면 기준 점수만 넘으면 차례마다 계속 물어봅니다.
+   */
+  decidedAtScore?: number;
   /** 흔들기와 폭탄은 각각 최종 금액을 두 배로 만듭니다. */
   shakeCount?: number;
   shakenMonths?: number[];
@@ -64,7 +70,7 @@ function dealGoStopAttempt(mode: GoStopMode, random: () => number, attempt: numb
   const handSize = mode === 'matgo' ? 10 : 7;
   const floorSize = mode === 'matgo' ? 8 : 6;
   let deck = shuffleHwatu([...createHwatuDeck(), ...(deckStyle === 'bonus' ? createGoStopBonusCards() : [])], random);
-  const players: GoStopPlayer[] = Array.from({ length: playerCount }, () => ({ hand: [], captured: [], goCount: 0, shakeCount: 0, shakenMonths: [] }));
+  const players: GoStopPlayer[] = Array.from({ length: playerCount }, () => ({ hand: [], captured: [], goCount: 0, decidedAtScore: 0, shakeCount: 0, shakenMonths: [] }));
 
   // 실제 배분 순서처럼 한 장씩 돌려, 어떤 플레이어에도 같은 카드가 생기지 않게 합니다.
   for (let count = 0; count < handSize; count += 1) {
@@ -124,6 +130,16 @@ export function scoreGoStop(cards: HwatuCard[]): GoStopScore {
 export const goStopThreshold = (mode: GoStopMode) => mode === 'matgo' ? 7 : 3;
 export const canCallGoStop = (round: GoStopRound, playerIndex = round.turn) =>
   scoreGoStop(round.players[playerIndex].captured).total >= goStopThreshold(round.mode);
+
+/**
+ * **물어볼지** 정합니다. 기준 점수를 넘은 것만으로는 모자랍니다 —
+ * 고를 외친 뒤로는 **점수가 그때보다 올라야** 다시 묻습니다.
+ * 그러지 않으면 한 장도 못 먹은 차례에도 고·스톱을 고르라고 합니다.
+ */
+export const shouldAskGoStop = (player: GoStopPlayer, mode: GoStopMode) => {
+  const total = scoreGoStop(player.captured).total;
+  return total >= goStopThreshold(mode) && total > (player.decidedAtScore ?? 0);
+};
 
 type CaptureResult = { floor: HwatuCard[]; captured: HwatuCard[]; matched: number };
 
@@ -268,7 +284,7 @@ function finishGoStopTurn(round: GoStopRound, players: GoStopPlayer[], floor: Hw
   const noCards = deck.length === 0 || players.every((item) => item.hand.length === 0);
   const actingPlayer = round.turn;
   const nextTurn = nextPlayerWithCards(players, actingPlayer);
-  const mayDecide = !noCards && scoreGoStop(players[actingPlayer].captured).total >= goStopThreshold(round.mode);
+  const mayDecide = !noCards && shouldAskGoStop(players[actingPlayer], round.mode);
   return {
     ...round,
     players,
@@ -307,7 +323,10 @@ export function chooseGoOrStop(round: GoStopRound, action: 'go' | 'stop'): GoSto
   if (round.finished) throw new Error('이미 끝난 판입니다.');
   if (round.pendingDecision !== round.turn || !canCallGoStop(round)) throw new Error(`${goStopThreshold(round.mode)}점이 되어야 고 또는 스톱을 고를 수 있습니다.`);
   if (action === 'stop') return { ...round, finished: true, winner: round.turn, message: `${round.turn + 1}번이 스톱했습니다` };
-  const players = round.players.map((player, index) => index === round.turn ? { ...player, goCount: player.goCount + 1 } : player);
+  // 외친 그때의 점수를 적어 둡니다. 다음 차례에 점수가 안 오르면 다시 안 묻습니다.
+  const players = round.players.map((player, index) => index === round.turn
+    ? { ...player, goCount: player.goCount + 1, decidedAtScore: scoreGoStop(player.captured).total }
+    : player);
   const actor = round.turn;
   return { ...round, players, turn: nextPlayerWithCards(players, actor), pendingDecision: null, message: `${actor + 1}번이 고를 외쳤습니다` };
 }

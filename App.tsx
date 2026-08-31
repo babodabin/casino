@@ -15,6 +15,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
 
@@ -66,7 +67,7 @@ import {
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
-import { calculateGoStopSettlement, chooseComputerGoStopCard, chooseGoOrStop, dealGoStop, declareGoStopShake, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopMode, type GoStopRound } from './src/gostop';
+import { calculateGoStopSettlement, chooseComputerGoStopCard, chooseGoOrStop, dealGoStop, declareGoStopShake, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
 import { chooseComputerMinhwatuCard, dealMinhwatu, playMinhwatuTurn, scoreMinhwatu, settleMinhwatu, type MinhwaRound } from './src/minhwatu';
 import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, playYukbaekTurn, scoreYukbaek, settleYukbaekRound, type YukbaekMatch } from './src/yukbaek';
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
@@ -1166,8 +1167,10 @@ function CasinoApp() {
       </View>}
       {!loaded && <View style={styles.loadingCover}><Text style={styles.muted}>저장 정보 불러오는 중…</Text></View>}
       {/*
-        샹들리에 아래 느낌. 가운데 위가 밝고 네 귀퉁이가 어두워야 '실내'로 보입니다.
+        샹들리에 아래 느낌. 가운데 위가 밝고 네 귀퉁이가 조금 가라앉아야 '실내'로 보입니다.
         둘 다 그림자로만 그려서 **자리를 한 칸도 안 먹고**, 눌림은 그대로 통과시킵니다.
+        ⚠️ 어둠은 아주 옅게만 씁니다. 진하게 깔면 위쪽 130px이 검정으로 눌려
+        게스트 · LV. 줄 언저리에서 바탕 자주색과 갈라진 띠처럼 보였습니다.
       */}
       <View pointerEvents="none" style={styles.roomLight} />
       <View pointerEvents="none" style={styles.roomVignette} />
@@ -1343,12 +1346,22 @@ const cardFanWidth = (size: CardSize, count: number, gap = 0) =>
  * ⚠️ `onLayout`은 **카드 때문에 높이가 변하지 않는 칸**에 걸어야 합니다(`flex: 1`인 칸).
  * 카드가 밀어 올리는 칸을 재면 큰 단계와 작은 단계를 계속 오갑니다.
  */
-function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, biggest = 'mid' as CardSize, smallest = 'mini' as CardSize } = {}) {
+function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, outerTrim = 0, biggest = 'mid' as CardSize, smallest = 'mini' as CardSize } = {}) {
   // 잰 자리만 담아 둡니다. **크기는 그릴 때마다 다시 고릅니다.**
   // ⚠️ onLayout 안에서 크기를 정하면 안 됩니다. 자리는 안 변하고 장수만 늘어나는 일이
   // 흔한데(블랙잭 히트, 판 시작), 그러면 onLayout이 다시 안 불려 예전 크기에 머뭅니다.
   // 파이 고우에서 일곱 장이 큰 카드로 그려져 한 장이 아래로 밀려난 것이 이 때문이었습니다.
-  const [box, setBox] = useState<{ width: number; height: number } | null>(null);
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
+  const window = useWindowDimensions();
+  /**
+   * ⚠️ **웹에서는 `onLayout`이 안 불립니다.**(react-native-web 0.21 · 2026-08-31에 확인)
+   * 그래서 잰 자리가 영영 안 들어오고 카드가 늘 제일 큰 단계에 머뭅니다.
+   * `outerTrim`을 주면 창 크기에서 그만큼 뺀 값을 대신 씁니다 —
+   * 파이 고우는 화면 제목줄 48을 뺍니다(창 812 → 판 자리 764, 실제로 재서 맞춘 값).
+   * `outerTrim`을 안 주면 예전처럼 못 잰 것으로 두어 다른 화면은 그대로입니다.
+   */
+  const box = measured ?? (outerTrim > 0 ? { width: window.width, height: window.height - outerTrim } : null);
+  const setBox = setMeasured;
   const onLayout = (event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     setBox((current) => (current && Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1 ? current : { width, height }));
@@ -1357,12 +1370,21 @@ function useCardFit({ rows = 1, spare = 0, across = 0, gap = 0, sideSpare = 0, b
   // 아직 못 쟀으면 제일 큰 단계로 둡니다. 재고 나면 곧바로 다시 고릅니다.
   const room = box ? (box.height - spare) / Math.max(1, rows) : Infinity;
   const side = box ? box.width - sideSpare : Infinity;
-  const fit = steps.find((step) => cardSizeBox[step].height <= room && (across <= 0 || cardFanWidth(step, across, gap) <= side))
-    ?? steps[steps.length - 1];
-  // 안 겹치고 나란히 놓았을 때의 폭. 이게 들어가면 겹칠 이유가 없습니다.
-  const sideBySide = cardSizeBox[fit].width * across + Math.max(0, across - 1) * 6;
-  const crowded = !!box && across > 0 && sideBySide > side;
-  return { fit, crowded, onLayout };
+  /**
+   * 장수를 주면 그 줄에 맞는 크기를 돌려줍니다.
+   * ⚠️ `onLayout`은 한 자리에 한 번만 붙일 수 있습니다. 그래서 줄마다 `useCardFit`을
+   * 또 부르면 두 번째는 자리를 못 재고 제일 큰 단계에 머뭅니다. **잰 자리를 같이 쓰세요.**
+   * (파이 고우처럼 딜러 일곱 장과 내 다섯 장이 한 화면에 있을 때 씁니다.)
+   */
+  const sizeFor = (count: number, rowGap = gap) =>
+    steps.find((step) => cardSizeBox[step].height <= room && (count <= 0 || cardFanWidth(step, count, rowGap) <= side))
+      ?? steps[steps.length - 1];
+  /** 그 장수를 그 크기로 나란히 놓으면 넘치는지. 넘칠 때만 겹칩니다. */
+  const crowdedFor = (count: number, step: CardSize) =>
+    !!box && count > 0 && cardSizeBox[step].width * count + Math.max(0, count - 1) * 6 > side;
+  const fit = sizeFor(across);
+  const crowded = crowdedFor(across, fit);
+  return { fit, crowded, onLayout, sizeFor, crowdedFor };
 }
 
 /**
@@ -1482,9 +1504,9 @@ const VIDEO_POKER_COINS = 9;
 const DEALER_REVEAL_MS = 620;
 
 /** 한 장씩 여는 버튼. 몇 장 열었는지 같이 보여 줍니다. */
-function RevealButton({ opened, total, onPress, label = '상대 패 열기' }: { opened: number; total: number; onPress: () => void; label?: string }) {
+function RevealButton({ opened, total, onPress, label = '상대 패 열기', disabled = false }: { opened: number; total: number; onPress: () => void; label?: string; disabled?: boolean }) {
   return (
-    <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={onPress}>
+    <Pressable disabled={disabled} style={[styles.primaryButton, styles.fullWidthButton, disabled && styles.disabledCard]} onPress={onPress}>
       <Text style={styles.primaryButtonText}>{opened === 0 ? label : `다음 장 열기 · ${opened}/${total}`}</Text>
     </Pressable>
   );
@@ -2156,18 +2178,34 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   const deal=useTableDeal(round,2,round?7:0);
   const dealing=deal.dealing;
   /**
-   * 카드 줄 둘(딜러·나)이 쓸 자리. spare는 실제로 재서 넣은 값입니다 —
-   * 아이폰 375×812에서 판 자리 764 가운데 카드 높이 말고 들어가는 것이
-   * 위 상태줄 32 · 반원 테이블의 테두리와 이름줄과 규칙줄 216 · 하이/로우 요약 62 ·
-   * 버튼 52로 합쳐 **394**입니다. 남은 370을 두 줄로 나눠 한 장이 185까지 쓸 수 있어
-   * 지금은 제일 큰 단계(72×108)로 올라갑니다.
-   * 너비는 부채로 일곱 장을 늘어놓은 폭을 봅니다. 재는 자리는 375이고 반원 테이블 안쪽은
-   * 301이라(테두리 18 · 좌우 여백 28 · 판 여백 28) 74를 뺍니다.
+   * 카드 줄 **셋**(딜러 7장 · 내 하이 5장 · 내 로우 2장)이 쓸 자리.
+   *
+   * 내 패를 한 줄에 일곱 장 두면 폭 301에 넣느라 카드가 58×88까지 내려갑니다.
+   * 두 줄로 나누면 한 줄이 다섯 장뿐이라 **72×108로 올라갑니다** —
+   * 72 × (1 + 4 × 0.68) = 268 ≤ 301이라 들어갑니다.
+   *
+   * **rows는 내 두 줄만 셉니다.** 딜러 줄은 한 단계 작아서 같은 높이로 나누면 안 됩니다 —
+   * 딜러 줄 높이(88 + 위 여백 16 = 104)는 spare에 넣었습니다.
+   *
+   * spare 537 = 화면에서 실제로 잰 값입니다(아이폰 375×812 · 판 자리 764).
+   *   위 상태줄 35 · 반원 테이블 안쪽 위아래 여백과 칩 트레이·이름줄 168 ·
+   *   딜러 줄 104 · 내 자리 칩 48 · 하이/로우 요약 69 · 결과 글 23 ·
+   *   버튼 52 · 내 두 줄의 위 여백 22(하이 16 · 로우 6) · 사이 여백 26.
+   * 남는 219를 두 줄로 나눠 한 줄이 109까지 쓰므로 108짜리 큰 카드가 **겨우** 들어갑니다.
+   * ⚠️ 여기서 무엇이든 몇 픽셀만 늘리면 카드가 한 단계 작아집니다.
+   *
+   * 너비 74는 재는 자리 375에서 반원 테이블 안쪽 301을 뺀 값입니다
+   * (테두리 18 · 좌우 여백 28 · 판 여백 28).
+   *
+   * ⚠️ **딜러는 한 줄로 둡니다.** 일곱 장을 크게 두면 폭이 366이라 판 밖으로 나갑니다.
+   * 그래서 딜러 줄만 `sizeFor(7)`로 한 단계 작게(58×88 · 폭 295) 잡습니다.
    */
-  const fit=useCardFit({rows:2,spare:394,across:7,sideSpare:74,biggest:'big'});
+  const fit=useCardFit({rows:2,spare:547,across:5,sideSpare:74,outerTrim:48,biggest:'big'});
+  const dealerSize=fit.sizeFor(7);
+  const dealerCrowded=fit.crowdedFor(7,dealerSize);
   // 겹쳐야만 들어갈 때만 겹칩니다. 자리가 남으면 나란히 놓아 카드가 다 보입니다.
-  const fan=fit.crowded?{marginLeft:cardFanMargin(fit.fit)}:null;
-  const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[fit.fit].height+16,gap:fit.crowded?0:6}];
+  const fan=dealerCrowded?{marginLeft:cardFanMargin(dealerSize)}:null;
+  const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[dealerSize].height+16,gap:dealerCrowded?0:6}];
   const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
   useAutoStart(() => start());
@@ -2175,6 +2213,28 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   const recommend=()=>{if(!round)return;setLowIds(arrangePaiGow(round.player).low.map(card=>card.id));};
   const chosenLow=round?round.player.filter(card=>lowIds.includes(card.id)):[];
   const chosenHigh=round?round.player.filter(card=>!lowIds.includes(card.id)):[];
+  // 지금까지 깔린 내 패만 그립니다. 고른 두 장은 **아래 줄로 내려갑니다** —
+  // 하이 5장 · 로우 2장이라는 규칙을 자리로 알려 주는 것입니다.
+  const laid=round?round.player.slice(0,deal.countFor(0)):[];
+  const myLow=laid.filter(card=>lowIds.includes(card.id));
+  const myHigh=laid.filter(card=>!lowIds.includes(card.id));
+  // 고르기 전에는 일곱 장이 다 위 줄에 있습니다. 그때만 한 단계 작아졌다가
+  // 두 장을 내리면 다섯 장이 되어 큰 카드로 올라갑니다.
+  const highSize=fit.sizeFor(Math.max(1,myHigh.length));
+  const lowSize=fit.sizeFor(2);
+  /**
+   * 내 카드 한 줄. **줄 높이는 제일 큰 카드에 맞춰 고정합니다** —
+   * 고를 때마다 줄 높이가 바뀌면 판 전체가 들썩입니다.
+   */
+  const myRow=(cards:Card[],size:CardSize,hint:string,padTop:number)=>{
+    const crowded=fit.crowdedFor(cards.length,size);
+    return <View style={[styles.dealerCardRow,{minHeight:cardSizeBox.big.height+padTop,paddingTop:padTop,gap:crowded?0:6}]}>
+      {cards.length===0?<Text style={styles.paiGowRowHint}>{hint}</Text>:cards.map((card,index)=>
+        <Pressable key={card.id} style={index>0&&crowded?{marginLeft:cardFanMargin(size)}:null} disabled={!!outcome} onPress={()=>toggle(card.id)}>
+          <PlayingCard card={card} size={size} emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/>
+        </Pressable>)}
+    </View>;
+  };
   const valid=chosenLow.length===2&&isValidPaiGowSplit(chosenHigh,chosenLow);
   const playerSplit=valid?splitPaiGow(round!.player,lowIds):null;
   const showdown=()=>{if(!round||!playerSplit||pending||outcome||dealing)return;const house=arrangePaiGow(round.dealer),resolved=resolvePaiGow(playerSplit,house);setDealerSplit(house);reveal.reset();setPending(resolved);};
@@ -2192,13 +2252,16 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
-      <View style={cardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?fan:null}><PlayingCard card={card} size={fit.fit} hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
-      <Text style={styles.dealerFeltRule}>하이 5장·로우 2장을 모두 이겨야 승리</Text>
+      <View style={cardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?fan:null}><PlayingCard card={card} size={dealerSize} hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
-      <View style={cardRow}>{round.player.slice(0,deal.countFor(0)).map((card,index)=><Pressable key={card.id} style={index?fan:null} disabled={!!outcome} onPress={()=>toggle(card.id)}><PlayingCard card={card} size={fit.fit} emphasis={lowIds.includes(card.id)?'selected':outcome?(outcome.result==='win'?'winner':'dim'):undefined}/></Pressable>)}</View>
+      {/* ⚠️ 하이 줄은 위 여백 16입니다. 이긴 카드가 위로 16 들려 이름줄을 덮기 때문입니다.
+          로우 줄은 위에 덮을 글자가 없어 6으로 줄여 그만큼 높이를 아낍니다. */}
+      {myRow(myHigh,highSize,'하이 · 5장',16)}
+      {myRow(myLow,lowSize,'여기가 로우 2장 자리입니다 · 위에서 두 장을 고르세요',6)}
       <DealerBetSpot amount={selectedBet}/>
     </DealerTable>
-    <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>하이 · 5장</Text><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><View style={styles.highLowResult}><Text style={styles.highLowResultTitle}>로우 · 2장</Text><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View></View>
+    {/* 승·패는 제목 옆에 붙입니다. 아래에 한 줄 더 두면 그만큼 판이 잘립니다. */}
+    <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><View style={styles.paiGowSummaryHead}><Text style={styles.highLowResultTitle}>하이 · 5장</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text></View><View style={styles.highLowResult}><View style={styles.paiGowSummaryHead}><Text style={styles.highLowResultTitle}>로우 · 2장</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text></View></View>
     {pending?<RevealButton opened={reveal.opened} total={7} onPress={openNext} label="딜러 패 열기"/>:!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
     <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
   </View></View>;
@@ -3791,6 +3854,8 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
   const [winners,setWinners]=useState<number[]|null>(null);
   // 보드에 실제로 뒤집어 놓은 장수. 플랍이 와도 여기서 한 장씩 눌러 열어야 올라갑니다.
   const [dealt,setDealt]=useState(0);
+  /** 공용 카드가 저절로 깔리는 중인지. 다 깔릴 때까지 열기 버튼을 잠급니다. */
+  const [opening,setOpening]=useState(false);
   const seatActions=useSeatActions();
   const stacks=useSeatStacks(players,selectedBet);
   // 개인 카드는 프리플랍에 한 번만 깔립니다(홀덤 두 장 · 오마하 넉 장).
@@ -3802,14 +3867,26 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
   const boardTarget=stage>=1&&stage<=4?shownFor(stage):5;
   const needBoard=stage>=1&&stage<=4&&dealt<boardTarget;
   const boardLabel=['','','플랍','턴','리버'][stage]??'';
-  const openBoard=()=>setDealt((value)=>Math.min(boardTarget,value+1));
+  /**
+   * 공용 카드 열기. **한 번만 누르면 나머지가 저절로 한 장씩 깔립니다.**
+   * 전에는 한 번에 한 장이라 플랍에서 세 번을 눌러야 했습니다.
+   * 세 장을 한꺼번에 띄우지 않는 이유는 카드 깔기와 같습니다 — 한꺼번에 나오면
+   * 무엇이 깔렸는지 볼 새가 없습니다.
+   */
+  const openBoard=()=>{setOpening(true);setDealt((value)=>Math.min(boardTarget,value+1));};
+  useEffect(()=>{
+    if(!opening)return;
+    if(dealt>=boardTarget){setOpening(false);return;}
+    const timer=setTimeout(()=>setDealt((value)=>Math.min(boardTarget,value+1)),DEAL_THEIRS_MS);
+    return ()=>clearTimeout(timer);
+  },[opening,dealt,boardTarget]);
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
     const table=dealTable(mode,players);
     setHands(table.hands);setCommunity(table.community);
     setRound(openTable(players,selectedBet));
-    setStage(1);setDealt(0);setWinners(null);setOutcome('');seatActions.clear();
+    setStage(1);setDealt(0);setOpening(false);setWinners(null);setOutcome('');seatActions.clear();
     setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
   };
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
@@ -3934,7 +4011,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       <View style={styles.tableOutcomeSlot}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}</View>
     </>:<Text style={styles.sevenPokerHint}>{omaha?'개인 카드 넉 장 중 두 장을 반드시 씁니다':'개인 카드 두 장과 공용 다섯 장으로 만듭니다'}</Text>}
   </View>
-  <View style={styles.tableBottomSlot}>{needBoard?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} label={`${boardLabel} 열기`}/>
+  <View style={styles.tableBottomSlot}>{needBoard?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} disabled={opening} label={`${boardLabel} 열기`}/>
     :myTurn?<Text style={styles.tableBottomHint}>내 차례입니다 · 판 가운데 버튼으로 고르세요</Text>
     :<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':stage===0?'카드 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}</View>
   <View style={styles.tableLegendSlot}><Text style={styles.sevenPokerLegend}>{['대기','프리플랍','플랍','턴','리버','승부'][stage]}{myTurn&&(round?.raises??0)>=MAX_RAISES_PER_STREET?' · 레이즈 한도':''}</Text></View>
@@ -4662,6 +4739,13 @@ function HwatuFloor({cards,deckCount,compact=false}:{cards:HwatuCard[];deckCount
 
 /** 모은 패를 늘어놓는 순서. 왼쪽이 값이 큰 쪽입니다. */
 const goStopTakenOrder=['광','열끗','띠','피'] as const;
+/**
+ * 모은 패 한 줄을 재는 값입니다. `hwatuCardTiny` 28폭 · 무리 사이 틈 8 ·
+ * 안 좁혔을 때 한 걸음 10(=겹침 -18).
+ */
+const GOSTOP_TAKEN_CARD=28;
+const GOSTOP_TAKEN_GAP=8;
+const GOSTOP_TAKEN_STEP=10;
 function goStopTakenKind(card:HwatuCard){
   if(card.kind==='광')return '광';
   if(card.kind==='열끗')return '열끗';
@@ -4706,6 +4790,27 @@ function automaticGoStopChoice(round: GoStopRound, played: HwatuCard, selectedPl
   return { playedMatchId, drawnMatchId: drawnMatches.length === 2 ? drawnMatches[0].id : undefined };
 }
 
+/**
+ * 판이 끝난 뒤 점수가 어떻게 나왔는지 줄 단위로 적습니다.
+ * 5광 · 피박 ×2처럼 **무엇 때문에 얼마가 되었는지**가 보여야 합니다.
+ */
+function goStopBill(title:string,winner:GoStopPlayer,bill:GoStopSettlement,reasons:string[],points:number,carry:number,bet:number,mine:boolean,lost=0){
+  const score=scoreGoStop(winner.captured);
+  return {
+    title:`${title} · ${score.total}점`,
+    lines:[
+      `광 ${score.bright} · 열끗 ${score.animal} · 띠 ${score.ribbon} · 피 ${score.pi} = ${score.total}점`,
+      ...(score.bonuses.length?[score.bonuses.join(' · ')]:[]),
+      ...(winner.goCount?[`${winner.goCount}고 → ${bill.goScore}점`]:[]),
+      ...(reasons.length?[reasons.join(' · ')]:[]),
+      ...(carry>1?[`나가리 ${carry}배`]:[]),
+      mine
+        ? `최종 ${points}점 × 베팅 ${bet.toLocaleString()} = 받는 돈 ${(bet*points).toLocaleString()} WC`
+        : `최종 ${points}점 × 베팅 ${bet.toLocaleString()} = 잃는 돈 ${lost.toLocaleString()} WC`,
+    ],
+  };
+}
+
 function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:GoStopMode;deckStyle:GoStopDeckStyle;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(value:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<GoStopRound|null>(null);
   const [settled,setSettled]=useState(false);
@@ -4717,6 +4822,12 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
    * 고스톱은 치는 맛이 재미인데 한 번에 처리하면 그게 안 보입니다.
    */
   const [slap,setSlap]=useState<{who:number;card:HwatuCard;next:GoStopRound}|null>(null);
+  /**
+   * 판이 끝났을 때 화면에 띄우는 계산서입니다.
+   * 피박 · 광박 · 고 배수는 `calculateGoStopSettlement`이 원래 다 세고 있었는데
+   * 기록 한 줄에만 들어가고 **화면에는 안 보였습니다.**
+   */
+  const [settleNote,setSettleNote]=useState<{title:string;lines:string[]}|null>(null);
   /** 친 순간 잠깐 크게 보이게 하는 값입니다. 0.26초 뒤 원래 크기로 돌아옵니다. */
   const [slapPop,setSlapPop]=useState(false);
   const title=mode==='matgo'?'맞고':'고스톱';
@@ -4724,6 +4835,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const finish=(next:GoStopRound,force=false)=>{
     if(settled&&!force)return;
     if(next.winner===null){
+      setSettleNote({title:next.nagari?'나가리 · 아무도 스톱하지 않았습니다':'무승부',lines:next.nagari?[`다음 판 정산이 ${carryMultiplier*2}배가 됩니다`,`베팅 ${selectedBet.toLocaleString()} WC는 그대로 돌려받습니다`]:[`베팅 ${selectedBet.toLocaleString()} WC는 그대로 돌려받습니다`]});
       onSettle(selectedBet,selectedBet,'push',next.nagari?`${title} · 나가리 · 다음 판 ${carryMultiplier*2}배`:`${title} · 무승부`);
       if(next.nagari)setCarryMultiplier((value)=>value*2);
       setSettled(true);return;
@@ -4733,11 +4845,13 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode));
       const wonPoints=bills.reduce((sum,bill)=>sum+Math.max(1,bill.finalPoints),0)*carryMultiplier;
       const reasons=Array.from(new Set(bills.flatMap((bill)=>bill.reasons)));
+      setSettleNote(goStopBill(`내가 이겼습니다`,winner,bills[0],reasons,wonPoints,carryMultiplier,selectedBet,true));
       onSettle(selectedBet,selectedBet*wonPoints,'win',`${title} · ${scoreGoStop(winner.captured).total}점 · ${carryMultiplier>1?`나가리 ${carryMultiplier}배 · `:''}${reasons.length?reasons.join(' · '):'기본 정산'}`);
     }else{
       const bill=calculateGoStopSettlement(winner,next.players[0],mode);
       const wantedLoss=selectedBet*Math.max(1,bill.finalPoints)*carryMultiplier;
       const extra=Math.min(Math.max(0,wantedLoss-selectedBet),coins);
+      setSettleNote(goStopBill(`컴퓨터 ${next.winner} 승리`,winner,bill,bill.reasons,Math.max(1,bill.finalPoints)*carryMultiplier,carryMultiplier,selectedBet,false,selectedBet+extra));
       if(extra>0)onPlaceBet(extra);
       onSettle(selectedBet+extra,0,'loss',`${title} · 컴퓨터 ${next.winner} 승리 · ${carryMultiplier>1?`나가리 ${carryMultiplier}배 · `:''}${bill.reasons.length?bill.reasons.join(' · '):'기본 정산'}`);
     }
@@ -4801,7 +4915,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
-    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);
+    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);setSettleNote(null);
     if(next.finished)finish(next,true);
   };
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
@@ -4827,19 +4941,36 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
     const next=chooseGoOrStop(round,action);
     setRound(next);if(next.finished)finish(next);
   };
-  const myScore=round?scoreGoStop(round.players[0].captured):null;
+  // 자리마다 점수를 다시 세는 일은 화투 48장을 매번 훑습니다. 판이 바뀔 때만 셉니다.
+  const scores=useMemo(()=>round?round.players.map((player)=>scoreGoStop(player.captured)):[],[round]);
+  const myScore=scores[0]??null;
   const bombMonths=round?Array.from(new Set(round.players[0].hand.map((card)=>card.month))).filter((month)=>round.players[0].hand.filter((card)=>card.month===month).length===3&&round.floor.filter((card)=>card.month===month).length===1):[];
   const shakeMonths=round?Array.from(new Set(round.players[0].hand.map((card)=>card.month))).filter((month)=>round.players[0].hand.filter((card)=>card.month===month).length===3&&!(round.players[0].shakenMonths??[]).includes(month)):[];
 
   // 실제 고스톱 판처럼 한 화면에 고정합니다. 위가 상대 자리, 가운데가 바닥,
   // 아래가 내 자리와 손패입니다. 스크롤이 없어 판 전체가 한눈에 들어옵니다.
-  const takenRow=(cards:HwatuCard[])=><View style={styles.goStopTakenRow}>{goStopTakenOrder.map((kind)=>{
-    const group=cards.filter((card)=>goStopTakenKind(card)===kind);
-    if(!group.length)return null;
-    // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
-    if(kind==='띠')group.sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣'));
-    return <View key={kind} style={styles.goStopTakenGroup}>{group.map((card,index)=><View key={card.id} style={index?styles.goStopTakenOverlap:null}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
-  })}</View>;
+  /**
+   * 모은 패. **한 줄에서 절대 안 넘치게** 겹치는 정도를 자리 폭에 맞춰 잽니다.
+   *
+   * ⚠️ 전에는 `flexWrap`이라 패가 늘면 줄이 접혔고, 그만큼 아래가 밀려 **내 손패가
+   * 화면 밖으로 나갔습니다**(게임 중에 패가 안 보인다고 하신 것이 이것입니다).
+   * 판은 스크롤이 없으므로 밀리면 그대로 안 보입니다.
+   */
+  const takenRow=(cards:HwatuCard[],width:number)=>{
+    const groups=goStopTakenOrder.map((kind)=>({kind,cards:cards.filter((card)=>goStopTakenKind(card)===kind)})).filter((group)=>group.cards.length);
+    // 겹쳐 놓는 장수(무리마다 첫 장은 안 겹칩니다)와 남는 폭으로 한 걸음을 정합니다.
+    const overlapped=cards.length-groups.length;
+    const spare=width-groups.length*GOSTOP_TAKEN_CARD-Math.max(0,groups.length-1)*GOSTOP_TAKEN_GAP;
+    const step=overlapped>0?Math.max(2,Math.min(GOSTOP_TAKEN_STEP,Math.floor(spare/overlapped))):GOSTOP_TAKEN_STEP;
+    return <View style={styles.goStopTakenRow}>{groups.map(({kind,cards:group})=>{
+      // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
+      const sorted=kind==='띠'?[...group].sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣')):group;
+      return <View key={kind} style={styles.goStopTakenGroup}>{sorted.map((card,index)=><View key={card.id} style={index?{marginLeft:step-GOSTOP_TAKEN_CARD}:null}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
+    })}</View>;
+  };
+  // 자리 폭(375 화면 기준). 판 좌우 여백 8+8, 자리 사이 6, 자리 안쪽 여백 7+7을 뺀 값입니다.
+  const seatTakenWidth=mode==='matgo'?345:162;
+  const myTakenWidth=359;
   // 손패 한 줄에 다 들어오도록 장수에 맞춰 겹치는 정도를 정합니다. 적을 때는 겹치지 않습니다.
   const handCount=round?round.players[0].hand.length:0;
   const handStep=Math.min(55,handCount>1?(335-52)/(handCount-1):55);
@@ -4852,11 +4983,11 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
       {/* 상대 자리. 손패는 뒷면 장수만, 모은 패는 아주 작게 겹쳐 쌓습니다. */}
       <View style={styles.goStopOpponentRow}>{round.players.slice(1).map((player,index)=>{
-        const score=scoreGoStop(player.captured);
+        const score=scores[index+1];
         return <View key={index} style={[styles.goStopSeat,round.turn===index+1&&!round.finished&&styles.goStopSeatActive]}>
           <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
           <View style={styles.goStopBackRow}>{player.hand.map((card)=><View key={card.id} style={styles.goStopBack}/>)}</View>
-          {takenRow(player.captured)}
+          {takenRow(player.captured,seatTakenWidth)}
         </View>;
       })}</View>
 
@@ -4901,7 +5032,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
       {/* 내 자리 */}
       <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
-      {takenRow(round.players[0].captured)}
+      {takenRow(round.players[0].captured,myTakenWidth)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
       {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
@@ -4919,7 +5050,10 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
         </>:round.pendingDecision===0&&!round.finished?<View style={styles.goStopButtonRow}>
           <Pressable style={styles.goStopButton} onPress={()=>decide('go')}><Text style={styles.primaryButtonText}>고 · 계속하기</Text></Pressable>
           <Pressable style={styles.goStopButtonQuiet} onPress={()=>decide('stop')}><Text style={styles.holdemActionText}>스톱 · 끝내기</Text></Pressable>
-        </View>:round.finished?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable>:
+        </View>:round.finished?<>
+          {settleNote?<View style={styles.goStopBillBox}><Text style={styles.goStopBillTitle}>{settleNote.title}</Text>{settleNote.lines.map((line,index)=><Text key={index} style={styles.goStopBillLine}>{line}</Text>)}</View>:null}
+          <Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable>
+        </>:
         (bombMonths.length||shakeMonths.length)&&round.turn===0?<View style={styles.goStopButtonRow}>
           {bombMonths.map((month)=><Pressable key={`b${month}`} style={styles.goStopButton} onPress={()=>bomb(month)}><Text style={styles.primaryButtonText}>{month}월 폭탄</Text></Pressable>)}
           {shakeMonths.map((month)=><Pressable key={`s${month}`} style={styles.goStopButtonQuiet} onPress={()=>shake(month)}><Text style={styles.holdemActionText}>{month}월 흔들기</Text></Pressable>)}
@@ -6528,6 +6662,38 @@ function WalletAnalysisScreen({ kind, records, onBack }: { kind: WalletAnalysis;
   );
 }
 
+/** 게임별 · 시간대별로 묶어 센 한 줄입니다. */
+type RecordSummary = { key: string; plays: number; wins: number; net: number };
+/**
+ * `records`를 원하는 기준으로 묶어 판수 · 이긴 판 · 손익을 셉니다.
+ * ⚠️ 지갑 분석의 `summariseRecords`와 다릅니다 — 그쪽은 이미 걸러 낸 묶음 하나를 세고
+ * 이쪽은 통째로 받아 기준마다 갈라 셉니다.
+ */
+function groupRecords(records: GameRecord[], keyOf: (record: GameRecord) => string) {
+  const table = new Map<string, RecordSummary>();
+  for (const record of records) {
+    const key = keyOf(record);
+    const row = table.get(key) ?? { key, plays: 0, wins: 0, net: 0 };
+    row.plays += 1;
+    if (record.result === 'win' || record.result === 'blackjack') row.wins += 1;
+    row.net += record.net;
+    table.set(key, row);
+  }
+  return [...table.values()];
+}
+
+/**
+ * 0~23시를 네 시간씩 여섯 칸으로 묶습니다.
+ * 24줄을 그대로 늘어놓으면 화면이 너무 길어지고, 한 칸에 든 판수도 너무 적어집니다.
+ */
+function timeBlockOf(playedAt: string) {
+  const start = Math.floor(new Date(playedAt).getHours() / 4) * 4;
+  return `${String(start).padStart(2, '0')}~${String(start + 4).padStart(2, '0')}시`;
+}
+
+const summaryLine = (row: RecordSummary) =>
+  `${row.plays}판 · 승률 ${(row.wins / row.plays * 100).toFixed(0)}%`;
+
 function maxWinStreak(records: GameRecord[]) {
   let current = 0;
   let maximum = 0;
@@ -6547,6 +6713,10 @@ function RecordsScreen({ records, totalPlays }: { records: GameRecord[]; totalPl
   const winRate = records.length > 0 ? wins / records.length * 100 : 0;
   const totalNet = records.reduce((sum, record) => sum + record.net, 0);
   const rank = levelFromPlays(totalPlays);
+  // 게임별은 **손해가 큰 쪽부터** 봅니다. 어디서 잃고 있는지가 먼저 보여야 합니다.
+  const byGame = groupRecords(records, (record) => record.game).sort((left, right) => left.net - right.net);
+  // 시간대는 이른 시간부터 늘어놓습니다. 키가 '00~04시'라 글자 순서가 곧 시간 순서입니다.
+  const byTime = groupRecords(records, (record) => timeBlockOf(record.playedAt)).sort((left, right) => left.key.localeCompare(right.key));
   return (
     <Page>
       <Text style={styles.pageTitle}>기록</Text>
@@ -6565,7 +6735,40 @@ function RecordsScreen({ records, totalPlays }: { records: GameRecord[]; totalPl
         <Stat label="최고 연승" value={`${maxWinStreak(records)}연승`} />
         <Stat label="총 손익" value={`${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString()}`} positive={totalNet > 0} />
       </View>
+      <Text style={styles.sectionTitle}>게임별</Text>
+      <Text style={styles.helperText}>손해가 큰 게임부터 놓았습니다. 해 본 게임만 나옵니다.</Text>
+      <View style={styles.panel}>
+        {byGame.length === 0 && <Text style={styles.emptyText}>아직 완료한 게임이 없습니다.</Text>}
+        {byGame.map((row, index) => (
+          <React.Fragment key={row.key}>
+            <Row
+              title={gameDisplayName(row.key)}
+              subtitle={summaryLine(row)}
+              value={`${row.net > 0 ? '+' : ''}${row.net.toLocaleString()} WC`}
+              positive={row.net > 0}
+            />
+            {index < byGame.length - 1 && <View style={styles.separator} />}
+          </React.Fragment>
+        ))}
+      </View>
+      <Text style={styles.sectionTitle}>시간대별</Text>
+      <Text style={styles.helperText}>네 시간씩 묶었습니다. 언제 이기고 있는지 보는 자리입니다.</Text>
+      <View style={styles.panel}>
+        {byTime.length === 0 && <Text style={styles.emptyText}>아직 완료한 게임이 없습니다.</Text>}
+        {byTime.map((row, index) => (
+          <React.Fragment key={row.key}>
+            <Row
+              title={row.key}
+              subtitle={summaryLine(row)}
+              value={`${row.net > 0 ? '+' : ''}${row.net.toLocaleString()} WC`}
+              positive={row.net > 0}
+            />
+            {index < byTime.length - 1 && <View style={styles.separator} />}
+          </React.Fragment>
+        ))}
+      </View>
       <Text style={styles.sectionTitle}>최근 경기</Text>
+      <Text style={styles.helperText}>기록은 최근 100판까지 남습니다. 위의 셈도 그 100판 것입니다.</Text>
       <View style={styles.panel}>
         {records.length === 0 && <Text style={styles.emptyText}>게임을 완료하면 기록이 여기에 저장됩니다.</Text>}
         {records.map((record, index) => (
@@ -6794,9 +6997,11 @@ const feltLook = {
 const styles = StyleSheet.create({
   app: { flex: 1, backgroundColor: colors.bg },
   // 위 가운데에서 번지는 금빛. 배경 없는 납작한 상자에 큰 그림자만 줘서 부드럽게 퍼집니다.
-  roomLight: { position: 'absolute', top: 0, alignSelf: 'center', width: 230, height: 6, borderRadius: 6, shadowColor: '#FFC978', shadowOpacity: 0.42, shadowRadius: 120, shadowOffset: { width: 0, height: 60 } },
-  // 안쪽으로 파고드는 검은 그림자 한 겹. 구석이 어두워집니다.
-  roomVignette: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, boxShadow: 'inset 0 0 130px 30px rgba(8,2,8,0.78)' },
+  roomLight: { position: 'absolute', top: 0, alignSelf: 'center', width: 260, height: 6, borderRadius: 6, shadowColor: '#FFC978', shadowOpacity: 0.55, shadowRadius: 150, shadowOffset: { width: 0, height: 70 } },
+  // 안쪽으로 파고드는 검은 그림자 한 겹. 구석이 살짝 가라앉습니다.
+  // ⚠️ 전에는 130px 번짐에 30px 퍼짐, 진하기 0.78이었습니다. 그러면 가장자리가 거의
+  // 검정이 되어 자주색 바탕과 갈라진 띠로 보입니다. 퍼짐은 빼고 진하기는 0.24까지만.
+  roomVignette: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, boxShadow: 'inset 0 0 96px 0 rgba(8,2,8,0.24)' },
   screen: { flex: 1 },
   splash: { flex: 1, backgroundColor: '#040711', overflow: 'hidden' },
   splashBackground: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'space-between' },
@@ -6826,7 +7031,8 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#171107', fontSize: 17, fontWeight: '800' },
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
   disclaimer: { color: colors.muted, fontSize: 12, marginTop: 18 },
-  header: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: '#171D28' },
+  // ⚠️ 아래 선을 파란 회색(#171D28)으로 두면 자주 바탕 위에서 선만 튀어 화면이 갈라져 보입니다.
+  header: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
   avatarText: { color: colors.goldLight, fontSize: 13, fontWeight: '800' },
@@ -7061,7 +7267,9 @@ const styles = StyleSheet.create({
   tableSideStack: { color: '#9FE3C0', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   // 칩이 늘어도 자리 높이가 안 바뀌게 다섯 개 높이(13 + 4×4)를 늘 잡아 둡니다.
   tableChipPile: { flexDirection: 'column-reverse', alignItems: 'center', height: 29 },
-  tableChip: { width: 13, height: 13, borderRadius: 7, borderWidth: 1, borderColor: 'rgba(255,255,255,0.45)' },
+  // 테두리를 점선으로 두면 둘레에 흰 눈금이 생겨 **칩으로 보입니다.** 버튼으로 오해받던 것을
+  // 이렇게 고쳤습니다. 점선은 자리를 한 칸도 더 안 먹습니다.
+  tableChip: { width: 13, height: 13, borderRadius: 7, borderWidth: 2, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.8)' },
   tableChipStacked: { marginBottom: -9 },
   tableChipText: { color: '#F8E6B0', fontSize: 11, fontWeight: '800' },
   tableChipTextSmall: { color: '#F8E6B0', fontSize: 10, fontWeight: '800' },
@@ -7108,7 +7316,9 @@ const styles = StyleSheet.create({
   paiGowDivider: { width: '100%', padding: 12, borderRadius: 14, backgroundColor: '#153E31', borderWidth: 1, borderColor: '#5A8C75' },
   paiGowDividerTitle: { color: '#FFE080', fontSize: 14, fontWeight: '900', marginBottom: 4 },
   paiGowHandSummary: { width: '100%', flexDirection: 'row', gap: 8 },
-  paiGowResultMark: { color: '#FFE080', fontSize: 16, fontWeight: '900', marginTop: 6 },
+  paiGowResultMark: { color: '#FFE080', fontSize: 15, fontWeight: '900' },
+  // 제목과 승·패를 한 줄에 놓습니다.
+  paiGowSummaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
   paiGowShowdownButton: { flex: 1, width: undefined },
   chineseRow: { ...feltLook, width: '100%', gap: 8, marginBottom: 10 },
   chineseRowActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
@@ -7218,6 +7428,8 @@ const styles = StyleSheet.create({
   tujeonHandLabel: { color: colors.gold, fontSize: 20, fontWeight: '900' },
   tujeonAdvice: { color: '#A08FA0', fontSize: 13, fontWeight: '700' },
   paiGowWarning: { color: '#FFB39D', fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  // 아직 아무것도 안 내린 로우 줄에 넣는 안내. 줄 높이는 그대로 두고 글자만 채웁니다.
+  paiGowRowHint: { color: '#9FBBAE', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   racingPickBanner: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 16, backgroundColor: '#332A12', borderWidth: 2, borderColor: '#E4BB4D' },
   racingPickCopy: { flex: 1 },
   racingPickEyebrow: { color: '#E4BB4D', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
@@ -7884,7 +8096,10 @@ const styles = StyleSheet.create({
   sicboPage: { padding: 18, paddingBottom: 46 },
   sicboBowl: { minHeight: 230, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 115, backgroundColor: '#621B22', borderWidth: 5, borderColor: '#D8B451' },
   sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 22, transform: [{ scale: 0.75 }] },
-  sicboResult: { fontSize: 16, fontWeight: '900', marginTop: -4 },
+  // ⚠️ lineHeight를 안 주면 한글 윗부분이 잘립니다(파이 고우 결과 줄에서 봤습니다).
+  // ⚠️ color가 없으면 글자가 검정으로 떨어져 어두운 바탕에서 거의 안 보입니다.
+  //    파이 고우 결과 줄이 잘린 것처럼 보인 것이 이것이었습니다(승·패 색은 뒤에 덧씌웁니다).
+  sicboResult: { color: colors.text, fontSize: 16, lineHeight: 26, fontWeight: '900' },
   yahtzeeDieButton: { alignItems:'center', gap:5, padding:4, borderRadius:12, borderWidth:2, borderColor:'transparent' },
   yahtzeeHeld: { backgroundColor:'rgba(225,182,63,0.22)', borderColor:'#E1B63F', transform:[{translateY:-8}] },
   yahtzeeHoldText: { color:'#F3D77B', fontSize:9, fontWeight:'900' },
@@ -8108,7 +8323,8 @@ const styles = StyleSheet.create({
   // 실제 고스톱 판처럼 한 화면에 고정한 배치입니다.
   goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0C4A2E', justifyContent: 'space-between' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
-  goStopSeat: { flex: 1, minHeight: 130, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
+  // 높이를 위아래로 묶어 둡니다. 상대가 패를 모을수록 자리가 커지면 그만큼 내 손패가 밀립니다.
+  goStopSeat: { flex: 1, minHeight: 130, maxHeight: 140, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
   goStopSeatActive: { borderColor: colors.gold },
   goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
@@ -8116,7 +8332,8 @@ const styles = StyleSheet.create({
   // 상대 손패는 뒷면 장수만 보여 줍니다. 무슨 패인지는 알 수 없으니까요.
   goStopBackRow: { flexDirection: 'row', gap: 2, minHeight: 22 },
   goStopBack: { width: 13, height: 21, borderRadius: 2, backgroundColor: '#1A2233', borderWidth: 1, borderColor: '#D12B32' },
-  goStopTakenRow: { flexDirection: 'row', flexWrap: 'wrap', minHeight: 46, alignItems: 'center', gap: 8 },
+  // ⚠️ 줄을 접지 않습니다(`flexWrap` 없음). 접히면 자리가 아래로 늘어 손패를 화면 밖으로 밀어냅니다.
+  goStopTakenRow: { flexDirection: 'row', height: 46, alignItems: 'center', gap: 8 },
   goStopTakenGroup: { flexDirection: 'row' },
   goStopTurnBox: { alignItems: 'center', gap: 6 },
   // 판 위에 떠 있는 상자입니다. 자리를 차지하지 않으므로 나타나도 화면이 안 밀립니다.
@@ -8135,7 +8352,10 @@ const styles = StyleSheet.create({
   goStopSlapMissed: { borderRadius: 5, borderWidth: 1, borderColor: 'rgba(255,227,154,0.45)', shadowColor: '#FFE39A', shadowOpacity: 0.35, shadowRadius: 6, elevation: 3 },
   // 작은 패 위에 얹을 때는 겹치는 폭도 그만큼 줄입니다.
   goStopSlapOverSmall: { marginLeft: -22, marginTop: 9, transform: [{ rotate: '8deg' }] },
-  goStopTakenOverlap: { marginLeft: -18 },
+  // 판이 끝났을 때만 나오는 계산서. 무엇으로 몇 점이 되었는지 적습니다.
+  goStopBillBox: { borderRadius: 10, borderWidth: 1, borderColor: colors.gold, backgroundColor: 'rgba(4,26,17,0.75)', paddingHorizontal: 10, paddingVertical: 8, gap: 2 },
+  goStopBillTitle: { color: '#FFE9A8', fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  goStopBillLine: { color: '#CFE0D6', fontSize: 11, fontWeight: '700', textAlign: 'center' },
   goStopFloorArea: { flex: 1, justifyContent: 'center' },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 96, paddingTop: 14, alignItems: 'center' },
   // 칠 수 있는 패는 살짝 들어 올리고 금빛을 둘러 눈에 띄게 합니다.
