@@ -299,10 +299,14 @@ const accessibilityLabels: Record<keyof AccessibilityOptions, { title: string; d
   reduceMotion: { title: '애니메이션 줄이기', detail: '룰렛·슬롯·주사위 회전 연출을 거의 없앱니다' },
 };
 
+/**
+ * 아래 바. **가운데가 홈**이고 왕관이 원으로 튀어나옵니다(목업대로).
+ * 순서를 바꿀 때는 홈이 가운데(세 번째)에 오게 두세요 — `tabCrown`이 가운데 칸을 전제합니다.
+ */
 const tabs: { name: Tab; icon: string }[] = [
-  { name: '홈', icon: '⌂' },
   { name: '게임', icon: '♠' },
   { name: '지갑', icon: '◈' },
+  { name: '홈', icon: '♔' },
   { name: '기록', icon: '▥' },
   { name: '설정', icon: '⚙' },
 ];
@@ -859,7 +863,7 @@ function CasinoApp() {
     // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
     <View style={[styles.app, { paddingTop: Math.max(0, insets.top - topInsetTrim) }]}>
       <StatusBar style="light" />
-      {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} />}
+      {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} onOpenSettings={() => setTab('설정')} />}
       <View style={styles.screen}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
@@ -1120,7 +1124,7 @@ function CasinoApp() {
         {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
         {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && <BottomInsetContext.Provider value={insets.bottom}>{renderTab({
-          tab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration,
+          tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
           onRefillCoins: refillTestCoins, coins, records, totalPlays, lastGame,
           onExportBackup: exportBackup, onPickBackup: pickBackupFile,
@@ -1159,7 +1163,9 @@ function CasinoApp() {
                 setAppScreen('tabs');
               }}
             >
-              <Text style={[styles.tabIcon, selected && styles.tabSelected]}>{item.icon}</Text>
+              {item.name === '홈'
+                ? <View style={[styles.tabCrown, selected && styles.tabCrownActive]}><Text style={[styles.tabCrownIcon, selected && styles.tabCrownIconActive]}>{item.icon}</Text></View>
+                : <Text style={[styles.tabIcon, selected && styles.tabSelected]}>{item.icon}</Text>}
               <Text style={[styles.tabLabel, selected && styles.tabSelected]}>{item.name}</Text>
             </Pressable>
           );
@@ -1178,21 +1184,29 @@ function CasinoApp() {
   );
 }
 
-function Header({ coins, totalPlays }: { coins: number; totalPlays: number }) {
+/**
+ * 위 바. 목업대로 **왼쪽 프로필 원 · 가운데 금테 알약 안에 코인 · 오른쪽 원형 아이콘**입니다.
+ * 이름과 레벨은 여기서 뺐습니다 — 레벨은 기록 화면 맨 위에 크게 있고,
+ * 이 줄은 세 덩이만 두어야 가운데 알약이 진짜 가운데에 옵니다.
+ */
+function Header({ coins, totalPlays, onOpenSettings }: { coins: number; totalPlays: number; onOpenSettings: () => void }) {
   const { level } = levelFromPlays(totalPlays);
   return (
     <View style={styles.header}>
-      <View style={styles.profileRow}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>G</Text></View>
-        <View>
-          <Text style={styles.profileName}>게스트</Text>
-          <Text style={styles.level}>LV. {level}</Text>
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>☻</Text>
+        {/* 레벨은 원 위에 얹습니다. 자리를 안 먹고, 숫자만 덩그러니 있는 것보다 뜻이 분명합니다. */}
+        <View style={styles.avatarLevel}><Text style={styles.avatarLevelText}>{level}</Text></View>
+      </View>
+      <View style={styles.headerMiddle}>
+        <View style={styles.walletPill}>
+          <View style={styles.walletCoin}><Text style={styles.walletCoinMark}>₩</Text></View>
+          <Text style={styles.walletText}>{coins.toLocaleString()}</Text>
         </View>
       </View>
-      <View style={styles.walletPill}>
-        <Text style={styles.coin}>●</Text>
-        <Text style={styles.walletText}>{coins.toLocaleString()} WC</Text>
-      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="설정" style={styles.headerRound} onPress={onOpenSettings}>
+        <Text style={styles.headerRoundIcon}>⚙</Text>
+      </Pressable>
     </View>
   );
 }
@@ -1200,6 +1214,8 @@ function Header({ coins, totalPlays }: { coins: number; totalPlays: number }) {
 /** 탭 화면에 넘길 값들. 자리 순서로 넘기면 실수하기 쉬워 객체 하나로 모았습니다. */
 type TabProps = {
   tab: Tab;
+  /** 화면 안에서 다른 탭으로 옮깁니다(홈의 PLAY NOW · 내 기록). */
+  onGoTab: (tab: Tab) => void;
   difficulty: string;
   saveDifficulty: (value: string) => void;
   sound: boolean;
@@ -1228,7 +1244,7 @@ type TabProps = {
 
 function renderTab(props: TabProps) {
   if (props.tab === '게임') return <GamesScreen onOpenCategory={props.onOpenCategory} onOpenBlackjack={props.onOpenBlackjack} onOpenCatalogGame={props.onOpenCatalogGame} records={props.records} lastGame={props.lastGame} />;
-  if (props.tab === '지갑') return <WalletScreen coins={props.coins} records={props.records} />;
+  if (props.tab === '지갑') return <WalletScreen coins={props.coins} records={props.records} onRefillCoins={props.onRefillCoins} />;
   if (props.tab === '기록') return <RecordsScreen records={props.records} totalPlays={props.totalPlays} />;
   if (props.tab === '설정') {
     return <SettingsScreen
@@ -1249,9 +1265,10 @@ function renderTab(props: TabProps) {
       onCancelImport={props.onCancelImport}
       backupNote={props.backupNote}
       pendingImport={props.pendingImport}
+      totalPlays={props.totalPlays}
     />;
   }
-  return <HomeScreen difficulty={props.difficulty} records={props.records} lastGame={props.lastGame} onContinue={(gameName) => {
+  return <HomeScreen difficulty={props.difficulty} records={props.records} lastGame={props.lastGame} onGoTab={props.onGoTab} onContinue={(gameName) => {
     const category = gameCategories.find((item) => item.games.some((game) => game.name === gameName)) ?? gameCategories[1];
     const game = category.games.find((item) => item.name === gameName) ?? category.games[0];
     props.onOpenCatalogGame(category, game);
@@ -1528,7 +1545,7 @@ function formatPlayedAt(value: string) {
   return new Date(value).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function HomeScreen({ difficulty, records, lastGame, onContinue }: { difficulty: string; records: GameRecord[]; lastGame: GameRecord['game'] | ''; onContinue: (game: GameRecord['game']) => void }) {
+function HomeScreen({ difficulty, records, lastGame, onGoTab, onContinue }: { difficulty: string; records: GameRecord[]; lastGame: GameRecord['game'] | ''; onGoTab: (tab: Tab) => void; onContinue: (game: GameRecord['game']) => void }) {
   const recentGame = records[0];
   // 마지막으로 '고른' 게임이 우선입니다. 없으면 마지막으로 끝낸 게임을 씁니다.
   const continueGame = lastGame || recentGame?.game || '블랙잭';
@@ -1541,8 +1558,22 @@ function HomeScreen({ difficulty, records, lastGame, onContinue }: { difficulty:
   const missionDone = Math.min(countPlayedOn(records, missionDayKey(new Date())), DAILY_MISSION_GOAL);
   return (
     <Page>
-      <Text style={styles.eyebrow}>오늘도 즐거운 한 판</Text>
-      <Text style={styles.pageTitle}>메인 로비</Text>
+      {/*
+        목업의 첫 화면입니다. **사진 자리는 아직 비워 둡니다** — 배경 사진은 6번이고
+        파일을 받아야 시작할 수 있습니다. 그때까지는 왕관과 제목만으로 자리를 잡아 둡니다.
+        ⚠️ 높이는 224로 묶어 둡니다. 사진이 들어와도 이 높이를 지키세요.
+      */}
+      <View style={styles.homeHero}>
+        <Text style={styles.homeHeroCrown}>♔</Text>
+        <Text style={styles.homeHeroTitle} {...displayFont}>CASINO</Text>
+        <View style={styles.homeHeroRule}><View style={styles.homeHeroRuleLine} /><Text style={styles.homeHeroSub} {...displayFont}>ROYAL</Text><View style={styles.homeHeroRuleLine} /></View>
+      </View>
+      <Pressable accessibilityRole="button" style={[styles.primaryButton, styles.homePlayNow]} onPress={() => onGoTab('게임')}>
+        <Text style={styles.homePlayNowText} {...displayFont}>PLAY NOW</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" style={styles.homeSecondary} onPress={() => onGoTab('기록')}>
+        <Text style={styles.homeSecondaryText}>내 기록</Text>
+      </Pressable>
 
       <Text style={styles.sectionTitle}>이어서 하기</Text>
       <View style={styles.heroCard}>
@@ -1676,26 +1707,42 @@ function GamesScreen({
         </View>
       </> : <>
         <Text style={styles.sectionTitle}>{visibleGames.length}개 게임</Text>
-        <View style={styles.catalogList}>
+        <View style={styles.gameGrid}>
           {visibleGames.map(({ category, game }) => (
-            <View key={`${category.name}-${game.name}`} style={styles.gameListCard}>
-              <Pressable accessibilityRole="button" style={styles.resultOpenArea} onPress={() => onOpenCatalogGame(category, game)}>
-                <View style={styles.gameListIcon}><Text style={styles.gameListIconText}>{game.icon}</Text></View>
-                <View style={styles.gameListCopy}>
-                  <Text style={styles.resultCategory}>{category.name}</Text>
-                  <Text style={styles.gameListTitle}>{gameDisplayName(game.name)}</Text>
-                  <Text style={styles.gameListDescription}>{game.description}</Text>
-                </View>
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${game.name} 즐겨찾기`} style={styles.favoriteButton} onPress={() => toggleFavorite(game.name)}>
-                <Text style={[styles.favoriteIcon, favorites.includes(game.name) && styles.favoriteIconActive]}>{favorites.includes(game.name) ? '★' : '☆'}</Text>
-              </Pressable>
-            </View>
+            <GameGridCard
+              key={`${category.name}-${game.name}`}
+              game={game}
+              onPress={() => onOpenCatalogGame(category, game)}
+              favorite={favorites.includes(game.name)}
+              onToggleFavorite={() => toggleFavorite(game.name)}
+            />
           ))}
           {visibleGames.length === 0 && <View style={styles.panel}><Text style={styles.emptyText}>{query.trim() ? '검색 결과가 없습니다.' : filter === 'favorites' ? '즐겨찾기한 게임이 없습니다. 게임 옆의 별을 눌러 추가하세요.' : filter === 'recent' ? '아직 연 게임이 없습니다. 게임을 하나 골라 보세요.' : '게임이 없습니다.'}</Text></View>}
         </View>
       </>}
     </Page>
+  );
+}
+
+/**
+ * 게임 카드 한 장. 목업대로 **위가 그림 칸, 아래가 이름**이고 두 줄 그리드로 깔립니다.
+ * 그림 파일이 아직 없어 그림 칸에는 지금처럼 글자 아이콘(♠ · 魚)이 들어갑니다.
+ * ⚠️ 이름은 짧은 이름만 씁니다 — `gameDisplayName`은 괄호가 붙어 두 줄을 넘깁니다.
+ */
+function GameGridCard({ game, onPress, favorite, onToggleFavorite }: { game: CatalogGame; onPress: () => void; favorite?: boolean; onToggleFavorite?: () => void }) {
+  return (
+    <View style={styles.gameGridCard}>
+      <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [pressed && styles.pressed]}>
+        <View style={styles.gameGridArt}>
+          <Text style={styles.gameGridArtText}>{game.icon}</Text>
+          {game.status !== 'playable' && <Text style={styles.gameGridBadge}>준비 중</Text>}
+        </View>
+        <Text style={styles.gameGridName} numberOfLines={2}>{game.name}</Text>
+      </Pressable>
+      {onToggleFavorite && <Pressable accessibilityRole="button" accessibilityLabel={`${game.name} 즐겨찾기`} style={styles.gameGridStar} onPress={onToggleFavorite}>
+        <Text style={[styles.favoriteIcon, favorite && styles.favoriteIconActive]}>{favorite ? '★' : '☆'}</Text>
+      </Pressable>}
+    </View>
   );
 }
 
@@ -1765,25 +1812,8 @@ function CategoryCatalogScreen({ category, onBack, onOpenGame }: { category: Gam
         <Text style={styles.eyebrow}>{category.eyebrow}</Text>
         <Text style={styles.detailLead}>원하는 게임을 선택하세요</Text>
         <View style={styles.searchBox}><Text style={styles.muted}>⌕  {category.name} 게임 검색</Text></View>
-        <View style={styles.catalogList}>
-          {category.games.map((game) => (
-            <Pressable
-              key={game.name}
-              accessibilityRole="button"
-              onPress={() => onOpenGame(game)}
-              style={({ pressed }) => [styles.gameListCard, pressed && styles.pressed]}
-            >
-              <View style={styles.gameListIcon}><Text style={styles.gameListIconText}>{game.icon}</Text></View>
-              <View style={styles.gameListCopy}>
-                <View style={styles.gameTitleRow}>
-                  <Text style={styles.gameListTitle}>{gameDisplayName(game.name)}</Text>
-                  {game.status !== 'playable' && <Text style={styles.comingSoonBadge}>준비 중</Text>}
-                </View>
-                <Text style={styles.gameListDescription}>{game.description}</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </Pressable>
-          ))}
+        <View style={styles.gameGrid}>
+          {category.games.map((game) => <GameGridCard key={game.name} game={game} onPress={() => onOpenGame(game)} />)}
         </View>
       </ScrollView>
     </View>
@@ -6524,7 +6554,7 @@ function summariseRecords(records: GameRecord[]) {
 
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toLocaleString()}`;
 
-function WalletScreen({ coins, records }: { coins: number; records: GameRecord[] }) {
+function WalletScreen({ coins, records, onRefillCoins }: { coins: number; records: GameRecord[]; onRefillCoins: () => void }) {
   const [analysis, setAnalysis] = useState<WalletAnalysis | null>(null);
   const overall = summariseRecords(records);
   // 최근 여덟 판의 손익을 막대로 보여 줍니다(고정 그림이 아니라 실제 기록).
@@ -6563,6 +6593,23 @@ function WalletScreen({ coins, records }: { coins: number; records: GameRecord[]
             </>
           : <Text style={styles.emptyText}>게임을 완료하면 최근 손익 그래프가 나타납니다.</Text>}
       </View>
+      {/*
+        목업의 네 칸 버튼입니다. 목업에는 충전 · 출금 · 이용 내역 · 선물함이었는데,
+        **충전과 출금은 진짜 결제라 이 앱에 없습니다**(게스트 · 가상 코인뿐입니다).
+        그래서 실제로 되는 네 가지로 바꿔 넣었습니다.
+      */}
+      <View style={styles.walletActions}>
+        {([['game', '게임별', '◈'], ['tier', '등급별', '▤'], ['ledger', '전체 내역', '▥']] as const).map(([kind, label, icon]) => (
+          <Pressable key={kind} accessibilityRole="button" style={({ pressed }) => [styles.walletAction, pressed && styles.pressed]} onPress={() => setAnalysis(kind)}>
+            <Text style={styles.walletActionIcon}>{icon}</Text>
+            <Text style={styles.walletActionLabel}>{label}</Text>
+          </Pressable>
+        ))}
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.walletAction, pressed && styles.pressed]} onPress={onRefillCoins}>
+          <Text style={styles.walletActionIcon}>＋</Text>
+          <Text style={styles.walletActionLabel}>코인 받기</Text>
+        </Pressable>
+      </View>
       <Text style={styles.sectionTitle}>카테고리별 비교</Text>
       <View style={styles.panel}>
         {gameCategories.map((category, index) => {
@@ -6580,14 +6627,6 @@ function WalletScreen({ coins, records }: { coins: number; records: GameRecord[]
             </React.Fragment>
           );
         })}
-      </View>
-      <Text style={styles.sectionTitle}>분석 메뉴</Text>
-      <View style={styles.panel}>
-        <Pressable accessibilityRole="button" onPress={() => setAnalysis('game')}><Row title="게임별 손익" subtitle={`${new Set(records.map((record) => record.game)).size}개 게임`} value="보기  ›" /></Pressable>
-        <View style={styles.separator} />
-        <Pressable accessibilityRole="button" onPress={() => setAnalysis('tier')}><Row title="베팅 등급별 수익률" subtitle={`${new Set(records.map((record) => record.difficulty)).size}개 등급`} value="보기  ›" /></Pressable>
-        <View style={styles.separator} />
-        <Pressable accessibilityRole="button" onPress={() => setAnalysis('ledger')}><Row title="전체 거래 내역" subtitle={`${records.length}건`} value="보기  ›" /></Pressable>
       </View>
     </Page>
   );
@@ -6714,6 +6753,24 @@ function timeBlockOf(playedAt: string) {
 const summaryLine = (row: RecordSummary) =>
   `${row.plays}판 · 승률 ${(row.wins / row.plays * 100).toFixed(0)}%`;
 
+/**
+ * 기록 한 줄. 목업대로 **썸네일 + 이름/날짜 + 오른쪽 초록·빨강 금액**입니다.
+ * 그림 파일이 아직 없어 썸네일에는 그 게임의 글자 아이콘이 들어갑니다.
+ */
+function RecordRow({ record }: { record: GameRecord }) {
+  const icon = gameCategories.flatMap((category) => category.games).find((game) => game.name === record.game)?.icon ?? '◆';
+  return (
+    <View style={styles.recordRow}>
+      <View style={styles.recordThumb}><Text style={styles.recordThumbText}>{icon}</Text></View>
+      <View style={styles.recordCopy}>
+        <Text style={styles.recordName} numberOfLines={1}>{gameDisplayName(record.game)}</Text>
+        <Text style={styles.recordWhen} numberOfLines={2}>{formatPlayedAt(record.playedAt)} · {resultLabel(record.result)} · 베팅 {record.bet.toLocaleString()}{record.detail ? ` · ${record.detail}` : ''}</Text>
+      </View>
+      <Text style={[styles.recordAmount, record.net > 0 ? styles.positive : record.net < 0 ? styles.negative : null]}>{record.net > 0 ? '+' : ''}{record.net.toLocaleString()}</Text>
+    </View>
+  );
+}
+
 function maxWinStreak(records: GameRecord[]) {
   let current = 0;
   let maximum = 0;
@@ -6732,6 +6789,9 @@ function RecordsScreen({ records, totalPlays }: { records: GameRecord[]; totalPl
   const wins = records.filter((record) => record.result === 'win' || record.result === 'blackjack').length;
   const winRate = records.length > 0 ? wins / records.length * 100 : 0;
   const totalNet = records.reduce((sum, record) => sum + record.net, 0);
+  // 목업의 요약 세 칸. 총 승리는 **이긴 판의 이익만** 더한 값이고, 총 손익과 다릅니다.
+  const wonTotal = records.reduce((sum, record) => sum + Math.max(0, record.net), 0);
+  const bestWin = records.reduce((most, record) => Math.max(most, record.net), 0);
   const rank = levelFromPlays(totalPlays);
   // 게임별은 **손해가 큰 쪽부터** 봅니다. 어디서 잃고 있는지가 먼저 보여야 합니다.
   const byGame = groupRecords(records, (record) => record.game).sort((left, right) => left.net - right.net);
@@ -6749,12 +6809,16 @@ function RecordsScreen({ records, totalPlays }: { records: GameRecord[]; totalPl
         <Text style={styles.smallText}>다음 레벨까지 {rank.playsToNext}판 · 이번 레벨 {rank.playsIntoLevel} / {rank.playsForLevel}판</Text>
         <Text style={styles.helperText}>레벨은 이기고 지는 것과 상관없이 플레이한 판수로만 오릅니다.</Text>
       </View>
-      <View style={styles.statsGrid}>
-        <Stat label="전체 플레이" value={`${records.length}판`} />
-        <Stat label="승률" value={`${winRate.toFixed(1)}%`} />
-        <Stat label="최고 연승" value={`${maxWinStreak(records)}연승`} />
-        <Stat label="총 손익" value={`${totalNet > 0 ? '+' : ''}${totalNet.toLocaleString()}`} positive={totalNet > 0} />
+      {/* 목업의 전체 요약. 세 칸을 세로 선으로 나눕니다. */}
+      <Text style={styles.sectionTitle}>전체 요약</Text>
+      <View style={styles.summaryBox}>
+        <View style={styles.summaryCell}><Text style={styles.summaryLabel}>총 플레이</Text><Text style={styles.summaryValue}>{records.length}회</Text></View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryCell}><Text style={styles.summaryLabel}>총 승리</Text><Text style={[styles.summaryValue, styles.positive]}>{wonTotal.toLocaleString()}</Text></View>
+        <View style={styles.summaryDivider} />
+        <View style={styles.summaryCell}><Text style={styles.summaryLabel}>최대 승리</Text><Text style={[styles.summaryValue, styles.positive]}>{bestWin.toLocaleString()}</Text></View>
       </View>
+      <Text style={styles.helperText}>승률 {winRate.toFixed(1)}% · 최고 {maxWinStreak(records)}연승 · 총 손익 {totalNet > 0 ? '+' : ''}{totalNet.toLocaleString()} WC</Text>
       <Text style={styles.sectionTitle}>게임별</Text>
       <Text style={styles.helperText}>손해가 큰 게임부터 놓았습니다. 해 본 게임만 나옵니다.</Text>
       <View style={styles.panel}>
@@ -6793,12 +6857,7 @@ function RecordsScreen({ records, totalPlays }: { records: GameRecord[]; totalPl
         {records.length === 0 && <Text style={styles.emptyText}>게임을 완료하면 기록이 여기에 저장됩니다.</Text>}
         {records.map((record, index) => (
           <React.Fragment key={record.id}>
-            <Row
-              title={`${gameDisplayName(record.game)} · ${resultLabel(record.result)}`}
-              subtitle={`${record.detail ? `${record.detail} · ` : ''}${betTierName(record.difficulty)} · 베팅 ${record.bet.toLocaleString()} WC · ${formatPlayedAt(record.playedAt)}`}
-              value={`${record.net > 0 ? '+' : ''}${record.net.toLocaleString()} WC`}
-              positive={record.net > 0}
-            />
+            <RecordRow record={record} />
             {index < records.length - 1 && <View style={styles.separator} />}
           </React.Fragment>
         ))}
@@ -6831,6 +6890,7 @@ function SettingsScreen(props: {
   onCancelImport: () => void;
   backupNote: string;
   pendingImport: { summary: string } | null;
+  totalPlays: number;
 }) {
   const [detail, setDetail] = useState<'speed' | 'accessibility' | null>(null);
 
@@ -6884,9 +6944,22 @@ function SettingsScreen(props: {
     </Page>
   );
 
+  const rank = levelFromPlays(props.totalPlays);
   return (
     <Page>
       <Text style={styles.pageTitle}>설정</Text>
+      {/*
+        목업의 프로필 카드입니다. 목업에는 회원 ID와 프로필 변경이 있었는데
+        **이 앱은 게스트뿐이라** 그 자리에 레벨과 누적 판수를 넣었습니다.
+      */}
+      <View style={styles.settingsProfile}>
+        <View style={styles.settingsAvatar}><Text style={styles.settingsAvatarText}>☻</Text></View>
+        <View style={styles.settingsProfileCopy}>
+          <Text style={styles.settingsProfileName}>게스트</Text>
+          <Text style={styles.smallText}>LV. {rank.level} · 누적 {props.totalPlays.toLocaleString()}판</Text>
+          <Text style={styles.helperText}>계정 없이 이 기기에만 저장됩니다</Text>
+        </View>
+      </View>
       <Text style={styles.sectionTitle}>기본 베팅 등급</Text>
       <View style={styles.difficultyRow}>
         {difficultyOptions.map((option) => (
@@ -6904,11 +6977,11 @@ function SettingsScreen(props: {
       <Text style={styles.sectionTitle}>데이터 백업</Text>
       <View style={styles.panel}>
         <Pressable accessibilityRole="button" onPress={props.onExportBackup}>
-          <Row title="파일로 내보내기" subtitle="코인 · 기록 · 설정을 JSON 파일 하나로 저장합니다" value="내보내기" />
+          <Row icon="↥" title="파일로 내보내기" subtitle="코인 · 기록 · 설정을 JSON 파일 하나로 저장합니다" value="내보내기" />
         </Pressable>
         <View style={styles.separator} />
         <Pressable accessibilityRole="button" onPress={props.onPickBackup}>
-          <Row title="파일에서 가져오기" subtitle="다른 기기에서 내보낸 파일을 불러옵니다" value="가져오기" />
+          <Row icon="↧" title="파일에서 가져오기" subtitle="다른 기기에서 내보낸 파일을 불러옵니다" value="가져오기" />
         </Pressable>
       </View>
       {props.pendingImport && (
@@ -6926,13 +6999,13 @@ function SettingsScreen(props: {
       <Text style={styles.helperText}>데이터는 이 기기 안에만 저장됩니다. 브라우저 데이터를 지우면 사라지니, 옮기거나 보관하려면 내보내기를 쓰세요.</Text>
       <Text style={styles.sectionTitle}>게임 환경</Text>
       <View style={styles.panel}>
-        <ToggleRow title="효과음" value={props.sound} onValueChange={props.setSound} />
+        <ToggleRow icon="♪" title="효과음" value={props.sound} onValueChange={props.setSound} />
         <View style={styles.separator} />
-        <ToggleRow title="진동" value={props.vibration} onValueChange={props.setVibration} />
+        <ToggleRow icon="≈" title="진동" value={props.vibration} onValueChange={props.setVibration} />
         <View style={styles.separator} />
-        <Pressable accessibilityRole="button" onPress={() => setDetail('speed')}><Row title="게임 진행 속도" value={`${props.gameSpeed}  ›`} /></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => setDetail('speed')}><Row icon="▷" title="게임 진행 속도" value={`${props.gameSpeed}  ›`} /></Pressable>
         <View style={styles.separator} />
-        <Pressable accessibilityRole="button" onPress={() => setDetail('accessibility')}><Row title="접근성" subtitle={accessibilitySummary(props.accessibility)} value="설정  ›" /></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => setDetail('accessibility')}><Row icon="◐" title="접근성" subtitle={accessibilitySummary(props.accessibility)} value="설정  ›" /></Pressable>
       </View>
       <Text style={styles.disclaimerBlock}>이 앱의 WC는 게임 전용 가상 코인이며 실제 현금으로 구매하거나 환전할 수 없습니다.</Text>
       <Text style={styles.buildStamp}>화면 판번호 {buildStamp}</Text>
@@ -6940,9 +7013,10 @@ function SettingsScreen(props: {
   );
 }
 
-function Row({ title, subtitle, value, positive = false }: { title: string; subtitle?: string; value: string; positive?: boolean }) {
+function Row({ title, subtitle, value, positive = false, icon }: { title: string; subtitle?: string; value: string; positive?: boolean; icon?: string }) {
   return (
     <View style={styles.row}>
+      {icon && <View style={styles.rowIcon}><Text style={styles.rowIconText}>{icon}</Text></View>}
       <View style={styles.rowCopy}><Text style={styles.rowTitle}>{title}</Text>{subtitle && <Text style={styles.smallText}>{subtitle}</Text>}</View>
       <Text style={[styles.rowValue, positive && styles.positive]}>{value}</Text>
     </View>
@@ -6953,8 +7027,8 @@ function Stat({ label, value, positive = false }: { label: string; value: string
   return <View style={styles.stat}><Text style={styles.muted}>{label}</Text><Text style={[styles.statValue, positive && styles.positive]}>{value}</Text></View>;
 }
 
-function ToggleRow({ title, value, onValueChange }: { title: string; value: boolean; onValueChange: (value: boolean) => void }) {
-  return <View style={styles.row}><Text style={styles.rowTitle}>{title}</Text><Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#303746', true: '#80651F' }} thumbColor={value ? '#E4BC55' : '#9AA2B0'} /></View>;
+function ToggleRow({ title, value, onValueChange, icon }: { title: string; value: boolean; onValueChange: (value: boolean) => void; icon?: string }) {
+  return <View style={styles.row}>{icon && <View style={styles.rowIcon}><Text style={styles.rowIconText}>{icon}</Text></View>}<Text style={[styles.rowTitle, styles.rowTitleGrow]}>{title}</Text><Switch value={value} onValueChange={onValueChange} trackColor={{ false: '#303746', true: '#80651F' }} thumbColor={value ? '#E4BC55' : '#9AA2B0'} /></View>;
 }
 
 /**
@@ -7052,10 +7126,19 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.75, transform: [{ scale: 0.99 }] },
   disclaimer: { color: colors.muted, fontSize: 12, marginTop: 18 },
   // ⚠️ 아래 선을 파란 회색(#171D28)으로 두면 자주 바탕 위에서 선만 튀어 화면이 갈라져 보입니다.
-  header: { height: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderBottomWidth: 1, borderBottomColor: colors.border },
+  header: { height: 44, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  // 가운데 알약이 진짜 가운데에 오게, 양쪽 원 사이의 남는 자리를 이 칸이 다 먹습니다.
+  headerMiddle: { flex: 1, alignItems: 'center' },
+  headerRound: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#5B4620', backgroundColor: colors.panel },
+  headerRoundIcon: { color: colors.goldLight, fontSize: 16, lineHeight: 20 },
+  // 알약 안의 코인. 진짜 동전처럼 두 색 테두리를 둡니다.
+  walletCoin: { width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold, borderWidth: 1, borderColor: colors.goldLight },
+  walletCoinMark: { color: '#3A2A08', fontSize: 10, fontWeight: '900', lineHeight: 13 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
-  avatarText: { color: colors.goldLight, fontSize: 13, fontWeight: '800' },
+  avatar: { width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: colors.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel },
+  avatarText: { color: colors.goldLight, fontSize: 15, fontWeight: '800', lineHeight: 19 },
+  avatarLevel: { position: 'absolute', right: -4, bottom: -3, minWidth: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold, borderWidth: 1, borderColor: colors.bg },
+  avatarLevelText: { color: '#3A2A08', fontSize: 9, fontWeight: '900', lineHeight: 13 },
   profileName: { color: colors.text, fontSize: 13, fontWeight: '700' },
   level: { color: colors.muted, fontSize: 10, marginTop: 1 },
   walletPill: { minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, borderWidth: 1, borderColor: '#745B22', borderRadius: 16, backgroundColor: '#11151D' },
@@ -7066,6 +7149,18 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.goldLight, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, marginBottom: 5 },
   pageTitle: { color: colors.text, fontSize: 29, fontWeight: '800', marginBottom: 20 },
   sectionTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '800', marginTop: 14, marginBottom: 11 },
+  // 홈 첫 화면. 사진이 들어올 자리라 높이를 미리 묶어 둡니다.
+  homeHero: { height: 224, borderRadius: 20, alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', overflow: 'hidden' },
+  homeHeroCrown: { color: colors.gold, fontSize: 46, lineHeight: 52 },
+  homeHeroTitle: { color: colors.goldLight, fontSize: 40, fontWeight: '900', letterSpacing: 3 },
+  homeHeroRule: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  homeHeroRuleLine: { width: 34, height: 1, backgroundColor: colors.goldDeep },
+  homeHeroSub: { color: colors.gold, fontSize: 13, fontWeight: '700', letterSpacing: 5 },
+  homePlayNow: { width: '100%', minHeight: 58, marginBottom: 10 },
+  homePlayNowText: { color: '#2A1A08', fontSize: 22, fontWeight: '900', letterSpacing: 2 },
+  // 아래 작은 버튼 하나. 금색을 두 개 두면 어느 쪽을 누를지 헷갈립니다.
+  homeSecondary: { minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderWidth: 1, borderColor: '#5B4620', backgroundColor: 'rgba(0,0,0,0.25)', marginBottom: 20 },
+  homeSecondaryText: { color: colors.goldLight, fontSize: 15, fontWeight: '800' },
   heroCard: { minHeight: 128, flexDirection: 'row', alignItems: 'center', padding: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', borderRadius: 18 },
   blackjackMark: { width: 72, height: 92, borderRadius: 12, backgroundColor: '#10372C', alignItems: 'center', justifyContent: 'center', gap: 3 },
   cardSuit: { color: '#F2E6CB', fontSize: 19, fontWeight: '800' },
@@ -7115,6 +7210,16 @@ const styles = StyleSheet.create({
   detailPage: { padding: 18, paddingBottom: 38 },
   detailLead: { color: colors.text, fontSize: 25, fontWeight: '900', marginBottom: 18 },
   catalogList: { gap: 10, marginTop: 16 },
+  // 게임은 **두 줄 그리드**로 깝니다(목업). 가로로 긴 줄은 한 화면에 세 개밖에 안 들어갔습니다.
+  gameGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 16 },
+  gameGridCard: { width: '48%', borderRadius: 16, overflow: 'hidden', backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520' },
+  // 그림이 들어올 칸. 지금은 글자 아이콘이 가운데 놓입니다.
+  gameGridArt: { height: 104, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel2 },
+  gameGridArtText: { color: colors.goldLight, fontSize: 34, fontWeight: '900' },
+  // 배지와 별은 **얹기만** 합니다. 자리를 먹으면 카드 높이가 들쭉날쭉해집니다.
+  gameGridBadge: { position: 'absolute', top: 6, left: 6, color: colors.muted, fontSize: 10, fontWeight: '800', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.55)' },
+  gameGridStar: { position: 'absolute', top: 2, right: 2, width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  gameGridName: { color: colors.text, fontSize: 14, fontWeight: '800', textAlign: 'center', paddingVertical: 10, paddingHorizontal: 6 },
   previewHero: { alignItems: 'center', paddingVertical: 20 },
   previewIcon: { width: 88, height: 88, borderRadius: 28, alignItems: 'center', justifyContent: 'center', backgroundColor: '#172B24', borderWidth: 1, borderColor: colors.gold, marginBottom: 18 },
   previewIconText: { color: colors.goldLight, fontSize: 32, fontWeight: '900' },
@@ -8436,6 +8541,16 @@ const styles = StyleSheet.create({
   seotdaMyHand: { color: colors.goldLight, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 4 },
   doriHint: { color: colors.muted, fontSize: 11, textAlign: 'center', marginTop: 2 },
   importApply: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', backgroundColor: colors.gold },
+  // 줄 앞 아이콘. 동그란 칸에 글자 하나만 넣습니다.
+  rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel2, borderWidth: 1, borderColor: '#5B4620', marginRight: 11 },
+  rowIconText: { color: colors.goldLight, fontSize: 14, lineHeight: 18 },
+  rowTitleGrow: { flex: 1 },
+  // 설정 맨 위 프로필 카드.
+  settingsProfile: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, marginBottom: 18, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#6D5520', borderTopColor: 'rgba(245,222,138,0.22)' },
+  settingsAvatar: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel2, borderWidth: 2, borderColor: colors.gold },
+  settingsAvatarText: { color: colors.goldLight, fontSize: 26, lineHeight: 32 },
+  settingsProfileCopy: { flex: 1, gap: 3 },
+  settingsProfileName: { color: colors.text, fontSize: 19, fontWeight: '900' },
   levelCard: { backgroundColor: colors.panel, borderRadius: 16, padding: 16, gap: 8, marginBottom: 14, borderWidth: 1, borderColor: colors.border },
   levelHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   levelBadge: { color: colors.goldLight, fontSize: 20, fontWeight: '700' },
@@ -8450,6 +8565,25 @@ const styles = StyleSheet.create({
   filterChipText: { color: colors.muted, fontSize: 13, fontWeight: '600' },
   filterChipTextActive: { color: colors.goldLight },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  // 기록 맨 위 세 칸 요약(목업). 칸 사이는 세로 선으로 나눕니다.
+  summaryBox: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, paddingVertical: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#5B4620', borderTopColor: 'rgba(245,222,138,0.22)' },
+  summaryCell: { flex: 1, alignItems: 'center', gap: 4 },
+  summaryDivider: { width: 1, alignSelf: 'stretch', backgroundColor: colors.border },
+  summaryLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
+  summaryValue: { color: colors.text, fontSize: 17, fontWeight: '900' },
+  // 기록 한 줄. 썸네일 · 이름/날짜 · 금액.
+  recordRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11 },
+  recordThumb: { width: 42, height: 42, borderRadius: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel2, borderWidth: 1, borderColor: '#5B4620' },
+  recordThumbText: { color: colors.goldLight, fontSize: 17, fontWeight: '900' },
+  recordCopy: { flex: 1, gap: 2 },
+  recordName: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  recordWhen: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  recordAmount: { color: colors.text, fontSize: 14, fontWeight: '900' },
+  // 지갑의 네 칸 버튼(목업).
+  walletActions: { flexDirection: 'row', gap: 8, marginTop: 14 },
+  walletAction: { flex: 1, minHeight: 68, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: '#5B4620' },
+  walletActionIcon: { color: colors.goldLight, fontSize: 19, lineHeight: 23 },
+  walletActionLabel: { color: colors.text, fontSize: 11, fontWeight: '800' },
   stat: { width: '48%', minHeight: 100, padding: 15, justifyContent: 'space-between', borderRadius: 16, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   statValue: { color: colors.text, fontSize: 22, fontWeight: '900' },
   difficultyRow: { flexDirection: 'row', gap: 7 },
@@ -8464,6 +8598,11 @@ const styles = StyleSheet.create({
   // 누르는 자리가 막대를 꽉 채웁니다. 남는 자리를 두면 누를 곳은 좁은데 막대만 두꺼워집니다.
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   tabIcon: { color: '#707988', fontSize: 24, lineHeight: 26 },
+  // 가운데 홈. 막대 위로 반쯤 올라온 금테 원입니다. 자리는 막대 높이 그대로 씁니다.
+  tabCrown: { width: 50, height: 50, borderRadius: 25, marginTop: -24, marginBottom: -2, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.panel2, borderWidth: 2, borderColor: colors.gold, shadowColor: '#FFD35F', shadowOpacity: 0.55, shadowRadius: 14 },
+  tabCrownActive: { backgroundColor: colors.gold, borderColor: colors.goldLight },
+  tabCrownIcon: { color: colors.goldLight, fontSize: 25, lineHeight: 30 },
+  tabCrownIconActive: { color: '#2A1A2E' },
   tabLabel: { color: '#707988', fontSize: 12, fontWeight: '700' },
   tabSelected: { color: colors.gold },
   loadingCover: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
