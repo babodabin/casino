@@ -4989,6 +4989,17 @@ const goStopTakenOrder=['광','열끗','띠','피'] as const;
  * 모은 패 한 줄을 재는 값입니다. `hwatuCardTiny` 28폭 · 무리 사이 틈 8 ·
  * 안 좁혔을 때 한 걸음 10(=겹침 -18).
  */
+/**
+ * 모은 패를 놓는 **네 자리의 폭**. 내 자리(359)에서 자리 사이 틈 6×3을 뺀 341을 나눕니다.
+ * 실제 고스톱 앱들이 하는 대로 **광 · 열끗 · 띠 · 피 자리를 고정**해 두고 그 안에서 겹쳐 쌓습니다.
+ * 폭은 그 무리에 최대 몇 장이 오는지로 잡았습니다 — 광 5 · 열끗 10 · 띠 10 · 나머지가 피입니다.
+ */
+const GOSTOP_LANES: { kind: (typeof goStopTakenOrder)[number]; width: number }[] = [
+  { kind: '광', width: 60 },
+  { kind: '열끗', width: 82 },
+  { kind: '띠', width: 82 },
+  { kind: '피', width: 117 },
+];
 const GOSTOP_TAKEN_CARD=28;
 const GOSTOP_TAKEN_GAP=8;
 const GOSTOP_TAKEN_STEP=10;
@@ -5220,6 +5231,31 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       return <View key={kind} style={styles.goStopTakenGroup}>{sorted.map((card,index)=><View key={card.id} style={index?{marginLeft:step-GOSTOP_TAKEN_CARD}:null}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
     })}</View>;
   };
+  /**
+   * 내가 모은 패. **네 자리를 늘 잡아 둡니다 — 비어 있어도 자리를 지킵니다.**
+   *
+   * ⚠️ 전에는 빈 무리를 아예 빼 버려서, 광 한 장이 들어오는 순간 광 자리가 새로 생기며
+   * 열끗 · 띠 · 피가 통째로 오른쪽으로 밀렸습니다. 판이 흔들려 보이던 것이 이것입니다.
+   *
+   * 자리마다 오른쪽 아래에 **무리 이름과 장수**를 얹습니다. 겹쳐 쌓으면 세기 어렵고,
+   * 얹는 것이라 자리를 한 칸도 더 안 먹습니다.
+   */
+  const takenLanes=(cards:HwatuCard[])=><View style={styles.goStopTakenRow}>{GOSTOP_LANES.map(({kind,width})=>{
+    const group=cards.filter((card)=>goStopTakenKind(card)===kind);
+    // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
+    const sorted=kind==='띠'?[...group].sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣')):group;
+    const step=sorted.length>1
+      ? Math.max(2,Math.min(GOSTOP_TAKEN_STEP,Math.floor((width-GOSTOP_TAKEN_CARD)/(sorted.length-1))))
+      : GOSTOP_TAKEN_STEP;
+    return <View key={kind} style={[styles.goStopLane,{width},sorted.length===0&&styles.goStopLaneEmpty]}>
+      {sorted.length===0
+        ? <Text style={styles.goStopLaneWaiting}>{kind}</Text>
+        : <>
+            {sorted.map((card,index)=><View key={card.id} style={index?{marginLeft:step-GOSTOP_TAKEN_CARD}:null}><HwatuCardView card={card} size="tiny"/></View>)}
+            <Text style={styles.goStopLaneCount}>{kind} {sorted.length}</Text>
+          </>}
+    </View>;
+  })}</View>;
   // 자리 폭(375 화면 기준). 판 좌우 여백 8+8, 자리 사이 6, 자리 안쪽 여백 7+7을 뺀 값입니다.
   const seatTakenWidth=mode==='matgo'?345:162;
   const myTakenWidth=359;
@@ -5289,7 +5325,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
       {/* 내 자리 */}
       <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>나 {myScore?.total??0}점{round.players[0].goCount?` · ${round.players[0].goCount}고`:''}</Text><Text style={styles.goStopSeatScore}>광 {myScore?.counts.광??0} · 열끗 {myScore?.counts.열끗??0} · 띠 {myScore?.counts.띠??0} · 피 {myScore?.counts.피??0}{carryMultiplier>1?` · 나가리 ${carryMultiplier}배`:''}</Text></View>
-      {takenRow(round.players[0].captured,myTakenWidth)}
+      {takenLanes(round.players[0].captured)}
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
       {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
@@ -8711,6 +8747,12 @@ const styles = StyleSheet.create({
   // ⚠️ 줄을 접지 않습니다(`flexWrap` 없음). 접히면 자리가 아래로 늘어 손패를 화면 밖으로 밀어냅니다.
   goStopTakenRow: { flexDirection: 'row', height: 46, alignItems: 'center', gap: 8 },
   goStopTakenGroup: { flexDirection: 'row' },
+  // 모은 패 네 자리. 폭을 고정해 두어 무리가 비어도 자리가 안 당겨집니다.
+  goStopLane: { height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: 5, paddingHorizontal: 1, backgroundColor: 'rgba(4,26,17,0.35)' },
+  goStopLaneEmpty: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.14)', backgroundColor: 'transparent' },
+  goStopLaneWaiting: { color: 'rgba(207,224,214,0.45)', fontSize: 10, fontWeight: '800' },
+  // 장수는 얹기만 합니다. 자리를 한 칸도 더 안 먹습니다.
+  goStopLaneCount: { position: 'absolute', right: 1, bottom: 0, color: '#FFE9A8', fontSize: 9, fontWeight: '900', paddingHorizontal: 3, borderRadius: 5, backgroundColor: 'rgba(0,0,0,0.65)' },
   goStopTurnBox: { alignItems: 'center', gap: 6 },
   // 판 위에 떠 있는 상자입니다. 자리를 차지하지 않으므로 나타나도 화면이 안 밀립니다.
   goStopSlapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4 },
@@ -8734,7 +8776,9 @@ const styles = StyleSheet.create({
   goStopBillBox: { borderRadius: 10, borderWidth: 1, borderColor: colors.gold, backgroundColor: 'rgba(4,26,17,0.75)', paddingHorizontal: 10, paddingVertical: 8, gap: 2 },
   goStopBillTitle: { color: '#FFE9A8', fontSize: 13, fontWeight: '900', textAlign: 'center' },
   goStopBillLine: { color: '#CFE0D6', fontSize: 11, fontWeight: '700', textAlign: 'center' },
-  goStopFloorArea: { flex: 1, justifyContent: 'center' },
+  // ⚠️ 전에는 `flex: 1`이라 남는 자리를 **바닥이 혼자 다 먹어** 판 가운데가 휑했습니다.
+  // 이제는 제 몫만 쓰고, 남는 자리는 `goStopBoard`의 space-between이 골고루 나눕니다.
+  goStopFloorArea: { flexGrow: 0, flexShrink: 1, justifyContent: 'center', paddingVertical: 4 },
   goStopHand: { flexDirection: 'row', justifyContent: 'center', minHeight: 96, paddingTop: 14, alignItems: 'center' },
   // 칠 수 있는 패는 살짝 들어 올리고 금빛을 둘러 눈에 띄게 합니다.
   goStopHandHit: { transform: [{ translateY: -12 }], borderRadius: 5, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 10, elevation: 10 },
