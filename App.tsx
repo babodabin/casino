@@ -73,6 +73,12 @@ import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, play
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
 import { dealDori, evaluateDori, resolveDori } from './src/dorijitgottaeng';
 import { backupFileName, buildBackup, checkBackup, type BackupData } from './src/backup';
+import {
+  balatroDiscards, balatroPayout, balatroPlays, balatroScoreHand, balatroSpendCap, balatroStake,
+  bestBalatroPlay, blindOf, blindTargets, bossOf, buyShopOffer, discardBalatroCards, leaveShop,
+  leveledBase, playBalatroHand, shopCost, startBalatroRun, targetOf,
+  type BalatroRun, type ShopOffer,
+} from './src/balatro';
 import { levelFromPlays } from './src/level';
 import { DAILY_MISSION_GOAL, DAILY_MISSION_REWARD, countPlayedOn, missionDayKey, shouldClaimMission } from './src/mission';
 import { decidePokerAction, doriEquity, estimateDrawEquity, estimateEquity, pokerActionLabel, seotdaEquity } from './src/pokerai';
@@ -117,14 +123,14 @@ import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptio
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
-type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSportsSetup' | 'predictSportsGame' | 'predictSocialSetup' | 'predictSocialGame' | 'jokerSetup' | 'jokerGame' | 'fishingSetup' | 'fishingGame' | 'fishRouletteSetup' | 'fishRouletteGame';
+type AppScreen = 'tabs' | 'categoryCatalog' | 'gamePreview' | 'carSetup' | 'carGame' | 'bullSetup' | 'bullGame' | 'yutSetup' | 'yutGame' | 'shellSetup' | 'shellGame' | 'fishRaceSetup' | 'fishRaceGame' | 'luckyFishSetup' | 'luckyFishGame' | 'blackjackSetup' | 'blackjackGame' | 'rouletteGame' | 'baccaratSetup' | 'baccaratGame' | 'crapsSetup' | 'crapsGame' | 'slotSetup' | 'slotGame' | 'pachislotGame' | 'sicboSetup' | 'sicboGame' | 'yahtzeeSetup' | 'yahtzeeGame' | 'oddEvenSetup' | 'oddEvenGame' | 'lottoSetup' | 'lottoGame' | 'scratchSetup' | 'scratchGame' | 'teenPattiSetup' | 'teenPattiGame' | 'paiGowSetup' | 'paiGowGame' | 'horseSetup' | 'horseGame' | 'cycleSetup' | 'cycleGame' | 'boatSetup' | 'boatGame' | 'greyhoundSetup' | 'greyhoundGame' | 'rouletteSetup' | 'videoPokerSetup' | 'videoPokerGame' | 'holdemSetup' | 'holdemGame' | 'omahaSetup' | 'omahaGame' | 'sevenPokerSetup' | 'sevenPokerGame' | 'fiveDrawSetup' | 'fiveDrawGame' | 'chinesePokerSetup' | 'chinesePokerGame' | 'highLowSetup' | 'highLowGame' | 'riichiSetup' | 'riichiGame' | 'chineseMahjongSetup' | 'chineseMahjongGame' | 'hongKongMahjongSetup' | 'hongKongMahjongGame' | 'sichuanMahjongSetup' | 'sichuanMahjongGame' | 'seotdaSetup' | 'seotdaGame' | 'doriSetup' | 'doriGame' | 'gostopSetup' | 'gostopGame' | 'matgoSetup' | 'matgoGame' | 'minhwatuSetup' | 'minhwatuGame' | 'yukbaekSetup' | 'yukbaekGame' | 'tujeonSetup' | 'tujeonGame' | 'bigTwoSetup' | 'bigTwoGame' | 'pusherSetup' | 'pusherGame' | 'predictSportsSetup' | 'predictSportsGame' | 'predictSocialSetup' | 'predictSocialGame' | 'jokerSetup' | 'jokerGame' | 'balatroChoice' | 'balatroHardSetup' | 'balatroHardGame' | 'fishingSetup' | 'fishingGame' | 'fishRouletteSetup' | 'fishRouletteGame';
 
 type CatalogGame = { name: string; icon: string; description: string; status: 'playable' | 'planned' };
 type GameCategory = { name: string; icon: string; detail: string; eyebrow: string; games: CatalogGame[] };
 
 type GameRecord = {
   id: string;
-  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓 · 스포츠' | '예측 마켓 · 사회문제' | '조커 포커' | '스크린낚시' | '물고기 룰렛';
+  game: '블랙잭' | '룰렛' | '바카라' | '크랩스' | '슬롯' | '식보' | '야찌' | '홀짝' | '공 어디에?' | '로또' | '즉석 복권' | '틴 파티' | '파이 고우' | '경마' | '경륜' | '경정' | '그레이하운드' | '자동차 레이스' | '소싸움' | '피시 레이스' | '행운의 물고기' | '비디오 포커' | '텍사스 홀덤' | '오마하' | '세븐 포커' | '파이브 카드 드로우' | '차이니즈 포커' | '하이로우' | '리치 마작' | '중국식 마작' | '홍콩 마작' | '사천 마작' | '고스톱' | '맞고' | '민화투' | '육백' | '윷 베팅' | '섰다' | '도리짓고땡' | '투전' | '빅투' | '코인 푸셔' | '예측 마켓 · 스포츠' | '예측 마켓 · 사회문제' | '조커 포커' | '발라트로' | '발라트로 하드' | '스크린낚시' | '물고기 룰렛';
   result: RoundResult;
   difficulty: string;
   bet: number;
@@ -182,7 +188,7 @@ const gameCategories: GameCategory[] = [
     { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
     { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
     { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
-    { name: '조커 포커', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임', status: 'playable' },
+    { name: '발라트로', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임 · 이지와 하드', status: 'playable' },
   ]},
   { name: '주사위', icon: '⚄', detail: '야찌 · 크랩스 · 룰렛', eyebrow: 'DICE & ARCADE', games: [
     { name: '야찌', icon: '⚅', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
@@ -226,7 +232,7 @@ const gameEntryScreens: Record<string, AppScreen> = {
   '예측 마켓 · 사회문제':'predictSocialSetup',
   '스크린낚시':'fishingSetup',
   '물고기 룰렛':'fishRouletteSetup',
-  '조커 포커':'jokerSetup',
+  '발라트로':'balatroChoice',
   '자동차 레이스':'carSetup',
   '소싸움':'bullSetup',
   '피시 레이스':'fishRaceSetup',
@@ -755,7 +761,7 @@ function CasinoApp() {
     const payout=stake*multiplier,net=payout-stake;if(payout)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-world-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
   };
-  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓 · 스포츠'|'예측 마켓 · 사회문제'|'조커 포커'|'스크린낚시'|'물고기 룰렛',stake:number,multiplier:number,detail:string)=>{
+  const settleNewGame=(game:'윷 베팅'|'공 어디에?'|'피시 레이스'|'행운의 물고기'|'차이니즈 포커'|'투전'|'빅투'|'코인 푸셔'|'예측 마켓 · 스포츠'|'예측 마켓 · 사회문제'|'조커 포커'|'발라트로'|'발라트로 하드'|'스크린낚시'|'물고기 룰렛',stake:number,multiplier:number,detail:string)=>{
     const payout=Math.round(stake*multiplier),net=payout-stake;
     if(payout>0)setCoins((current)=>current+payout);
     addRecord((count)=>({id:`${Date.now()}-new-${count}`,game,result:net>0?'win':net===0?'push':'loss',difficulty,bet:stake,net,playedAt:new Date().toISOString(),detail}));
@@ -1102,8 +1108,11 @@ function CasinoApp() {
         {appScreen === 'bigTwoSetup' && <SimpleSetupScreen title="빅투 준비" hero="♦3 · · · 2♠" lead="열세 장을 먼저 다 내려놓으면 이깁니다" rules={['1. '+tablePlayers+'명이 열세 장씩 나눠 갖습니다. ♦3을 가진 사람이 먼저 내고 첫 장에는 ♦3이 들어가야 합니다.','2. 숫자는 3이 가장 약하고 2가 가장 셉니다. 같은 숫자면 ♦ ♣ ♥ ♠ 순으로 세집니다.','3. 한 장·두 장(페어)·세 장(트리플)·다섯 장(스트레이트 이상)만 낼 수 있습니다.','4. 앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다. 낼 게 없으면 넘깁니다.','5. 먼저 다 내면 '+bigTwoWinPayout[tablePlayers]+'배입니다. 사람이 많을수록 배당이 큽니다. 져도 세 장 이하로 털었으면 절반을 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} players={tablePlayers} onPlayersChange={setTablePlayers} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bigTwoGame')}/>}
         {appScreen === 'bigTwoGame' && <BigTwoGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
         {appScreen === 'pusherSetup' && <SimpleSetupScreen title="코인 푸셔 준비" hero="◉ ◉ ◉" lead="밀판이 밀어낸 동전이 내 몫입니다" rules={['1. 동전을 한 개 넣으면 밀판이 한 번 앞으로 밉니다.','2. 앞턱을 넘어간 동전이 내 몫입니다. 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아집니다.','3. 금화는 '+pusherGoldPayout+'배로 쳐줍니다.','4. 앞쪽 양옆에는 빠지는 홈이 있어 그리로 밀린 동전은 사라집니다.','5. 판은 실제 기계처럼 그대로 남아 다음에 이어서 합니다.']} startLabel="기계 앞에 서기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('pusherGame')}/>}
-        {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['이 게임은 남과 겨루지 않습니다. 혼자 점수를 쌓아 목표를 넘기면 이깁니다.','','― 한 판의 흐름 ―','1. 카드 여덟 장을 들고 시작합니다.','2. 그중 한 장에서 다섯 장까지 골라 냅니다. 낸 카드의 족보로 점수가 붙습니다.','3. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리와 버린 자리는 곧바로 새 카드로 채워집니다.','4. 세 번을 다 내면 판이 끝납니다. 그때까지 쌓인 점수가 목표 '+jokerTarget.toLocaleString()+'점을 넘겨야 배당이 나옵니다.','','― 점수 셈 (이게 전부입니다) ―','5. 점수 = (족보 칩 + 점수에 든 카드의 칩) × 배수.','6. 카드 한 장의 칩은 A가 11, 10·J·Q·K가 10, 나머지는 숫자 그대로입니다.','7. 족보마다 기본 칩과 배수가 있습니다 — 하이 카드 5칩 ×1 · 원 페어 10 ×2 · 투 페어 20 ×2 · 트리플 30 ×3 · 스트레이트 30 ×4 · 플러시 35 ×4 · 풀하우스 40 ×4 · 포카드 60 ×7 · 스트레이트 플러시 100 ×8.','8. 점수에 드는 카드는 족보를 이룬 카드뿐입니다. 페어를 내면 짝이 된 두 장만 칩을 보태고, 스트레이트와 플러시는 다섯 장이 모두 들어갑니다.','9. 예를 들어 K♥ K♠를 원 페어로 내면 (10 + 10 + 10) × 2 = 60점입니다. 족보 칩 10에 K 두 장의 칩 10+10을 더하고 배수 2를 곱한 값입니다.','','― 조커 ―','10. 판을 시작할 때 조커 세 장을 무작위로 받습니다. 조커는 칩이나 배수를 올려 줍니다.','11. 광대는 배수 +4, 계산가는 칩 +40, 쌍둥이는 같은 숫자가 있으면 배수 ×2, 무늬꾼은 무늬가 다 같으면 배수 ×3, 짝수쟁이·홀수쟁이는 해당하는 카드마다 배수 +2, 막내는 점수에 든 카드마다 칩 +12, 욕심쟁이는 ◆마다 배수 +3입니다.','12. 어떤 조커를 받았느냐에 따라 노려야 할 족보가 달라집니다. 이것이 이 게임의 핵심입니다. 무늬꾼을 받았으면 플러시를, 막내를 받았으면 카드가 많이 들어가는 족보를 노립니다.','13. 배수는 마지막에 곱해집니다. 그래서 칩을 먼저 크게 만든 뒤 배수를 걸수록 점수가 크게 뜁니다.','','― 요령 ―','14. 버리기 두 번은 아껴도 남으면 그냥 사라집니다. 조커에 안 맞는 카드는 일찍 버리세요.','15. 낮은 족보를 세 번 내는 것보다, 버리기를 써서 조커에 맞는 큰 족보를 한 번 만드는 편이 대개 낫습니다.','16. 화면의 골라주기를 누르면 지금 손에서 점수가 제일 높게 나오는 조합을 잡아 줍니다.','','― 배당 ―','17. 목표를 넘기면 1.7배, 목표의 두 배를 넘기면 3배, 세 배를 넘기면 10배입니다. 목표에 못 미치면 베팅금을 잃습니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
-        {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('조커 포커',stake,multiplier,detail)}/>}
+        {appScreen === 'balatroChoice' && <BalatroChoiceScreen onBack={()=>setAppScreen('categoryCatalog')} onEasy={()=>setAppScreen('jokerSetup')} onHard={()=>setAppScreen('balatroHardSetup')}/>}
+        {appScreen === 'balatroHardSetup' && <SimpleSetupScreen title="발라트로 하드 준비" hero="J ★ 세 단" lead="작은 · 큰 · 보스를 이어서 다 깨야 이깁니다" rules={['이 게임은 남과 겨루지 않습니다. 세 단을 차례로 깨면 이깁니다.','','― 한 판의 흐름 ―','1. 작은 블라인드 '+blindTargets['작은'].toLocaleString()+'점 → 큰 '+blindTargets['큰'].toLocaleString()+'점 → 보스 '+blindTargets['보스'].toLocaleString()+'점 순서입니다.','2. 단마다 낼 기회 '+balatroPlays+'번, 버릴 기회 '+balatroDiscards+'번입니다. 점수는 단마다 0에서 다시 셉니다.','3. 낼 기회를 다 쓰고도 목표를 못 넘기면 그 자리에서 판이 끝납니다.','','― 보스 조건 ―','4. 보스 블라인드에는 조건이 하나 붙습니다. 판을 시작할 때 미리 보여 줍니다.','5. 무늬 봉인(그 무늬는 칩을 안 줌) · 버리기 금지 · 한 장 덜(손패 6장) · 배수 반토막 · 첫 패 버림 중 하나입니다.','','― 족보 레벨 ―','6. 낸 족보는 한 단씩 오릅니다. 같은 족보를 쓸수록 그 족보의 칩과 배수가 커집니다.','7. 그래서 한 족보를 밀고 가는 것과 큰 족보를 노리는 것 사이에서 골라야 합니다.','','― 상점 ―','8. 단을 깰 때마다 상점이 열립니다. 조커 · 조커 칸 · 족보 레벨을 삽니다.','9. ⚠️ 상점은 진짜 WC를 씁니다. 이 판에 거는 돈이 그만큼 늘어납니다.','10. 한 판에 상점에 쓸 수 있는 돈은 처음 베팅의 '+balatroSpendCap+'배까지입니다.','','― 배당 ―','11. 세 단을 다 깨면 처음 베팅의 '+balatroPayout+'배를 받습니다. 상점에 쓴 돈에는 배당이 안 붙습니다.','12. 사는 사람과 안 사는 사람의 환급률이 같아지게 값을 맞췄습니다. 상점은 이득도 손해도 아닙니다.']} startLabel="첫 블라인드로" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('balatroChoice')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('balatroHardGame')}/>}
+        {appScreen === 'balatroHardGame' && <BalatroHardGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('balatroHardSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('발라트로 하드',stake,multiplier,detail)}/>}
+        {appScreen === 'jokerSetup' && <SimpleSetupScreen title="조커 포커 준비" hero="J ★ 조커 셋" lead="조커를 끼고 포커 족보로 점수를 쌓습니다" rules={['이 게임은 남과 겨루지 않습니다. 혼자 점수를 쌓아 목표를 넘기면 이깁니다.','','― 한 판의 흐름 ―','1. 카드 여덟 장을 들고 시작합니다.','2. 그중 한 장에서 다섯 장까지 골라 냅니다. 낸 카드의 족보로 점수가 붙습니다.','3. 낼 기회는 세 번, 버릴 기회는 두 번입니다. 낸 자리와 버린 자리는 곧바로 새 카드로 채워집니다.','4. 세 번을 다 내면 판이 끝납니다. 그때까지 쌓인 점수가 목표 '+jokerTarget.toLocaleString()+'점을 넘겨야 배당이 나옵니다.','','― 점수 셈 (이게 전부입니다) ―','5. 점수 = (족보 칩 + 점수에 든 카드의 칩) × 배수.','6. 카드 한 장의 칩은 A가 11, 10·J·Q·K가 10, 나머지는 숫자 그대로입니다.','7. 족보마다 기본 칩과 배수가 있습니다 — 하이 카드 5칩 ×1 · 원 페어 10 ×2 · 투 페어 20 ×2 · 트리플 30 ×3 · 스트레이트 30 ×4 · 플러시 35 ×4 · 풀하우스 40 ×4 · 포카드 60 ×7 · 스트레이트 플러시 100 ×8.','8. 점수에 드는 카드는 족보를 이룬 카드뿐입니다. 페어를 내면 짝이 된 두 장만 칩을 보태고, 스트레이트와 플러시는 다섯 장이 모두 들어갑니다.','9. 예를 들어 K♥ K♠를 원 페어로 내면 (10 + 10 + 10) × 2 = 60점입니다. 족보 칩 10에 K 두 장의 칩 10+10을 더하고 배수 2를 곱한 값입니다.','','― 조커 ―','10. 판을 시작할 때 조커 세 장을 무작위로 받습니다. 조커는 칩이나 배수를 올려 줍니다.','11. 광대는 배수 +4, 계산가는 칩 +40, 쌍둥이는 같은 숫자가 있으면 배수 ×2, 무늬꾼은 무늬가 다 같으면 배수 ×3, 짝수쟁이·홀수쟁이는 해당하는 카드마다 배수 +2, 막내는 점수에 든 카드마다 칩 +12, 욕심쟁이는 ◆마다 배수 +3입니다.','12. 어떤 조커를 받았느냐에 따라 노려야 할 족보가 달라집니다. 이것이 이 게임의 핵심입니다. 무늬꾼을 받았으면 플러시를, 막내를 받았으면 카드가 많이 들어가는 족보를 노립니다.','13. 배수는 마지막에 곱해집니다. 그래서 칩을 먼저 크게 만든 뒤 배수를 걸수록 점수가 크게 뜁니다.','','― 요령 ―','14. 버리기 두 번은 아껴도 남으면 그냥 사라집니다. 조커에 안 맞는 카드는 일찍 버리세요.','15. 낮은 족보를 세 번 내는 것보다, 버리기를 써서 조커에 맞는 큰 족보를 한 번 만드는 편이 대개 낫습니다.','16. 화면의 골라주기를 누르면 지금 손에서 점수가 제일 높게 나오는 조합을 잡아 줍니다.','','― 배당 ―','17. 목표를 넘기면 1.7배, 목표의 두 배를 넘기면 3배, 세 배를 넘기면 10배입니다. 목표에 못 미치면 베팅금을 잃습니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('balatroChoice')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('jokerGame')}/>}
+        {appScreen === 'jokerGame' && <JokerPokerGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('jokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('발라트로',stake,multiplier,detail)}/>}
         {appScreen === 'fishingSetup' && <SimpleSetupScreen title="스크린낚시 준비" hero="🎣 바다" lead="던지고 · 기다리고 · 챔질하고 · 건져 올리기" rules={['1. 갯바위 · 방파제 · 먼바다 중 한 곳을 고릅니다. 깊을수록 큰 고기가 나오지만 어렵습니다.','2. 던진 뒤 찌를 보다가 입질이 오면 곧바로 챔질을 누릅니다. 너무 이르거나 늦으면 놓칩니다.','3. 챔질에 성공하면 릴 싸움입니다. 감기로 당겨 오고, 줄이 팽팽하면 버티기로 늦춥니다.','4. 장력이 끝까지 차면 줄이 끊어져 한 푼도 못 받습니다.','5. 불가사리 · 복어 · 해파리도 뭅니다. 잡아도 값이 안 나갑니다.']} startLabel="바다로 나가기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishingGame')}/>}
         {appScreen === 'fishingGame' && <ScreenFishingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishingSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('스크린낚시',stake,multiplier,detail)}/>}
         {appScreen === 'fishRouletteSetup' && <SimpleSetupScreen title="물고기 룰렛 준비" hero="🐟 ① ~ ⑫" lead="열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜봅니다" rules={["1. 둥근 바다 둘레에 자리 12곳이 있습니다. 시작하면 물고기 12마리와 문어 한 마리를 풀어 놓습니다.","2. 물고기는 헤엄쳐 다니다 자리 하나로 들어갑니다. 한 번 들어가면 다시 안 나옵니다.","3. 문어는 느립니다. 앉은 자리와 시계 방향 옆 칸까지 두 칸을 막고, 그 두 칸에는 물고기가 못 들어갑니다.","4. 20초가 지나면 판이 끝납니다. 그때까지 못 들어간 물고기와 문어는 세지 않습니다.","5. 먼저 · 많이 · 없음 · 이웃 두 자리 · 문어 자리 · 홀짝 · 앞뒤 절반 중에 골라 겁니다.","6. 많이에서 같은 마릿수면 먼저 받은 자리가 이깁니다. 그래서 동점이 안 생깁니다."]} startLabel="바다에 물고기 풀기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('fishRouletteGame')}/>}
@@ -1744,6 +1753,170 @@ function GameGridCard({ game, onPress, favorite, onToggleFavorite }: { game: Cat
       </Pressable>}
     </View>
   );
+}
+
+/**
+ * 발라트로 — 들어와서 **이지와 하드를 고릅니다.** 목록 자리는 한 줄만 씁니다.
+ * 슬롯이 클래식과 파치슬롯을 고르는 방식과 같습니다.
+ */
+function BalatroChoiceScreen({ onBack, onEasy, onHard }: { onBack: () => void; onEasy: () => void; onHard: () => void }) {
+  return (
+    <View style={styles.detailScreen}>
+      <ScreenHeader title="발라트로(Balatro)" onBack={onBack} />
+      <ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
+        <Text style={styles.eyebrow}>JOKER POKER</Text>
+        <Text style={styles.detailLead}>어느 쪽으로 하시겠습니까</Text>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.balatroPick, pressed && styles.pressed]} onPress={onEasy}>
+          <Text style={styles.balatroPickName}>이지 — 한 판</Text>
+          <Text style={styles.balatroPickText}>여덟 장으로 목표 {jokerTarget.toLocaleString()}점 하나를 넘깁니다. 낼 기회 {jokerPlays}번 · 버릴 기회 {jokerDiscards}번.</Text>
+          <Text style={styles.balatroPickText}>한 판에 1~2분. 목표를 넘긴 만큼 1.7 · 3 · 10배가 나옵니다.</Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" style={({ pressed }) => [styles.balatroPick, styles.balatroPickHard, pressed && styles.pressed]} onPress={onHard}>
+          <Text style={styles.balatroPickName}>하드 — 블라인드 세 단</Text>
+          <Text style={styles.balatroPickText}>작은 {blindTargets['작은'].toLocaleString()} → 큰 {blindTargets['큰'].toLocaleString()} → 보스 {blindTargets['보스'].toLocaleString()}점을 이어서 다 깨야 이깁니다. 단마다 낼 기회 {balatroPlays}번 · 버릴 기회 {balatroDiscards}번.</Text>
+          <Text style={styles.balatroPickText}>보스 블라인드에는 조건이 하나 붙습니다. 낸 족보는 쓸수록 세집니다.</Text>
+          <Text style={styles.balatroPickText}>단 사이에 상점이 열립니다. ⚠️ 상점은 진짜 WC를 씁니다 — 베팅의 {balatroSpendCap}배까지.</Text>
+          <Text style={styles.balatroPickText}>세 단을 다 깨면 처음 베팅의 {balatroPayout}배. 한 판에 5~8분.</Text>
+        </Pressable>
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * 발라트로 하드. 블라인드 세 단을 이어서 깹니다.
+ * ⚠️ 상점에서 산 것은 **그 자리에서 진짜 WC가 빠집니다.** 정산은 처음 베팅 + 상점을 합친
+ * 돈을 기록하고, 배당은 **처음 베팅에만** 곱합니다(`src/balatro.ts`의 배당 주석 참고).
+ */
+function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettle }: { coins: number; selectedBet: number; onBack: () => void; onPlaceBet: (value: number) => boolean; onSettle: (stake: number, multiplier: number, detail: string) => void }) {
+  const [run, setRun] = useState<BalatroRun | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const settled = useRef(false);
+  const start = () => {
+    if (selectedBet > coins || !onPlaceBet(selectedBet)) return;
+    settled.current = false; setPicked([]); setRun(startBalatroRun());
+  };
+  useAutoStart(() => start());
+
+  const over = !!run && (run.phase === 'won' || run.phase === 'lost');
+  useEffect(() => {
+    if (!run || !over || settled.current) return;
+    settled.current = true;
+    // 건 돈은 처음 베팅 + 상점에서 쓴 것입니다. 배당은 처음 베팅에만 곱하므로
+    // 여기서 배수를 건 돈 기준으로 되돌려 넘깁니다(정산 함수가 stake × 배수로 셉니다).
+    const staked = Math.round(selectedBet * balatroStake(run));
+    const payout = run.phase === 'won' ? Math.round(selectedBet * balatroPayout) : 0;
+    const spentWon = Math.round(selectedBet * run.spent);
+    onSettle(staked, staked > 0 ? payout / staked : 0,
+      `${run.phase === 'won' ? '세 단 다 깸' : `${blindOf(run)} 블라인드에서 막힘`} · 상점 ${spentWon.toLocaleString()} WC`);
+  }, [run, over]);
+
+  const boss = run ? bossOf(run) : undefined;
+  const chosen = run ? run.round.hand.filter((card) => picked.includes(card.id)) : [];
+  const preview = run && chosen.length > 0 && chosen.length <= 5 ? balatroScoreHand(chosen, run.held, run.levels, boss) : null;
+  const toggle = (id: string) => {
+    if (!run || run.phase !== 'play') return;
+    setPicked((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < 5 ? [...current, id] : current);
+  };
+  const suggest = () => { if (!run || run.phase !== 'play') return; setPicked(bestBalatroPlay(run.round.hand, run.held, run.levels, boss).cards.map((card) => card.id)); };
+  const play = () => { if (!run || !preview || run.phase !== 'play') return; setRun(playBalatroHand(run, chosen)); setPicked([]); };
+  const discard = () => { if (!run || run.phase !== 'play' || chosen.length === 0 || run.round.discardsLeft <= 0) return; setRun(discardBalatroCards(run, chosen)); setPicked([]); };
+  const buy = (offer: ShopOffer) => {
+    if (!run || run.phase !== 'shop') return;
+    const cost = Math.round(selectedBet * offer.cost);
+    if (cost > coins || !onPlaceBet(cost)) return;
+    try { setRun(buyShopOffer(run, offer)); } catch { /* 못 사면 그대로 둡니다 */ }
+  };
+  const next = () => { if (!run || run.phase !== 'shop') return; setRun(leaveShop(run)); setPicked([]); };
+
+  const offerName = (offer: ShopOffer) => offer.kind === 'joker' ? `조커 · ${offer.id}`
+    : offer.kind === 'slot' ? '조커 칸 하나 더'
+    : `족보 올리기 · ${offer.type}`;
+  const offerText = (offer: ShopOffer) => offer.kind === 'joker' ? (jokers.find((joker) => joker.id === offer.id)?.text ?? '')
+    : offer.kind === 'slot' ? '조커를 한 장 더 들 수 있습니다'
+    : `그 족보의 칩과 배수가 한 단 오릅니다`;
+
+  return <View style={styles.jokerScreen}><ScreenHeader title="발라트로 하드" onBack={onBack} /><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+    <View style={styles.rouletteStatusRow}>
+      <View><Text style={styles.eyebrow}>{run ? `${blindOf(run)} 블라인드 · 목표 ${targetOf(run).toLocaleString()}점` : 'BALATRO HARD'}</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
+      <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>건 돈 {run ? Math.round(selectedBet * balatroStake(run)).toLocaleString() : selectedBet.toLocaleString()} WC</Text></View>
+    </View>
+
+    {!run ? <Pressable disabled={selectedBet > coins} style={[styles.primaryButton, styles.fullWidthButton, selectedBet > coins && styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet > coins ? '코인이 부족합니다' : '판 시작'}</Text></Pressable> : <>
+      {/* 세 단이 어디까지 왔는지. 지금 단은 금색입니다. */}
+      <View style={styles.blindRow}>{(['작은', '큰', '보스'] as const).map((blind, index) => (
+        <View key={blind} style={[styles.blindStep, index === run.blindIndex && styles.blindStepNow, index < run.blindIndex && styles.blindStepDone]}>
+          <Text style={[styles.blindStepName, index === run.blindIndex && styles.blindStepNameNow]}>{blind}</Text>
+          <Text style={styles.blindStepTarget}>{blindTargets[blind].toLocaleString()}</Text>
+        </View>
+      ))}</View>
+      {blindOf(run) === '보스' && <View style={styles.bossBox}><Text style={styles.bossName}>보스 · {run.boss.name}</Text><Text style={styles.bossText}>{run.boss.text}</Text></View>}
+
+      <View style={styles.jokerScoreRow}>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>점수</Text><Text style={styles.jokerScoreValue}>{run.round.score.toLocaleString()}</Text></View>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>낼 기회</Text><Text style={styles.jokerScoreValue}>{run.round.playsLeft}</Text></View>
+        <View style={styles.jokerScoreBox}><Text style={styles.jokerScoreLabel}>버릴 기회</Text><Text style={styles.jokerScoreValue}>{run.round.discardsLeft}</Text></View>
+      </View>
+      <View style={styles.jokerBar}><View style={[styles.jokerBarFill, { width: `${Math.min(100, run.round.score / targetOf(run) * 100)}%` }]} /></View>
+
+      <View style={styles.jokerRow}>{run.held.map((id) => {
+        const joker = jokers.find((item) => item.id === id);
+        return <View key={id} style={styles.jokerCard}><Text style={styles.jokerName}>{joker?.name ?? id}</Text><Text style={styles.jokerEffect}>{joker?.text ?? ''}</Text></View>;
+      })}
+        {Array.from({ length: Math.max(0, run.slots - run.held.length) }, (_, index) => <View key={`빈${index}`} style={[styles.jokerCard, styles.jokerCardEmpty]}><Text style={styles.jokerEffect}>빈 칸</Text></View>)}
+      </View>
+
+      {run.phase === 'shop' ? <>
+        <View style={styles.shopBox}>
+          <Text style={styles.shopTitle}>상점 · {blindOf(run)} 블라인드를 깼습니다</Text>
+          <Text style={styles.shopNote}>⚠️ 여기서 쓰는 것은 진짜 WC입니다. 이 판에 {Math.round(selectedBet * balatroSpendCap).toLocaleString()} WC까지 쓸 수 있고 지금까지 {Math.round(selectedBet * run.spent).toLocaleString()} WC 썼습니다.</Text>
+          {run.shop.length === 0 && <Text style={styles.emptyText}>살 것이 없습니다.</Text>}
+          {run.shop.map((offer, index) => {
+            const cost = Math.round(selectedBet * offer.cost);
+            const tooMuch = run.spent + offer.cost > balatroSpendCap + 1e-9 || cost > coins || (offer.kind === 'joker' && run.held.length >= run.slots);
+            return <Pressable key={index} disabled={tooMuch} accessibilityRole="button" style={({ pressed }) => [styles.shopItem, tooMuch && styles.disabledCard, pressed && styles.pressed]} onPress={() => buy(offer)}>
+              <View style={styles.shopItemCopy}><Text style={styles.shopItemName}>{offerName(offer)}</Text><Text style={styles.shopItemText}>{offerText(offer)}</Text></View>
+              <Text style={styles.shopItemCost}>{cost.toLocaleString()} WC</Text>
+            </Pressable>;
+          })}
+        </View>
+        <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={next}><Text style={styles.primaryButtonText}>다음 블라인드로</Text></Pressable>
+      </> : <>
+        <View style={styles.feltTable}><View style={styles.feltSurface}>
+          <View style={styles.feltGlow} pointerEvents="none" />
+          <Text style={styles.feltLabel}>{over ? '판이 끝났습니다' : `내 패 — ${picked.length}/5장 선택`}</Text>
+          <View style={styles.handRowPlain}>{run.round.hand.map((card) => <Pressable key={card.id} disabled={over} onPress={() => toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id) ? 'selected' : undefined} /></Pressable>)}</View>
+          {/* 칩 × 배수를 **크게** 보여 줍니다. 최종 점수만 나오면 무엇이 점수를 만드는지 안 보입니다. */}
+          {preview ? <View style={styles.mathRow}>
+            <Text style={styles.mathHand}>{preview.hand.type}{preview.level > 1 ? ` LV.${preview.level}` : ''}</Text>
+            <View style={styles.mathBoxes}>
+              <View style={styles.mathChips}><Text style={styles.mathValue}>{preview.chips.toLocaleString()}</Text></View>
+              <Text style={styles.mathTimes}>×</Text>
+              <View style={styles.mathMult}><Text style={styles.mathValue}>{preview.mult}</Text></View>
+              <Text style={styles.mathTimes}>=</Text>
+              <Text style={styles.mathTotal}>{preview.score.toLocaleString()}</Text>
+            </View>
+          </View> : <Text style={styles.jokerPreview}>{over ? '' : '낼 카드를 고르세요'}</Text>}
+        </View></View>
+
+        {!over ? <View style={styles.balatroActionRow}>
+          <Pressable style={[styles.secondaryButton, styles.balatroAction]} onPress={suggest}><Text style={styles.secondaryButtonText}>골라주기</Text></Pressable>
+          <Pressable disabled={chosen.length === 0 || run.round.discardsLeft <= 0} style={[styles.secondaryButton, styles.balatroAction, (chosen.length === 0 || run.round.discardsLeft <= 0) && styles.disabledCard]} onPress={discard}><Text style={styles.secondaryButtonText}>버리기</Text></Pressable>
+          <Pressable disabled={!preview} style={[styles.primaryButton, styles.balatroAction, !preview && styles.disabledCard]} onPress={play}><Text style={styles.primaryButtonText}>내기</Text></Pressable>
+        </View> : <>
+          <Text style={styles.sicboResult}>{run.phase === 'won' ? `세 단을 다 깼습니다 · ${Math.round(selectedBet * balatroPayout).toLocaleString()} WC` : `${blindOf(run)} 블라인드에서 막혔습니다`}</Text>
+          <Text style={styles.jokerPreview}>건 돈 {Math.round(selectedBet * balatroStake(run)).toLocaleString()} WC (처음 {selectedBet.toLocaleString()} + 상점 {Math.round(selectedBet * run.spent).toLocaleString()})</Text>
+          <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable>
+        </>}
+      </>}
+
+      {/* 족보 레벨. 올라간 것만 적습니다. */}
+      <Text style={styles.disclaimer}>{(Object.keys(run.levels) as (keyof typeof run.levels)[])
+        .filter((type) => run.levels[type] > 1)
+        .map((type) => `${type} LV.${run.levels[type]} (${leveledBase(type, run.levels).chips}칩 ×${leveledBase(type, run.levels).mult})`)
+        .join(' · ') || '같은 족보를 낼수록 그 족보가 세집니다'}</Text>
+    </>}
+  </ScrollView></View>;
 }
 
 function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
@@ -7468,6 +7641,44 @@ const styles = StyleSheet.create({
   feltGlow: { position: 'absolute', top: '-45%', left: '8%', right: '8%', height: '110%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.055)' },
   feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
   jokerScreen: { flex: 1, backgroundColor: colors.bg },
+  // 발라트로 고르기
+  balatroPick: { padding: 16, borderRadius: 18, marginBottom: 12, gap: 6, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.22)' },
+  balatroPickHard: { borderColor: colors.gold },
+  balatroPickName: { color: colors.goldLight, fontSize: 18, fontWeight: '900' },
+  balatroPickText: { color: colors.muted, fontSize: 12, lineHeight: 19 },
+  // 블라인드 세 단
+  blindRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  blindStep: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  blindStepNow: { borderColor: colors.gold, backgroundColor: colors.panel2 },
+  blindStepDone: { opacity: 0.5 },
+  blindStepName: { color: colors.muted, fontSize: 12, fontWeight: '900' },
+  blindStepNameNow: { color: colors.goldLight },
+  blindStepTarget: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  bossBox: { padding: 12, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(120,20,40,0.35)', borderWidth: 1, borderColor: '#8E2B44' },
+  bossName: { color: '#FFC7B0', fontSize: 14, fontWeight: '900' },
+  bossText: { color: '#F0D6CC', fontSize: 12, lineHeight: 18, marginTop: 3 },
+  // 상점
+  shopBox: { padding: 14, borderRadius: 16, gap: 10, marginBottom: 12, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.gold },
+  shopTitle: { color: colors.goldLight, fontSize: 16, fontWeight: '900' },
+  shopNote: { color: colors.muted, fontSize: 11, lineHeight: 17 },
+  shopItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  shopItemCopy: { flex: 1, gap: 2 },
+  shopItemName: { color: colors.text, fontSize: 14, fontWeight: '800' },
+  shopItemText: { color: colors.muted, fontSize: 11, lineHeight: 16 },
+  shopItemCost: { color: colors.goldLight, fontSize: 14, fontWeight: '900' },
+  // 칩 × 배수를 눈에 보이게
+  mathRow: { alignItems: 'center', gap: 6, marginTop: 8 },
+  mathHand: { color: colors.goldLight, fontSize: 13, fontWeight: '900' },
+  mathBoxes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mathChips: { minWidth: 74, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, alignItems: 'center', backgroundColor: '#123A5E', borderWidth: 1, borderColor: '#2E6E9E' },
+  mathMult: { minWidth: 52, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, alignItems: 'center', backgroundColor: '#5E1220', borderWidth: 1, borderColor: '#A03246' },
+  mathValue: { color: colors.text, fontSize: 18, fontWeight: '900' },
+  mathTimes: { color: colors.muted, fontSize: 15, fontWeight: '900' },
+  mathTotal: { color: colors.goldLight, fontSize: 21, fontWeight: '900' },
+  // 세 버튼이 자리를 똑같이 나눠 가집니다. 안 그러면 내기가 다 먹어 글자가 세로로 눕습니다.
+  balatroActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 4 },
+  balatroAction: { flex: 1, minWidth: 0 },
+  jokerCardEmpty: { borderStyle: 'dashed', opacity: 0.6 },
   jokerScoreRow: { width: '100%', flexDirection: 'row', gap: 8 },
   jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   jokerScoreLabel: { color: '#A08FA0', fontSize: 11, fontWeight: '800' },
