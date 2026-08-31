@@ -61,11 +61,15 @@ export function createGoStopBonusCards(): HwatuCard[] {
   return [2, 3].map((value) => ({ id: `bonus-${value}pi`, month: 0, kind: '피' as const, bonus: value, name: `보너스 ${value}피` }));
 }
 
-export function dealGoStop(mode: GoStopMode = 'gostop', random: () => number = Math.random, deckStyle: GoStopDeckStyle = 'classic'): GoStopRound {
-  return dealGoStopAttempt(mode, random, 0, deckStyle);
+/**
+ * 새 판을 돌립니다. `firstTurn`은 **먼저 낼 사람**입니다 —
+ * 고스톱은 **이긴 사람이 다음 판을 먼저 냅니다.** 안 주면 0번(나)부터입니다.
+ */
+export function dealGoStop(mode: GoStopMode = 'gostop', random: () => number = Math.random, deckStyle: GoStopDeckStyle = 'classic', firstTurn = 0): GoStopRound {
+  return dealGoStopAttempt(mode, random, 0, deckStyle, firstTurn);
 }
 
-function dealGoStopAttempt(mode: GoStopMode, random: () => number, attempt: number, deckStyle: GoStopDeckStyle): GoStopRound {
+function dealGoStopAttempt(mode: GoStopMode, random: () => number, attempt: number, deckStyle: GoStopDeckStyle, firstTurn = 0): GoStopRound {
   const playerCount = mode === 'matgo' ? 2 : 3;
   const handSize = mode === 'matgo' ? 10 : 7;
   const floorSize = mode === 'matgo' ? 8 : 6;
@@ -87,10 +91,10 @@ function dealGoStopAttempt(mode: GoStopMode, random: () => number, attempt: numb
   }
   // 바닥 총통은 보통 다시 돌립니다. 잘못된 난수에서도 무한 반복하지 않도록 30회로 제한합니다.
   const floorHasFour = Array.from({ length: 12 }, (_, index) => index + 1).some((month) => sameMonth(floor, month).length === 4);
-  if (floorHasFour && attempt < 30) return dealGoStopAttempt(mode, random, attempt + 1, deckStyle);
+  if (floorHasFour && attempt < 30) return dealGoStopAttempt(mode, random, attempt + 1, deckStyle, firstTurn);
   const chongtongWinner = players.findIndex((player) => Array.from({ length: 12 }, (_, index) => index + 1).some((month) => sameMonth(player.hand, month).length === 4));
   return {
-    mode, deckStyle, players, floor, deck, turn: 0,
+    mode, deckStyle, players, floor, deck, turn: Math.max(0, Math.min(playerCount - 1, firstTurn)),
     finished: chongtongWinner >= 0,
     winner: chongtongWinner >= 0 ? chongtongWinner : null,
     pendingDecision: null, lastEvents: chongtongWinner >= 0 ? ['총통'] : [], nagari: false,
@@ -187,6 +191,10 @@ export function playGoStopTurn(round: GoStopRound, cardId: string, choice: Match
     captured = [...first.captured, ...second.captured];
     if (drawn && originalMatches.length === 0 && drawn.month === played.month) events.push('쪽');
     if (drawn && originalMatches.length === 2 && drawn.month === played.month) events.push('따닥');
+    // 바닥에 같은 월 세 장이 깔려 있을 때 넷째를 내면 네 장을 한꺼번에 가져갑니다.
+    // 먹기는 전부터 먹고 있었는데 **이름이 안 붙어** 화면에 아무 말도 안 떴습니다.
+    if (originalMatches.length === 3) events.push('네 장 다 먹음');
+    if (drawn && sameMonth(first.floor, drawn.month).length === 3) events.push('깐 패로 네 장 다 먹음');
     if (captured.length > 0 && floor.length === 0) events.push('싹쓸이');
   }
 
@@ -292,12 +300,13 @@ function finishGoStopTurn(round: GoStopRound, players: GoStopPlayer[], floor: Hw
     deck,
     turn: noCards || mayDecide ? actingPlayer : nextTurn,
     finished: noCards,
-    // 패를 다 썼는데 스톱한 사람이 없으면 점수와 관계없이 나가리입니다.
+    // 패를 다 썼는데 스톱한 사람이 없으면 **점수와 관계없이 승리 없이 끝납니다.**
+    // 기준 점수를 넘긴 사람이 있어도 스톱을 안 외쳤으면 이긴 것이 아닙니다.
     winner: null,
     pendingDecision: mayDecide ? actingPlayer : null,
     lastEvents: events,
     nagari: noCards,
-    message: noCards ? '나가리 · 다음 판 정산이 두 배가 됩니다' : mayDecide ? '고 또는 스톱을 고르세요' : events.length ? `${events.join(' · ')}! ${nextTurn + 1}번 차례` : `${nextTurn + 1}번 차례`,
+    message: noCards ? '승리 없이 끝났습니다 · 나가리 · 다음 판 정산이 두 배가 됩니다' : mayDecide ? '고 또는 스톱을 고르세요' : events.length ? `${events.join(' · ')}! ${nextTurn + 1}번 차례` : `${nextTurn + 1}번 차례`,
   };
 }
 

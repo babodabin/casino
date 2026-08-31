@@ -3509,7 +3509,6 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn,spot==='top'&&styles.tableTopHead]}>
         <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
         <Text style={side?styles.tableSideStack:styles.tableSeatStack}>{(seat===0?coins:stacks.stacks[seat]-info.contributed).toLocaleString()} WC</Text>
-        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         <View style={styles.tableSeatStatusSlot}>{info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :winners?.includes(seat)?<Text style={styles.tableSeatWinner}>승리</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
@@ -3539,7 +3538,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
+          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
         </View>
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
@@ -3671,7 +3670,6 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn,spot==='top'&&styles.tableTopHead]}>
         <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
         <Text style={side?styles.tableSideStack:styles.tableSeatStack}>{(seat===0?coins:stacks.stacks[seat]-info.contributed).toLocaleString()} WC</Text>
-        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         <View style={styles.tableSeatStatusSlot}>{info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :label?<Text style={styles.tableSeatWinner}>{label} 승</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
@@ -3708,7 +3706,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
+          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
         </View>
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
@@ -3736,6 +3734,16 @@ function PokerSetupScreen(props: { mode:'holdem'|'omaha'; players:number; onPlay
 const MAX_RAISES_PER_STREET = maxRaisesPerStreet;
 
 const tableSeatName = (seat: number) => (seat === 0 ? '나' : `컴퓨터 ${seat}`);
+
+/**
+ * 자리마다 이번 판에 낸 돈. **판 가운데에 숫자로 적습니다.**
+ * 전에는 자리 옆에 작은 칩을 그렸는데, 칩으로 안 보이고 버튼처럼 보였습니다.
+ * 폴드한 사람은 낸 돈이 팟에 남아 있으므로 같이 적되 폴드라고 표시합니다.
+ */
+const tableContributionLine = (round: TableRound) =>
+  round.seats
+    .map((seat, index) => `${tableSeatName(index)} ${seat.contributed.toLocaleString()}${seat.folded ? ' 폴드' : ''}`)
+    .join(' · ');
 
 /** 자리에 띄운 행동 표시가 남아 있는 시간. 다음 사람이 두기 전에 지워집니다. */
 const SEAT_ACTION_MS = 1600;
@@ -3778,6 +3786,8 @@ const tableChipColors = ['#E4E4E4', '#C8402F', '#2F6BC8', '#2F9B5A', '#171107'];
  *
  * 좌우 자리(compact)는 세로로 쌓으면 29가 들어 카드 자리를 먹습니다. 그래서 옆으로 눕혀 겹칩니다.
  */
+// ⚠️ 2026-08-31부터 **아무 데서도 안 씁니다.** 작은 칩 대신 판 가운데에 낸 돈을 숫자로
+// 적기로 했습니다(tableContributionLine). 되살리려면 seatRow의 이름줄에 다시 넣으면 됩니다.
 function SeatChips({ amount, unit, compact = false }: { amount: number; unit: number; compact?: boolean }) {
   if (amount <= 0) return null;
   const count = Math.max(1, Math.min(5, Math.round(amount / Math.max(1, unit))));
@@ -3968,7 +3978,6 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       <View style={[styles.tableSeatHead,side&&styles.tableSeatHeadColumn,spot==='top'&&styles.tableTopHead]}>
         <Text style={side?styles.tableSideName:styles.tableSeatName}>{tableSeatName(seat)}</Text>
         <Text style={side?styles.tableSideStack:styles.tableSeatStack}>{(seat===0?coins:stacks.stacks[seat]-info.contributed).toLocaleString()} WC</Text>
-        <SeatChips amount={info.contributed} unit={selectedBet} compact={side}/>
         <View style={styles.tableSeatStatusSlot}>{info.folded?<Text style={styles.tableSeatFolded}>폴드</Text>
           :winners?.includes(seat)?<Text style={styles.tableSeatWinner}>승리</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
@@ -4002,7 +4011,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
         <View style={styles.tableCenterSlot}>
           <View style={[styles.holdemCards,styles.pokerBoardRow]}>{community.slice(0,boardShown).map((card,index)=><View key={card.id} style={index?styles.pokerBoardFan:null}><PlayingCard card={card} compact stacked emphasis={emphasis(card,'board')}/></View>)}{boardShown===0&&<Text style={styles.sevenPokerHint}>공용 카드는 플랍부터 열립니다</Text>}</View>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution}>내가 낸 돈 {round.seats[0].contributed.toLocaleString()} WC · 남은 사람 {tableLive(round).length}명</Text>
+          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
         </View>
         <View style={styles.tableSideSlot}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
@@ -4799,8 +4808,10 @@ function goStopBill(title:string,winner:GoStopPlayer,bill:GoStopSettlement,reaso
   return {
     title:`${title} · ${score.total}점`,
     lines:[
-      `광 ${score.bright} · 열끗 ${score.animal} · 띠 ${score.ribbon} · 피 ${score.pi} = ${score.total}점`,
-      ...(score.bonuses.length?[score.bonuses.join(' · ')]:[]),
+      // ⚠️ 장수와 점수를 **따로** 적습니다. 한 줄로 섞으면 `띠 4`가 넉 장인지 4점인지 모릅니다.
+      `모은 패 · 광 ${score.counts.광} · 열끗 ${score.counts.열끗} · 띠 ${score.counts.띠} · 피 ${score.counts.피}장`,
+      `점수 · 광 ${score.bright} + 열끗 ${score.animal} + 띠 ${score.ribbon} + 피 ${score.pi} = ${score.total}점`,
+      ...(score.bonuses.length?[`그중 ${score.bonuses.join(' · ')}`]:[]),
       ...(winner.goCount?[`${winner.goCount}고 → ${bill.goScore}점`]:[]),
       ...(reasons.length?[reasons.join(' · ')]:[]),
       ...(carry>1?[`나가리 ${carry}배`]:[]),
@@ -4816,6 +4827,8 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
   const [settled,setSettled]=useState(false);
   const [pendingPlay,setPendingPlay]=useState<HwatuCard|null>(null);
   const [carryMultiplier,setCarryMultiplier]=useState(1);
+  /** 다음 판을 먼저 낼 사람. **이긴 사람이 먼저 냅니다.** 나가리면 그대로 둡니다. */
+  const [firstTurn,setFirstTurn]=useState(0);
   /**
    * 방금 낸 패를 바닥의 맞은 패 위에 얹어 둔 상태입니다. 아직 가져가지 않았습니다.
    * next에 계산은 끝나 있고, 한 번 더 눌러야 판에 반영합니다.
@@ -4841,6 +4854,8 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       setSettled(true);return;
     }
     const winner=next.players[next.winner];
+    // 이긴 사람이 다음 판을 먼저 냅니다.
+    setFirstTurn(next.winner);
     if(next.winner===0){
       const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode));
       const wonPoints=bills.reduce((sum,bill)=>sum+Math.max(1,bill.finalPoints),0)*carryMultiplier;
@@ -4915,7 +4930,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
-    const next=dealGoStop(mode,Math.random,deckStyle);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);setSettleNote(null);
+    const next=dealGoStop(mode,Math.random,deckStyle,firstTurn);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);setSettleNote(null);
     if(next.finished)finish(next,true);
   };
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
@@ -4997,7 +5012,9 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
         {slap?(()=>{
           const hit=round.floor.filter((item)=>item.month===slap.card.month);
           // 낸 패를 처리한 뒤 더미에서 한 장을 뒤집습니다. 그 패도 바닥을 칠 수 있습니다.
-          const drawn=round.deck[0];
+          // ⚠️ 보너스패는 그냥 먹고 넘어가므로 건너뜁니다 — `automaticGoStopChoice`와 같은 셈입니다.
+          // 안 그러면 보너스판(50장)에서 **엉뚱한 패를 깐 것처럼** 보여 줍니다.
+          const drawn=round.deck.find((card)=>!card.bonus);
           const drawnHit=drawn?round.floor.filter((item)=>item.month===drawn.month):[];
           // 이번 차례에 실제로 가져간 패입니다. 판이 넘어가기 전과 뒤를 견줘서 구합니다.
           const had=new Set(round.players[slap.who].captured.map((card)=>card.id));
@@ -5009,6 +5026,9 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
           const sizeFor=(taken:boolean)=>taken?'normal':'small' as const;
           return <View style={styles.goStopSlapOverlay}>
             <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
+            {/* 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일은 **크게** 알려 줍니다.
+                이게 없어서 먹고도 못 먹은 줄 아셨습니다. */}
+            {slap.next.lastEvents?.length?<Text style={styles.goStopSlapEvent}>{slap.next.lastEvents.join(' · ')}!</Text>:null}
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
                 <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop&&slapTook?1.28:1}]}]}>
@@ -8339,6 +8359,8 @@ const styles = StyleSheet.create({
   // 판 위에 떠 있는 상자입니다. 자리를 차지하지 않으므로 나타나도 화면이 안 밀립니다.
   goStopSlapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4 },
   goStopSlapWho: { color: '#FFE9A8', fontSize: 13, fontWeight: '900' },
+  // 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일. 놓치면 규칙이 안 도는 줄 압니다.
+  goStopSlapEvent: { color: '#FFD35F', fontSize: 17, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 6 },
   goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
   goStopSlapPair: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   goStopSlapSide: { alignItems: 'center', gap: 3 },

@@ -353,3 +353,63 @@ test('고를 외치면 그때의 점수를 적어 둔다', () => {
   };
   assert.equal(chooseGoOrStop(base, 'go').players[0].decidedAtScore, 3);
 });
+
+test('바닥에 같은 월 세 장이 있을 때 넷째를 내면 네 장을 다 먹고 이름이 붙는다', () => {
+  const march = deck.filter((item) => item.month === 3);
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [march[3]], captured: [], goCount: 0 },
+      { hand: [card(5)], captured: [], goCount: 0 },
+      { hand: [card(6)], captured: [], goCount: 0 },
+    ],
+    floor: [march[0], march[1], march[2], card(9)],
+    deck: [card(11), card(12)], turn: 0, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopTurn(round, march[3].id);
+  assert.equal(next.players[0].captured.length, 4);
+  assert.equal(next.lastEvents?.includes('네 장 다 먹음'), true);
+  assert.equal(next.floor.some((item) => item.month === 3), false);
+});
+
+test('깐 패가 바닥의 같은 월 세 장과 맞아도 네 장을 다 먹는다', () => {
+  const june = deck.filter((item) => item.month === 6);
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(9)], captured: [], goCount: 0 },
+      { hand: [card(5)], captured: [], goCount: 0 },
+      { hand: [card(10)], captured: [], goCount: 0 },
+    ],
+    floor: [june[0], june[1], june[2], card(7)],
+    deck: [june[3], card(12)], turn: 0, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopTurn(round, card(9).id);
+  assert.equal(next.players[0].captured.length, 4);
+  assert.equal(next.lastEvents?.includes('깐 패로 네 장 다 먹음'), true);
+});
+
+test('패를 다 쓰면 기준 점수를 넘긴 사람이 있어도 승리 없이 끝난다', () => {
+  // 삼광 3점으로 이미 기준을 넘겼지만 스톱을 안 외쳤습니다.
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(2)], captured: scoring, goCount: 0 },
+      { hand: [], captured: [], goCount: 0 },
+      { hand: [], captured: [], goCount: 0 },
+    ],
+    floor: [], deck: [card(4)], turn: 0, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopTurn(round, card(2).id);
+  assert.equal(next.finished, true);
+  assert.equal(next.winner, null);
+  assert.equal(next.nagari, true);
+  assert.equal(next.pendingDecision, null);
+});
+
+test('이긴 사람이 다음 판을 먼저 낸다', () => {
+  for (const first of [0, 1, 2]) assert.equal(dealGoStop('gostop', () => 0.37, 'classic', first).turn, first);
+  // 자리 수를 넘기면 0번으로 돌립니다.
+  assert.equal(dealGoStop('matgo', () => 0.37, 'classic', 5).turn, 1);
+});
