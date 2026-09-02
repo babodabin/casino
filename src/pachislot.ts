@@ -11,7 +11,8 @@
 //
 // 화면에서는 3매 = 베팅 금액 한 번으로 바꿔 씁니다.
 
-export const pachiSymbols = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🔁'] as const;
+// ⚠️ 종(🔔) 대신 왕관(👑)을 씁니다. 배당을 정하는 것은 아래 '벨' 역할이고 여기 그림은 보이기만 합니다.
+export const pachiSymbols = ['🍒', '🍋', '👑', '⭐', '💎', '7️⃣', '🔁'] as const;
 export type PachiSymbol = typeof pachiSymbols[number];
 export type PachiReels = [PachiSymbol, PachiSymbol, PachiSymbol];
 
@@ -64,7 +65,7 @@ const atBellOdds = 0.62;
 const reelsOf: Record<PachiRole, PachiReels> = {
   'AT': ['7️⃣', '7️⃣', '7️⃣'],
   '찬스존': ['⭐', '⭐', '⭐'],
-  '벨': ['🔔', '🔔', '🔔'],
+  '벨': ['👑', '👑', '👑'],
   '리플레이': ['🔁', '🔁', '🔁'],
   '체리': ['🍒', '🍋', '💎'],
   '꽝': ['🍋', '💎', '🍒'],

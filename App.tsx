@@ -221,7 +221,7 @@ type GameRecord = {
 };
 
 /** 릴이 도는 동안만 쓰는 그림입니다. 결과는 레버를 당길 때 이미 정해져 있습니다. */
-const pachiSpinSymbols = ['🍒', '🍋', '🔔', '⭐', '💎', '7️⃣', '🔁'] as const;
+const pachiSpinSymbols = ['🍒', '🍋', '👑', '⭐', '💎', '7️⃣', '🔁'] as const;
 
 /**
  * 파치슬롯 기계에 붙는 사진. **위 화면과 아래 그림판이 한 짝**입니다.
@@ -2468,7 +2468,7 @@ function SlotGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBetC
 function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; motion: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (stake: number, spin: PachiSpin) => void }) {
   const option = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const [machine, setMachine] = useState<PachiState>(createPachiState);
-  const [reels, setReels] = useState<PachiReels>(['🍒', '🔔', '7️⃣']);
+  const [reels, setReels] = useState<PachiReels>(['🍒', '👑', '7️⃣']);
   const [stopped, setStopped] = useState<[boolean, boolean, boolean]>([true, true, true]);
   const [spinning, setSpinning] = useState(false);
   const [shown, setShown] = useState<PachiSpin | null>(null);
@@ -2535,11 +2535,15 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       상태 글(통상 · 게임 수 · 천장)은 실제 기계처럼 **조작대 옆 작은 창**에 있습니다.
     */}
     <View style={[styles.pachiCabinet, machine.phase === 'AT' && styles.pachiCabinetAt]}>
+      {/* 기계 어깨. 위로 갈수록 밝아지는 금속 띠라 몸통이 서 있는 것처럼 보입니다. */}
+      <View style={[styles.pachiShoulder, webGradient('linear-gradient(180deg, #4A5160 0%, #2A2F3A 60%, #171A21 100%)')]}>
+        <Text style={styles.pachiShoulderText}>WORLD CASINO</Text>
+      </View>
       <PachiBulbs lit={twinkle} />
       {/* 위 화면. 실제 기계의 연출용 LCD 자리입니다. */}
       <View style={styles.pachiTopScreen}>
         <Image source={photo.top} style={styles.pachiTopPhoto} resizeMode="cover" />
-        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0) 38%, rgba(0,0,0,0.55) 100%)')]} />
+        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.28) 0%, rgba(0,0,0,0) 40%, rgba(0,0,0,0.46) 100%)')]} />
         <View pointerEvents="none" style={styles.pachiGlassStreak} />
         <PachiSparkle left={22} top={26} size={16} delay={0} twinkle={twinkle} />
         <PachiSparkle left={268} top={18} size={22} delay={0.4} twinkle={twinkle} />
@@ -2560,7 +2564,12 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
         릴 창. **세 줄이 보이고 가운데가 당첨 줄**입니다(실제 기계와 같습니다).
         위아래 줄은 이웃 심볼을 보여 주는 장식이라 계산에 안 들어갑니다.
       */}
-      <View style={styles.pachiReelBezel}>
+      {/*
+        릴 창. 은색 테는 **세 겹**입니다 — 바깥 크롬, 안쪽 그늘, 그리고 창.
+        한 겹짜리 회색 띠로는 아무리 색을 골라도 금속으로 안 보입니다.
+      */}
+      <View style={[styles.pachiReelBezel, webGradient('linear-gradient(180deg, #F2F5F9 0%, #C3CAD6 22%, #8B93A2 52%, #C9D0DA 78%, #6E7684 100%)')]}>
+        <View style={styles.pachiBezelRivetRow}>{[0, 1, 2, 3, 4, 5].map((index) => <View key={index} style={styles.pachiRivet} />)}</View>
         <View style={styles.pachiReelWindow}>
           {reels.map((symbol, index) => (
             <View key={index} style={[styles.pachiReel, index < 2 && styles.pachiReelDivider]}>
@@ -2574,10 +2583,11 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
           <View pointerEvents="none" style={styles.pachiPaylineBar} />
           <View pointerEvents="none" style={styles.pachiReelGlass} />
         </View>
+        <View style={styles.pachiBezelRivetRow}>{[0, 1, 2, 3, 4, 5].map((index) => <View key={index} style={styles.pachiRivet} />)}</View>
       </View>
 
       {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
-      <View style={styles.pachiDeck}>
+      <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
         {/* 레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다. */}
         <Pressable disabled={spinning || blocked} onPress={pullLever} style={[styles.pachiLeverBase, (spinning || blocked) && styles.disabledCard]}>
           <View style={styles.pachiLeverMount} />
@@ -2600,11 +2610,14 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       {/* 아래 그림판. 위 화면과 같은 사진의 아래쪽입니다. */}
       <View style={styles.pachiArtPanel}>
         <Image source={photo.panel} style={styles.pachiTopPhoto} resizeMode="cover" />
-        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.05) 45%, rgba(0,0,0,0.6) 100%)')]} />
+        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)')]} />
         <Text style={styles.pachiArtText}>WORLD CASINO · PACHISLOT</Text>
       </View>
       <PachiBulbs lit={twinkle} />
-      <View style={styles.pachiTray} />
+      {/* 동전 받이. 안쪽이 어두워 파인 것처럼 보입니다. */}
+      <View style={[styles.pachiTray, webGradient('linear-gradient(180deg, #0A0C11 0%, #1B1F27 40%, #0A0C11 100%)')]}>
+        <View style={styles.pachiTrayHole} />
+      </View>
     </View>
 
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} onPress={() => onBetChange(amount)} level={option.bets.indexOf(amount) + 1} />)}</View>
@@ -9092,9 +9105,9 @@ const styles = StyleSheet.create({
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
 
   // 위 화면 — 연출용 LCD
-  pachiTopScreen: { height: 196, backgroundColor: '#05060A', overflow: 'hidden' },
+  pachiTopScreen: { height: 178, backgroundColor: '#05060A', overflow: 'hidden' },
   pachiTopPhoto: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
-  pachiScreenShade: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.18)' },
+  pachiScreenShade: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.08)' },
   // 유리에 비스듬히 드는 빛. 얹기만 해서 자리를 안 먹습니다.
   pachiGlassStreak: { position: 'absolute', left: -60, top: -40, width: 90, height: 320, backgroundColor: 'rgba(255,255,255,0.09)', transform: [{ rotate: '18deg' }] },
   pachiFlash: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#FFF7DA' },
@@ -9107,8 +9120,16 @@ const styles = StyleSheet.create({
   pachiWinTagText: { color: '#FFF1C6', fontSize: 11, fontWeight: '900' },
 
   // 릴 창 — 은색 테 안에 창이 하나 뚫려 있습니다
-  pachiReelBezel: { paddingHorizontal: 10, paddingVertical: 8, backgroundColor: '#B9C0CC', borderTopWidth: 2, borderTopColor: '#E6EAF1', borderBottomWidth: 2, borderBottomColor: '#6D7382' },
-  pachiReelWindow: { height: 160, flexDirection: 'row', borderRadius: 8, overflow: 'hidden', backgroundColor: '#FBF6EA', borderWidth: 2, borderColor: '#2A2E36' },
+  // 크롬 테. 웹에서는 위 그러데이션이 얹히고, 앱에서는 이 단색이 그대로 보입니다.
+  pachiReelBezel: { paddingHorizontal: 15, paddingVertical: 5, backgroundColor: '#AEB6C3', borderTopWidth: 2, borderTopColor: '#F4F7FB', borderBottomWidth: 3, borderBottomColor: '#5A6270' },
+  // 테에 박힌 나사. 여섯 개씩 위아래로 박습니다.
+  pachiBezelRivetRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingVertical: 3 },
+  pachiRivet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8A92A1', borderTopWidth: 1, borderTopColor: '#E4E9F0', borderBottomWidth: 1, borderBottomColor: '#4A515D' },
+  // 기계 어깨
+  pachiShoulder: { height: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2F3A', borderBottomWidth: 1, borderBottomColor: '#0D1015' },
+  pachiShoulderText: { color: '#C6CEDC', fontSize: 10, fontWeight: '900', letterSpacing: 4 },
+  // 창 안쪽. 테두리를 굵게 두고 안쪽 그늘을 넣어 유리 뒤로 들어가 보이게 합니다.
+  pachiReelWindow: { height: 152, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#FCF8EE', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
   pachiReel: { flex: 1, alignItems: 'center', justifyContent: 'space-around', paddingVertical: 2 },
   pachiReelDivider: { borderRightWidth: 1, borderRightColor: 'rgba(0,0,0,0.13)' },
   pachiSymbol: { fontSize: 40, lineHeight: 48 },
@@ -9130,15 +9151,16 @@ const styles = StyleSheet.create({
   // 공에 드는 빛 한 점. 이것 하나로 둥글어 보입니다.
   pachiLeverGloss: { position: 'absolute', left: 5, top: 4, width: 8, height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)' },
   // 기계에 박힌 전구 줄
-  pachiBulbRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 11, backgroundColor: '#0A0C11' },
-  pachiBulb: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#7FD8FF' },
-  pachiBulbGold: { backgroundColor: '#FFD98A' },
-  pachiBulbPink: { backgroundColor: '#FF9ED2' },
+  pachiBulbRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 14, backgroundColor: '#0A0C11', borderTopWidth: 1, borderTopColor: '#20242C', borderBottomWidth: 1, borderBottomColor: '#20242C' },
+  // 전구는 빛 번짐(shadow)까지 줘야 켜져 보입니다. 자리는 안 늘어납니다.
+  pachiBulb: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#7FD8FF', shadowColor: '#7FD8FF', shadowOpacity: 0.95, shadowRadius: 6 },
+  pachiBulbGold: { backgroundColor: '#FFD98A', shadowColor: '#FFD98A' },
+  pachiBulbPink: { backgroundColor: '#FF9ED2', shadowColor: '#FF9ED2' },
   pachiSparkle: { position: 'absolute', color: '#FFF6D8', fontWeight: '900', textShadowColor: '#FFD98A', textShadowRadius: 10 },
   pachiStopRow: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 12 },
   // 실물 버튼처럼 둥글고, 위가 밝고 아래가 어둡습니다.
   pachiStopButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C2028', borderWidth: 2, borderTopColor: '#7C8494', borderLeftColor: '#5C6472', borderRightColor: '#333A44', borderBottomColor: '#20252D', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 5, shadowOffset: { width: 0, height: 3 } },
-  pachiStopInner: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3FA9DE', borderWidth: 1, borderTopColor: '#B7E6FF', borderBottomColor: '#1B6E96' },
+  pachiStopInner: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3FA9DE', borderWidth: 1, borderTopColor: '#B7E6FF', borderBottomColor: '#1B6E96', shadowColor: '#8FE3FF', shadowOpacity: 0.7, shadowRadius: 7 },
   pachiStopButtonOff: { opacity: 0.42 },
   pachiStopText: { color: '#08222E', fontSize: 15, fontWeight: '900' },
   // 조작대 옆 작은 창. 예전에는 이 글이 화면 맨 위에 큰 판으로 있었습니다.
@@ -9148,9 +9170,11 @@ const styles = StyleSheet.create({
   pachiMeterSmall: { color: '#6FA88A', fontSize: 9, fontWeight: '800' },
 
   // 아래 그림판과 받침
-  pachiArtPanel: { height: 96, backgroundColor: '#0A0B10', overflow: 'hidden', justifyContent: 'flex-end' },
+  pachiArtPanel: { height: 86, backgroundColor: '#0A0B10', overflow: 'hidden', justifyContent: 'flex-end' },
   pachiArtText: { color: 'rgba(255,241,198,0.9)', fontSize: 10, fontWeight: '900', letterSpacing: 3, textAlign: 'center', marginBottom: 6, textShadowColor: '#000', textShadowRadius: 6 },
-  pachiTray: { height: 12, backgroundColor: '#0C0E12', borderTopWidth: 1, borderTopColor: '#2A2E36' },
+  pachiTray: { height: 22, backgroundColor: '#0C0E12', borderTopWidth: 2, borderTopColor: '#3A404B', alignItems: 'center', justifyContent: 'center' },
+  // 동전이 나오는 구멍
+  pachiTrayHole: { width: 92, height: 8, borderRadius: 4, backgroundColor: '#05070A', borderTopWidth: 1, borderTopColor: '#252A33' },
 
   pachislotScreen: { flex: 1, backgroundColor: colors.bg },
   pachislotMachine: { backgroundColor: '#17305B', borderColor: '#D74C58' },
