@@ -67,7 +67,7 @@ import {
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
-import { calculateGoStopSettlement, chooseComputerGoStopCard, chooseGoOrStop, dealGoStop, declareGoStopShake, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
+import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, dealGoStop, declareGoStopShake, goStopLevelOf, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
 import { chooseComputerMinhwatuCard, dealMinhwatu, playMinhwatuTurn, scoreMinhwatu, settleMinhwatu, type MinhwaRound } from './src/minhwatu';
 import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, playYukbaekTurn, scoreYukbaek, settleYukbaekRound, type YukbaekMatch } from './src/yukbaek';
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
@@ -3071,6 +3071,14 @@ function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   const [outcome,setOutcome]=useState<YutOutcome|null>(null);
   const [throwing,setThrowing]=useState(false);
   const [history,setHistory]=useState<YutOutcome[]>([]);
+  /**
+   * 손으로 던지는 느낌.
+   * 판을 **위로 쓸면** 윷이 날아갑니다. 세게 쓸수록 오래 구릅니다.
+   * ⚠️ **세기는 구르는 시간만 바꿉니다.** 결과는 `throwYut()`이 그대로 정합니다 —
+   * 세게 쓸면 윷이 잘 나온다면 그건 다른 게임입니다.
+   */
+  const [pull,setPull]=useState(0);
+  const spinMs=useRef(1000);
   useEffect(()=>{
     if(!throwing)return;
     const spin=setInterval(()=>setSticks(throwYutSticks()),90);
@@ -3080,17 +3088,39 @@ function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
       setSticks(result.sticks);setOutcome(result.outcome);setThrowing(false);
       setHistory(current=>[result.outcome,...current].slice(0,12));
       onSettle(selectedBet,yutMultiplier(choice,result.outcome),`${choice}에 베팅 · ${result.outcome}(배 ${result.sticks.filter(face=>face==='배').length}개)`);
-    },1000);
+    },spinMs.current);
     return()=>{clearInterval(spin);clearTimeout(stop);};
   },[throwing]);
-  const start=()=>{if(throwing||selectedBet>coins)return;if(!onPlaceBet(selectedBet))return;setOutcome(null);setThrowing(true);};
+  /** power는 쓸어 올린 거리(px)입니다. 안 주면 버튼으로 던진 것이라 기본 시간을 씁니다. */
+  const start=(power=0)=>{
+    if(throwing||selectedBet>coins)return;
+    if(!onPlaceBet(selectedBet))return;
+    spinMs.current=Math.round(Math.max(700,Math.min(1600,700+power*4)));
+    setOutcome(null);setThrowing(true);
+  };
+  // 판을 위로 쓸면 던집니다. 누르는 버튼도 그대로 둡니다 — 쓸기를 모르는 사람이 막히면 안 됩니다.
+  const latestStart=useRef(start);
+  latestStart.current=start;
+  const throwResponder=useRef(PanResponder.create({
+    onStartShouldSetPanResponder:()=>true,
+    onMoveShouldSetPanResponder:(_event,gesture)=>Math.abs(gesture.dy)>4,
+    onPanResponderMove:(_event,gesture)=>setPull(Math.max(0,Math.min(1,-gesture.dy/120))),
+    onPanResponderRelease:(_event,gesture)=>{
+      setPull(0);
+      // 위로 40px 넘게 쓸었거나 빠르게 튕겼으면 던진 것으로 봅니다.
+      if(-gesture.dy>40||gesture.vy<-0.6)latestStart.current(-gesture.dy);
+    },
+    onPanResponderTerminate:()=>setPull(0),
+  })).current;
   const won=outcome!==null&&outcome===choice;
   return <View style={styles.yutScreen}><ScreenHeader title="윷 베팅" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>YUT · 도 개 걸 윷 모</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{throwing?'윷을 던지는 중':outcome?`결과 ${outcome}`:'결과를 고르세요'}</Text></View></View>
-    <View style={styles.yutMat}>
-      <View style={styles.yutStickRow}>{sticks.map((face,index)=><YutStickView key={index} face={face} tumbling={throwing}/>)}</View>
+    <View {...(throwing?{}:throwResponder.panHandlers)} style={[styles.yutMat,pull>0&&styles.yutMatPulled]}>
+      {/* 쓸어 올린 만큼 윷이 따라 올라옵니다. 자리를 안 먹게 옮기기만 합니다. */}
+      <View style={[styles.yutStickRow,{transform:[{translateY:-Math.round(pull*16)}]}]}>{sticks.map((face,index)=><YutStickView key={index} face={face} tumbling={throwing}/>)}</View>
       <Text style={[styles.yutOutcomeText,won&&styles.yutOutcomeWin]}>{throwing?'…':outcome??'준비'}</Text>
-      <Text style={styles.yutOutcomeDetail}>{throwing?'윷가락이 구르는 중입니다':outcome?`배 ${sticks.filter(face=>face==='배').length}개 · ${won?`${yutPayout[choice]}배 적중`:'미적중'}`:'배가 위로 오는 개수로 결과가 정해집니다'}</Text>
+      <Text style={styles.yutOutcomeDetail}>{throwing?'윷가락이 구르는 중입니다':pull>0?'놓으면 날아갑니다 · 세게 쓸수록 오래 구릅니다':outcome?`배 ${sticks.filter(face=>face==='배').length}개 · ${won?`${yutPayout[choice]}배 적중`:'미적중'}`:'배가 위로 오는 개수로 결과가 정해집니다'}</Text>
+      <Text style={styles.yutThrowHint}>{throwing?'':'판을 위로 쓸어 던지세요'}</Text>
     </View>
     <Text style={styles.sectionTitle}>결과 선택</Text>
     <View style={styles.yutChoiceGrid}>{yutOutcomes.map(item=><Pressable key={item} disabled={throwing} onPress={()=>setChoice(item)} style={[styles.yutChoice,choice===item&&styles.yutChoiceActive,outcome===item&&styles.yutChoiceHit]}>
@@ -3100,7 +3130,7 @@ function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
       <Text style={styles.yutChoiceChance}>{(yutProbability[item]*100).toFixed(1)}%</Text>
     </Pressable>)}</View>
     {history.length>0&&<View style={styles.yutHistory}><Text style={styles.slotRulesTitle}>최근 결과</Text><View style={styles.yutHistoryRow}>{history.map((item,index)=><Text key={index} style={[styles.yutHistoryChip,(item==='윷'||item==='모')&&styles.yutHistoryChipRare]}>{item}</Text>)}</View></View>}
-    <Pressable disabled={throwing||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(throwing||selectedBet>coins)&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${choice}에 ${selectedBet.toLocaleString()} WC 던지기`}</Text></Pressable>
+    <Pressable disabled={throwing||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(throwing||selectedBet>coins)&&styles.disabledCard]} onPress={()=>start()}><Text style={styles.primaryButtonText}>{selectedBet>coins?'코인이 부족합니다':`${choice}에 ${selectedBet.toLocaleString()} WC 던지기`}</Text></Pressable>
   </ScrollView></View>;
 }
 
@@ -4905,7 +4935,9 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
             : {step:'내 차례',title:'밝게 올라온 패를 확인하고 한 장을 버리세요',detail:mode==='sichuan'?`정결한 ${suitNames[voidSuits[0]]}가 남아 있다면 그 종류부터 버리세요.`:'이어질 숫자나 같은 그림을 남기고, 몸통을 만들기 어려운 패를 누르세요.'};
   return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
     {/* 요령 한 줄은 도움말을 폈을 때만 보입니다. 판이 화면에 들어오는 것이 먼저입니다. */}
-    <View style={styles.mahjongTurnGuide}><Text style={styles.mahjongTurnStep}>{turnGuide.step}</Text><Text style={styles.mahjongTurnTitle}>{turnGuide.title}</Text>{showPlayHelp?<Text style={styles.mahjongTurnDetail}>{turnGuide.detail}</Text>:null}</View>
+    {/* ⚠️ 사천의 정결 고르기 상자가 떠 있을 때는 이 줄을 뺍니다 — 같은 말을 두 번 하는 데다
+        둘을 같이 두면 판이 47만큼 넘쳐 아래가 잘렸습니다. */}
+    {!choosingVoid&&<View style={styles.mahjongTurnGuide}><Text style={styles.mahjongTurnStep}>{turnGuide.step}</Text><Text style={styles.mahjongTurnTitle}>{turnGuide.title}</Text>{showPlayHelp?<Text style={styles.mahjongTurnDetail}>{turnGuide.detail}</Text>:null}</View>}
     {mode==='riichi'&&phase==='playing'&&<><Pressable onPress={()=>setShowPlayHelp((value)=>!value)} style={styles.mahjongPlayHelpToggle}><Text style={styles.mahjongPlayHelpToggleText}>{showPlayHelp?'초보 진행 도움 접기 −':'초보 진행 도움 보기 +'}</Text></Pressable>{showPlayHelp&&<View style={styles.mahjongPlayHelp}><Text style={styles.mahjongPlayHelpTitle}>지금 알아둘 것</Text><View style={styles.mahjongStatusRow}><Text style={styles.mahjongStatusLabel}>내 상태</Text><Text style={styles.mahjongStatusText}>{riichiDeclared?'리치 선언 · 새로 뽑은 패만 버릴 수 있음':openMelds.length?'오픈 패 · 리치는 불가능, 공개해도 되는 역 필요':'멘젠 · 텐파이가 되면 리치 가능'}</Text></View><View style={styles.mahjongStatusRow}><Text style={styles.mahjongStatusLabel}>론 상태</Text><Text style={[styles.mahjongStatusText,(temporaryFuriten||permanentFuritenNow)&&styles.mahjongStatusWarning]}>{temporaryFuriten?'후리텐 · 다음 내 차례까지 론 불가':permanentFuritenNow?'후리텐 · 내 버림패에 대기패가 있어 론 불가':'론 가능 · 단, 완성 모양과 역이 모두 필요'}</Text></View><View style={styles.mahjongStatusRow}><Text style={styles.mahjongStatusLabel}>용어</Text><Text style={styles.mahjongStatusText}>텐파이=한 장 남음 · 유효패=뽑으면 좋아지는 패 · 쯔모=직접 뽑아 승리 · 론=남의 버림패로 승리</Text></View></View>}</>}
     {mode==='riichi'&&phase==='playing'&&showPlayHelp&&discardGuides.length>0&&<View style={styles.mahjongDiscardGuide}><Text style={styles.mahjongDiscardGuideTitle}>추천 버림패 · 위에서부터 확인</Text><Text style={styles.mahjongDiscardGuideCaution}>정답을 대신 고르는 기능은 아닙니다. 현재 패 모양과 남은 유효패를 계산한 참고 순위입니다.</Text>{discardGuides.map((guide,index)=><View key={`${guide.tile.suit}${guide.tile.value}`} style={[styles.mahjongDiscardGuideRow,index===0&&styles.mahjongDiscardGuideBest]}><View style={styles.mahjongDiscardGuideRank}><Text style={styles.mahjongDiscardGuideRankText}>{index+1}</Text></View><Text style={styles.mahjongDiscardGuideTile}>{guide.tile.glyph}</Text><View style={styles.mahjongDiscardGuideText}><Text style={styles.mahjongDiscardGuideName}>{guide.tile.glyph} 버리기 {guide.tenpai?'· 텐파이':''}</Text><Text style={styles.mahjongDiscardGuideReason}>{guide.reason}</Text></View></View>)}</View>}
     {mode==='riichi'&&phase==='playing'&&showPlayHelp&&pendingCall&&!pendingCall.canRon&&<View style={styles.mahjongCallAdvice}><Text style={styles.mahjongCallAdviceTitle}>치·퐁·깡 전에 확인</Text><Text style={styles.mahjongCallAdviceText}>가져오면 패가 공개되어 멘젠과 리치를 잃습니다. 역패·탕야오처럼 공개해도 남는 역이 확실하거나, 텐파이가 크게 가까워질 때만 선택하세요. 모르겠다면 ‘넘기기’가 안전합니다.</Text></View>}
@@ -5124,14 +5156,16 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
 
   /** 컴퓨터 한 명이 한 번 두는 것까지만 합니다. 한꺼번에 돌리면 뭘 냈는지 보이지 않습니다. */
   const stepComputer=(current:GoStopRound):GoStopRound=>{
-    if(current.pendingDecision===current.turn)return chooseGoOrStop(current,'stop');
+    const level=goStopLevelOf(mode,current.turn);
+    // 실력에 따라 고를 외치기도 합니다. 전에는 점수만 되면 무조건 스톱이었습니다.
+    if(current.pendingDecision===current.turn)return chooseGoOrStop(current,chooseComputerGoStop(current,current.turn,level));
     const hand=current.players[current.turn].hand;
     if(!hand.length)return current;
     const bombMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&current.floor.filter((card)=>card.month===month).length===1);
     if(bombMonth!==undefined)return playGoStopBomb(current,bombMonth);
     const shakeMonth=Array.from(new Set(hand.map((card)=>card.month))).find((month)=>hand.filter((card)=>card.month===month).length===3&&!(current.players[current.turn].shakenMonths??[]).includes(month));
     const shaken=shakeMonth!==undefined?declareGoStopShake(current,shakeMonth):current;
-    const played=chooseComputerGoStopCard(shaken);
+    const played=chooseComputerGoStopCard(shaken,shaken.turn,level,Math.random);
     return playGoStopTurn(shaken,played.id,automaticGoStopChoice(shaken,played));
   };
 
@@ -5273,7 +5307,7 @@ function GoStopGameScreen({mode,deckStyle,coins,selectedBet,onBack,onPlaceBet,on
       <View style={styles.goStopOpponentRow}>{round.players.slice(1).map((player,index)=>{
         const score=scores[index+1];
         return <View key={index} style={[styles.goStopSeat,round.turn===index+1&&!round.finished&&styles.goStopSeatActive]}>
-          <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
+          <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1} · {goStopLevelOf(mode,index+1)}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
           <View style={styles.goStopBackRow}>{player.hand.map((card)=><View key={card.id} style={styles.goStopBack}/>)}</View>
           {takenRow(player.captured,seatTakenWidth)}
         </View>;
@@ -5957,6 +5991,13 @@ function BlackjackGameScreen(props: {
     across: Math.max(2, player.length, dealer.length, splitHand?.length ?? 0),
     // 재는 자리는 375인데 반원 테이블 안쪽은 301입니다(테두리 18 · 좌우 여백 28 · 판 여백 28).
     sideSpare: 74,
+    /**
+     * ⚠️ 이걸 안 주면 **자리를 아예 못 잽니다** — 웹에서는 `onLayout`이 안 불립니다.
+     * 2026-08-31까지 블랙잭은 `onLayout`을 어디에도 안 붙여 둬서 카드가 늘 제일 큰 단계였고,
+     * 히트로 손이 커져도 안 줄어 줄이 접혔습니다.
+     * 64 = 창 812에서 판 자리 748을 뺀 값(위 제목줄). 실제로 재서 넣었습니다.
+     */
+    outerTrim: 64,
     biggest: 'big',
   });
   const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
@@ -5989,7 +6030,7 @@ function BlackjackGameScreen(props: {
       </View>
 
       {/* 스크롤 없이 한 화면에 고정합니다. 위쪽은 테이블, 아래쪽은 버튼 자리로 나눕니다. */}
-      <View style={styles.fixedTableArea}>
+      <View style={styles.fixedTableArea} onLayout={handFit.onLayout}>
         <DealerTable>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
@@ -8346,6 +8387,9 @@ const styles = StyleSheet.create({
   yutScreen: { flex: 1, backgroundColor: colors.bg },
   yutMat: { marginTop: 16, padding: 18, borderRadius: 20, alignItems: 'center', backgroundColor: '#2A2415', borderWidth: 2, borderColor: '#8A6E2F' },
   yutStickRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  // 쓸어 올리는 동안 판이 살짝 밝아집니다. 테두리 색만 바꿔 자리는 그대로입니다.
+  yutMatPulled: { borderColor: colors.gold },
+  yutThrowHint: { color: '#B79A5A', fontSize: 11, fontWeight: '800', marginTop: 6, minHeight: 16 },
   yutStick: { width: 34, height: 116, borderRadius: 17, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2 },
   yutStickFlat: { backgroundColor: '#EFE0C0', borderColor: '#B79A63' },
   yutStickRound: { backgroundColor: '#6B4A25', borderColor: '#3E2A13' },

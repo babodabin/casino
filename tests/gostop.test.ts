@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateGoStopSettlement, chooseComputerGoStopCard, chooseGoOrStop, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
+import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, goStopLevelOf, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
 import { createHwatuDeck, type HwatuCard } from '../src/hwatu.ts';
 
 const deck = createHwatuDeck();
@@ -412,4 +412,64 @@ test('이긴 사람이 다음 판을 먼저 낸다', () => {
   for (const first of [0, 1, 2]) assert.equal(dealGoStop('gostop', () => 0.37, 'classic', first).turn, first);
   // 자리 수를 넘기면 0번으로 돌립니다.
   assert.equal(dealGoStop('matgo', () => 0.37, 'classic', 5).turn, 1);
+});
+
+const levelRound = (mine: HwatuCard[], captured: HwatuCard[], goCount: number, rival: HwatuCard[] = []): GoStopRound => ({
+  mode: 'gostop',
+  players: [
+    { hand: [card(2)], captured: rival, goCount: 0 },
+    { hand: mine, captured, goCount },
+    { hand: [card(6)], captured: [], goCount: 0 },
+  ],
+  floor: [], deck: [card(4), card(7)], turn: 1, finished: false, winner: null, pendingDecision: 1, message: '',
+});
+
+test('쉬움은 늘 스톱하고, 보통·전문가는 자리가 남으면 고를 외친다', () => {
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const hand = [card(5), card(6), card(7), card(9)];
+  const round = levelRound(hand, scoring, 0);
+  assert.equal(chooseComputerGoStop(round, 1, '쉬움'), 'stop');
+  assert.equal(chooseComputerGoStop(round, 1, '보통'), 'go');
+  assert.equal(chooseComputerGoStop(round, 1, '전문가'), 'go');
+});
+
+test('낼 패가 거의 없거나 상대가 기준에 닿으면 스톱한다', () => {
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  // 낼 패가 한 장뿐입니다. 고를 외쳐도 점수를 못 올립니다.
+  assert.equal(chooseComputerGoStop(levelRound([card(5)], scoring, 0), 1, '전문가'), 'stop');
+  // 상대가 이미 홍단(3점)입니다. 굳히는 편이 낫습니다.
+  const rivalReady = levelRound([card(5), card(6), card(7), card(9)], scoring, 0, [card(1, '띠'), card(2, '띠'), card(3, '띠')]);
+  assert.equal(chooseComputerGoStop(rivalReady, 1, '전문가'), 'stop');
+});
+
+test('고를 여러 번 외친 뒤에는 더 안 간다', () => {
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const hand = [card(5), card(6), card(7), card(9)];
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 2), 1, '보통'), 'stop');
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 2), 1, '전문가'), 'go');
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 3), 1, '전문가'), 'stop');
+});
+
+test('자리마다 실력이 다르고 맞고는 보통 하나다', () => {
+  assert.equal(goStopLevelOf('gostop', 1), '쉬움');
+  assert.equal(goStopLevelOf('gostop', 2), '전문가');
+  assert.equal(goStopLevelOf('matgo', 1), '보통');
+});
+
+test('쉬움은 가끔 두 번째로 좋은 패를 낸다', () => {
+  const month = deck.filter((item) => item.month === 9);
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(2)], captured: [], goCount: 0 },
+      { hand: [month[0], card(5), card(6)], captured: [], goCount: 0 },
+      { hand: [card(7)], captured: [], goCount: 0 },
+    ],
+    floor: [month[1]], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  // 난수를 안 주면 늘 제일 좋은 수(바닥을 먹는 9월)를 냅니다.
+  assert.equal(chooseComputerGoStopCard(round, 1, '쉬움').month, 9);
+  assert.equal(chooseComputerGoStopCard(round, 1, '전문가', () => 0).month, 9);
+  // 쉬움은 난수가 낮으면 두 번째 수를 냅니다.
+  assert.notEqual(chooseComputerGoStopCard(round, 1, '쉬움', () => 0).month, 9);
 });

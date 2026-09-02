@@ -310,12 +310,32 @@ function finishGoStopTurn(round: GoStopRound, players: GoStopPlayer[], floor: Hw
   };
 }
 
-/** 컴퓨터는 먹을 수 있는 패의 가치와 당장 완성되는 월을 보고 손패를 고릅니다. */
-export function chooseComputerGoStopCard(round: GoStopRound, playerIndex = round.turn): HwatuCard {
+/**
+ * 컴퓨터 실력. 마작과 같은 세 단계입니다.
+ * 자리마다 다른 실력을 주면 같은 판에서도 상대가 제각각으로 움직입니다.
+ */
+export type GoStopLevel = '쉬움' | '보통' | '전문가';
+
+/**
+ * 자리별 실력. 0번은 나라서 안 씁니다.
+ * 고스톱(3인)은 컴퓨터 둘이 쉬움 · 전문가, 맞고(2인)는 하나가 보통입니다.
+ */
+export const goStopLevels: GoStopLevel[] = ['보통', '쉬움', '전문가'];
+export const goStopLevelOf = (mode: GoStopMode, seat: number): GoStopLevel =>
+  mode === 'matgo' ? '보통' : (goStopLevels[seat] ?? '보통');
+
+/**
+ * 컴퓨터는 먹을 수 있는 패의 가치와 당장 완성되는 월을 보고 손패를 고릅니다.
+ *
+ * 실력에 따라 고르는 눈이 다릅니다 —
+ * **쉬움**은 제일 좋은 수 대신 두 번째 수를 고를 때가 있고, 보통·전문가는 늘 제일 좋은 수입니다.
+ * ⚠️ 난수를 안 주면 예전과 똑같이(늘 제일 좋은 수) 움직입니다. 기존 테스트가 그것을 봅니다.
+ */
+export function chooseComputerGoStopCard(round: GoStopRound, playerIndex = round.turn, level: GoStopLevel = '보통', random?: () => number): HwatuCard {
   const player = round.players[playerIndex];
   if (!player?.hand.length) throw new Error('컴퓨터가 낼 손패가 없습니다.');
   const value = (card: HwatuCard) => card.kind === '광' ? 8 : card.kind === '열끗' ? 5 : card.kind === '띠' ? 4 : card.double ? 3 : 2;
-  return [...player.hand].sort((a, b) => {
+  const ordered = [...player.hand].sort((a, b) => {
     const score = (card: HwatuCard) => {
       const matches = sameMonth(round.floor, card.month);
       const capturedValue = matches.reduce((sum, item) => sum + value(item), 0);
@@ -324,7 +344,44 @@ export function chooseComputerGoStopCard(round: GoStopRound, playerIndex = round
       return matches.length * 20 + capturedValue + value(card) + preserveTriple;
     };
     return score(b) - score(a) || a.month - b.month;
-  })[0];
+  });
+  // 쉬움은 셋에 한 번쯤 두 번째로 좋은 수를 냅니다. 사람이 이길 구석이 있어야 합니다.
+  if (level === '쉬움' && random && ordered.length > 1 && random() < 0.34) return ordered[1];
+  return ordered[0];
+}
+
+/**
+ * 고를 외칠지 스톱할지. **실력에 따라 다릅니다.**
+ *
+ * 전에는 컴퓨터가 점수만 되면 **무조건 스톱**했습니다. 그래서 컴퓨터가 고를 외치는 것을
+ * 볼 수가 없었고, 판이 늘 3점에서 끝났습니다.
+ *
+ * 보는 것 네 가지입니다.
+ *   1. **남은 차례** — 낼 패가 없으면 고를 외쳐도 점수를 못 올립니다
+ *   2. **상대 점수** — 상대가 기준에 닿았으면 굳히는 편이 낫습니다
+ *   3. **이미 외친 고** — 고를 외칠수록 지면 크게 물립니다(고박)
+ *   4. **내 점수** — 크게 났으면 굳히고, 겨우 넘겼으면 더 갑니다
+ */
+export function chooseComputerGoStop(round: GoStopRound, playerIndex = round.turn, level: GoStopLevel = '보통'): 'go' | 'stop' {
+  const me = round.players[playerIndex];
+  if (!me) return 'stop';
+  const threshold = goStopThreshold(round.mode);
+  const score = scoreGoStop(me.captured).total;
+  const handLeft = me.hand.length;
+  const rivalBest = Math.max(0, ...round.players.map((player, seat) => seat === playerIndex ? 0 : scoreGoStop(player.captured).total));
+
+  // 쉬움은 늘 스톱합니다. 처음 배우는 사람과 붙는 자리입니다.
+  if (level === '쉬움') return 'stop';
+  // 낼 패가 한 장 남짓이면 고를 외쳐도 올릴 자리가 없습니다.
+  if (handLeft <= 1) return 'stop';
+  // 상대가 기준 점수에 닿았습니다. 다음 차례에 뒤집힐 수 있으니 굳힙니다.
+  if (rivalBest >= threshold - 1) return 'stop';
+  // 고를 외칠수록 잃을 것이 커집니다. 보통은 두 번, 전문가는 세 번까지만 봅니다.
+  if (me.goCount >= (level === '전문가' ? 3 : 2)) return 'stop';
+  // 아직 낼 패가 넉넉하고 점수가 크지 않으면 더 갑니다.
+  const roomToGrow = handLeft >= (level === '전문가' ? 2 : 3);
+  const smallScore = score <= threshold + (level === '전문가' ? 3 : 1);
+  return roomToGrow && smallScore ? 'go' : 'stop';
 }
 
 /** 점수가 난 뒤 고를 수 있는 고/스톱. 고는 계속, 스톱은 즉시 승리입니다. */
