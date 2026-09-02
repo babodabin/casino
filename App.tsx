@@ -2723,41 +2723,45 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       </View>
 
       {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
+      {/*
+        조작대. **위는 안내 줄, 아래는 버튼 줄**입니다.
+        ⚠️ 안내 줄에 `READY`처럼 뜻 모를 말을 쓰지 마세요 — **지금 뭘 해야 하는지**를 적습니다.
+        ⚠️ 버튼은 손가락으로 누르는 것이라 44보다 작으면 안 됩니다(58로 뒀습니다).
+      */}
       <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
-        <View style={styles.pachiStopRow}>{[0, 1, 2].map((index) => (
-          <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
-            {/* 보내 주신 실물 버튼 사진입니다. 흰 배경은 지웠습니다. */}
-            <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
-            <Text style={styles.pachiStopText}>{index + 1}</Text>
-          </Pressable>
-        ))}
-        {/* 하나씩 누르기 귀찮을 때. 누르면 1·2·3이 차례로 촤르륵 섭니다. */}
-        <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiStopButton, styles.pachiAllButton, pressed && styles.pachiPressed, !spinning && styles.pachiStopButtonOff]}>
-          <Image source={pachiStopButtonImage} style={styles.pachiAllImage} resizeMode="contain" />
-          <Text style={styles.pachiAllText}>ALL</Text>
-        </Pressable>
-      </View>
-        {/* ⚠️ 레버는 **오른쪽 끝**입니다. 보내 주신 기계 사진도 레버가 오른쪽에 있습니다. */}
-        {/*
-          ⚠️ **`통상 · 1G · 천장 999G`를 뺐습니다.**(2026-09-02) 실제 기계에는 그 숫자가 없습니다 —
-          가게가 기계 위에 다는 데이터 카운터에 나오는 값입니다. 화면만 복잡했습니다.
-          AT·찬스존처럼 **지금 뭔가 일어나는 중일 때만** 알려 줍니다.
-        */}
-        <View style={styles.pachiMeter}>
-          <Text style={styles.pachiMeterName}>{machine.phase === '통상' ? 'READY' : machine.phase}</Text>
-          <Text style={styles.pachiMeterValue}>{machine.phase === 'AT' ? `남은 ${machine.atLeft}` : machine.phase === '찬스존' ? `남은 ${machine.zoneLeft}` : '—'}</Text>
-          <View style={styles.pachiCeilingBar}><View style={[styles.pachiCeilingFill, { width: `${Math.round(ceilingRatio * 100)}%` }]} /></View>
+        <View style={styles.pachiGuide}>
+          <Text style={styles.pachiGuideText}>
+            {machine.phase === 'AT' ? `AT · 남은 ${machine.atLeft}게임`
+              : machine.phase === '찬스존' ? `찬스존 · 남은 ${machine.zoneLeft}게임`
+              : spinning ? '버튼을 눌러 하나씩 멈추세요'
+              : blocked ? '코인이 모자랍니다'
+              : '레버를 당기세요'}
+          </Text>
+          {payout > 0 ? <Text style={styles.pachiGuideWin}>+{payout.toLocaleString()} WC</Text> : null}
         </View>
-        {/*
-          레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다.
-          ⚠️ 잭팟 그림에서 레버를 오려 써 봤는데 **배경이 같이 붙어 나와** 네모난 얼룩으로 보였습니다.
-          통짜 기계 그림에서 부품만 떼어 내는 건 안 됩니다. 코드로 그린 이쪽이 낫습니다.
-        */}
-        <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
-          <View style={styles.pachiLeverMount} />
-          <View style={styles.pachiLeverStick} />
-          <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
-        </Pressable>
+
+        <View style={styles.pachiButtonRow}>
+          {[0, 1, 2].map((index) => (
+            <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
+              <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
+              <Text style={styles.pachiStopText}>{index + 1}</Text>
+            </Pressable>
+          ))}
+          <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, !spinning && styles.pachiStopButtonOff]}>
+            <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
+            <Text style={styles.pachiAllText}>ALL</Text>
+          </Pressable>
+
+          {/*
+            레버. **누르는 자리를 크게** 잡았습니다 — 그림은 작아도 손가락은 굵습니다.
+            안 눌린다고 하셔서 46×66으로 키웠습니다.
+          */}
+          <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
+            <View style={styles.pachiLeverMount} />
+            <View style={styles.pachiLeverStick} />
+            <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
+          </Pressable>
+        </View>
       </View>
 
       {/* 아래 그림판. 위 화면과 같은 사진의 아래쪽입니다. */}
@@ -9348,8 +9352,14 @@ const styles = StyleSheet.create({
   pachiReelGlass: { position: 'absolute', left: -40, top: -30, width: 70, height: 260, backgroundColor: 'rgba(255,255,255,0.16)', transform: [{ rotate: '16deg' }] },
 
   // 조작대 — 레버 · 정지 셋 · 작은 상태창
-  pachiDeck: { height: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
-  pachiLeverBase: { width: 40, height: 74, alignItems: 'center', justifyContent: 'flex-end' },
+  pachiDeck: { height: 96, paddingHorizontal: 8, paddingBottom: 4, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
+  // 안내 줄. 지금 뭘 해야 하는지 한 줄로 적습니다.
+  pachiGuide: { height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  pachiGuideText: { color: '#C7D2E4', fontSize: 12, fontWeight: '800' },
+  pachiGuideWin: { color: '#FFE9A6', fontSize: 12, fontWeight: '900' },
+  pachiButtonRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  // 그림은 작아도 **누르는 자리는 크게**. 안 눌린다고 하셔서 키웠습니다.
+  pachiLeverBase: { width: 46, height: 66, alignItems: 'center', justifyContent: 'flex-end' },
   // 누르면 살짝 들어갑니다. 실물 버튼 느낌은 여기서 옵니다.
   pachiPressed: { transform: [{ scale: 0.93 }], opacity: 0.85 },
   // 조작대에 박힌 받침. 아래가 넓고 어둡습니다.
@@ -9369,15 +9379,16 @@ const styles = StyleSheet.create({
   pachiStopRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   // 실물 버튼처럼 둥글고, 위가 밝고 아래가 어둡습니다.
   // 버튼 아래 그림자. 이것 하나로 판에 붙어 있지 않고 **올라와 있는** 것으로 보입니다.
-  pachiStopButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
-  pachiStopImage: { position: 'absolute', width: 48, height: 48 },
+  // ⚠️ 손가락으로 누르는 것이라 44보다 작으면 안 됩니다.
+  pachiStopButton: { width: 58, height: 58, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
+  pachiStopImage: { position: 'absolute', width: 58, height: 58 },
   pachiStopButtonOff: { opacity: 0.4 },
-  pachiStopText: { color: '#04361F', fontSize: 15, fontWeight: '900', marginTop: -4, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
+  pachiStopText: { color: '#04361F', fontSize: 18, fontWeight: '900', marginTop: -4, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
   // 한 번에 멈추는 버튼. 누르면 1·2·3이 차례로 촤르륵 섭니다.
   // 3번 옆에 붙는 ALL. 같은 버튼 그림을 조금 작게 씁니다.
-  pachiAllButton: { width: 44, height: 44 },
-  pachiAllImage: { position: 'absolute', width: 44, height: 44 },
-  pachiAllText: { color: '#04361F', fontSize: 11, fontWeight: '900', marginTop: -3, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
+
+
+  pachiAllText: { color: '#04361F', fontSize: 13, fontWeight: '900', marginTop: -3, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
   // 조작대 옆 작은 창. 예전에는 이 글이 화면 맨 위에 큰 판으로 있었습니다.
   pachiMeter: { width: 76, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 7, backgroundColor: '#07110C', borderWidth: 1, borderColor: '#2F6B52', gap: 2 },
   pachiMeterName: { color: '#7BE0A8', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
