@@ -223,7 +223,7 @@ type GameRecord = {
 /** 릴이 도는 동안만 쓰는 그림입니다. 결과는 레버를 당길 때 이미 정해져 있습니다. */
 const pachiSpinSymbols = ['🍒', '🍋', '👑', '⭐', '💎', '7️⃣', '🔁'] as const;
 /** 릴 한 칸의 높이. 띠가 이만큼씩 내려옵니다. 창 높이(152)를 세 칸으로 나눈 값입니다. */
-const pachiCellHeight = 50;
+const pachiCellHeight = 26;
 
 /**
  * 파치슬롯 기계에 붙는 사진. **위 화면과 아래 그림판이 한 짝**입니다.
@@ -266,7 +266,8 @@ const pachiPhotos: { name: string; image: number }[] = [
  * ⚠️ 이모지는 기기마다 다르게 그려집니다(아이폰과 안드로이드가 다릅니다).
  * 여기 없는 심볼이 오면 이모지로 떨어집니다 — 그림을 지우면 화면이 안 깨지고 이모지로 돌아갑니다.
  */
-const pachiStopButtonImage = require('./assets/pachislot/stopbutton.png');
+/** 기계 사진. 비워 둔 자리에 사진·릴·이름을 얹습니다. */
+const pachiCabinetImage = require('./assets/pachislot/cabinet.png');
 /** 간판 옆 장식. 보내 주신 그림입니다. */
 const pachiDecoImage = require('./assets/pachislot/deco-slot.png');
 
@@ -2545,6 +2546,15 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
   const [shown, setShown] = useState<PachiSpin | null>(null);
   // 레버를 당길 때 결과를 이미 정해 둡니다. 정지 버튼은 정해진 것을 한 줄씩 보여 줄 뿐입니다.
   const pending = useRef<PachiSpin | null>(null);
+  /**
+   * 릴 한 칸의 높이. **화면 폭에서 계산합니다.**
+   * 기계 사진이 폭에 맞춰 늘어나니 창도 같이 늘어납니다. 칸 높이를 고정하면
+   * 심볼이 당첨 줄에서 어긋납니다(26으로 고정했더니 위로 올라가 있었습니다).
+   *   기계 높이 = 폭 × 409/291,  창 높이 = 기계 높이 × 0.191,  한 칸 = 창 높이 ÷ 3
+   */
+  const { width: screenWidth } = useWindowDimensions();
+  const reelCell = Math.round(Math.max(240, screenWidth - 28) * (409 / 291) * 0.191 / 3);
+
   /** 지금 붙어 있는 사진. 당첨될 때마다 **아무 장으로나** 바뀝니다(순서대로 돌지 않습니다). */
   const [photoIndex, setPhotoIndex] = useState(() => Math.floor(Math.random() * pachiPhotos.length));
   const photo = pachiPhotos[photoIndex % pachiPhotos.length];
@@ -2652,125 +2662,74 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       위 화면 · 릴 창 · 조작대 · 그림판이 한 몸통 안에 들어 있어야 기계로 보입니다.
       상태 글(통상 · 게임 수 · 천장)은 실제 기계처럼 **조작대 옆 작은 창**에 있습니다.
     */}
-    <View style={[styles.pachiCabinet, machine.phase === 'AT' && styles.pachiCabinetAt]}>
-      {/*
-        간판. **기계 몸통의 맨 윗칸**입니다 — 글자만 떠 있으면 기계에 안 붙은 것처럼 보입니다.
-        실제 기계도 릴 위에 간판 판이 한 장 더 있습니다.
-      */}
-      <View style={[styles.pachiSign, webGradient('linear-gradient(180deg, #3A2145 0%, #1E1128 55%, #120A18 100%)')]}>
-        <Image source={pachiDecoImage} style={styles.pachiSignDeco} resizeMode="contain" />
-        <PachiArch text={`${photo.name} 슬롯`} />
-        <Image source={pachiDecoImage} style={styles.pachiSignDeco} resizeMode="contain" />
-      </View>
-      <PachiBulbs count={22} lit={twinkle} />
-      {/* 위 화면. 실제 기계의 연출용 LCD 자리입니다. */}
-      <View style={styles.pachiTopScreen}>
-        {/*
-          사진을 **자르지 않고 통째로** 보여 줍니다(contain).
-          뒤에는 같은 사진을 꽉 채워(cover) 어둡게 깔아, 남는 좌우가 검은 띠로 비지 않게 합니다.
-        */}
-        <Image source={photo.image} style={[styles.pachiTopPhoto, styles.pachiTopBackdrop]} resizeMode="cover" />
-        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="contain" />
-        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.5) 100%)')]} />
-        <View pointerEvents="none" style={styles.pachiGlassStreak} />
-        <PachiSparkle left={22} top={26} size={16} delay={0} twinkle={twinkle} />
-        <PachiSparkle left={268} top={18} size={22} delay={0.4} twinkle={twinkle} />
-        <PachiSparkle left={196} top={104} size={13} delay={0.8} twinkle={twinkle} />
-        <PachiSparkle left={54} top={132} size={18} delay={1.2} twinkle={twinkle} />
-        <PachiSparkle left={310} top={86} size={15} delay={1.6} twinkle={twinkle} />
-        <Animated.View pointerEvents="none" style={[styles.pachiFlash, { opacity: flash }]} />
-        {/* ⚠️ 이름은 **기계 바깥 간판**에 있습니다. 여기에는 다시 쓰지 마세요. */}
-        {payout > 0 ? <View style={styles.pachiWinTag}><Text style={styles.pachiWinTagText}>+{payout.toLocaleString()} WC · {shown?.outMedals}매</Text></View> : null}
-        {free && <View style={styles.pachiReplayTag}><Text style={styles.pachiWinTagText}>리플레이</Text></View>}
-        {shown?.byCeiling && <View style={styles.pachiCeilingTag}><Text style={styles.pachiWinTagText}>천장 도달</Text></View>}
+    {/*
+      ⚠️ **기계는 사진 한 장입니다.** 제가 네모로 그리던 것을 걷어냈습니다 —
+      코드로는 이 질감이 안 나옵니다. 사진 위에 **움직이는 것만** 얹습니다.
+
+      비워 둔 세 자리를 픽셀로 재서 비율로 적어 뒀습니다(사진 291×409 기준).
+        흰 판   x 36~258  y 56~101   → 12.4% / 13.7% / 76.3% / 11.0%
+        회색 창 x 43~249  y 120~198  → 14.8% / 29.3% / 70.8% / 19.1%
+        빨간 판 x 22~274  y 302~394  →  7.6% / 73.8% / 86.6% / 22.5%
+      ⚠️ **사진을 바꾸면 이 숫자도 다시 재야 합니다.**
+      버튼과 레버는 사진에 그려져 있고, 그 위에 **안 보이는 누름 자리만** 겹쳐 놓았습니다.
+    */}
+    <View style={styles.pachiMachine}>
+      <Image source={pachiCabinetImage} style={styles.pachiCabinetImage} resizeMode="contain" />
+
+      {/* 흰 판 — 가수 사진 */}
+      <View style={styles.pachiWhitePanel}>
+        <Image source={photo.image} style={styles.pachiFill} resizeMode="cover" />
+        <Animated.View pointerEvents="none" style={[styles.pachiFill, styles.pachiFlash, { opacity: flash }]} />
+        {payout > 0 ? <View style={styles.pachiWinTag}><Text style={styles.pachiWinTagText}>+{payout.toLocaleString()}</Text></View> : null}
       </View>
 
-      {/*
-        릴 창. **세 줄이 보이고 가운데가 당첨 줄**입니다(실제 기계와 같습니다).
-        위아래 줄은 이웃 심볼을 보여 주는 장식이라 계산에 안 들어갑니다.
-      */}
-      {/*
-        릴 창. 은색 테는 **세 겹**입니다 — 바깥 크롬, 안쪽 그늘, 그리고 창.
-        한 겹짜리 회색 띠로는 아무리 색을 골라도 금속으로 안 보입니다.
-      */}
-      <View style={[styles.pachiReelBezel, webGradient('linear-gradient(180deg, #F2F5F9 0%, #C3CAD6 22%, #8B93A2 52%, #C9D0DA 78%, #6E7684 100%)')]}>
-        <View style={styles.pachiBezelRivetRow}>{[0, 1, 2, 3, 4, 5].map((index) => <View key={index} style={styles.pachiRivet} />)}</View>
-        <View style={styles.pachiReelWindow}>
-          {reels.map((symbol, index) => (
-            <View key={index} style={[styles.pachiReel, index < 2 && styles.pachiReelDivider]}>
-              <Animated.View style={[styles.pachiReelStrip, {
-                transform: [{ translateY: reelShift[index].interpolate({ inputRange: [0, 1], outputRange: [0, pachiCellHeight] }) }],
-              }]}>
-                {/*
-                  ⚠️ **칸 높이를 못 박습니다.** 심볼 크기가 34·34·48·34로 서로 달라서 그냥 쌓으면
-                  가운데 심볼이 창 가운데보다 **34쯤 위로** 올라가 있었습니다.
-                  칸을 다 50으로 두면 세 번째 칸이 정확히 당첨 줄에 옵니다.
-                  맨 위 한 칸은 창 밖에 있다가, 띠가 내려오면 창 안으로 들어옵니다.
-                */}
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={34} dim /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={34} dim /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={symbol} size={46} win={stopped[index] && Boolean(shown?.outMedals)} /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={34} dim /></View>
-              </Animated.View>
-            </View>
-          ))}
-          {/* 원통처럼 보이게 위아래를 어둡게 깔고, 그 위에 유리 반사를 비스듬히 얹습니다. */}
-          <View pointerEvents="none" style={[styles.pachiReelCurve, webGradient('linear-gradient(180deg, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.06) 34%, rgba(0,0,0,0.06) 66%, rgba(0,0,0,0.72) 100%)')]} />
-          <View pointerEvents="none" style={styles.pachiPaylineBar} />
-          <View pointerEvents="none" style={styles.pachiReelGlass} />
-        </View>
-        <View style={styles.pachiBezelRivetRow}>{[0, 1, 2, 3, 4, 5].map((index) => <View key={index} style={styles.pachiRivet} />)}</View>
-      </View>
-
-      {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
-      <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
-        <View style={styles.pachiStopRow}>{[0, 1, 2].map((index) => (
-          <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
-            {/* 보내 주신 실물 버튼 사진입니다. 흰 배경은 지웠습니다. */}
-            <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
-            <Text style={styles.pachiStopText}>{index + 1}</Text>
-          </Pressable>
+      {/* 회색 창 — 릴 셋. 가운데 줄이 당첨 줄입니다. */}
+      <View style={styles.pachiWindow}>
+        {reels.map((symbol, index) => (
+          <View key={index} style={styles.pachiReel}>
+            <Animated.View style={[styles.pachiReelStrip, { marginTop: -reelCell }, {
+              transform: [{ translateY: reelShift[index].interpolate({ inputRange: [0, 1], outputRange: [0, reelCell] }) }],
+            }]}>
+              <View style={[styles.pachiCell, { height: reelCell }]}><PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={24} dim /></View>
+              <View style={[styles.pachiCell, { height: reelCell }]}><PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={24} dim /></View>
+              <View style={[styles.pachiCell, { height: reelCell }]}><PachiSymbol symbol={symbol} size={30} win={stopped[index] && Boolean(shown?.outMedals)} /></View>
+              <View style={[styles.pachiCell, { height: reelCell }]}><PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={24} dim /></View>
+            </Animated.View>
+          </View>
         ))}
-        {/* 하나씩 누르기 귀찮을 때. 누르면 1·2·3이 차례로 촤르륵 섭니다. */}
-        <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiStopButton, styles.pachiAllButton, pressed && styles.pachiPressed, !spinning && styles.pachiStopButtonOff]}>
-          <Image source={pachiStopButtonImage} style={styles.pachiAllImage} resizeMode="contain" />
-          <Text style={styles.pachiAllText}>ALL</Text>
-        </Pressable>
-      </View>
-        {/* ⚠️ 레버는 **오른쪽 끝**입니다. 보내 주신 기계 사진도 레버가 오른쪽에 있습니다. */}
-        {/*
-          ⚠️ **`통상 · 1G · 천장 999G`를 뺐습니다.**(2026-09-02) 실제 기계에는 그 숫자가 없습니다 —
-          가게가 기계 위에 다는 데이터 카운터에 나오는 값입니다. 화면만 복잡했습니다.
-          AT·찬스존처럼 **지금 뭔가 일어나는 중일 때만** 알려 줍니다.
-        */}
-        <View style={styles.pachiMeter}>
-          <Text style={styles.pachiMeterName}>{machine.phase === '통상' ? 'READY' : machine.phase}</Text>
-          <Text style={styles.pachiMeterValue}>{machine.phase === 'AT' ? `남은 ${machine.atLeft}` : machine.phase === '찬스존' ? `남은 ${machine.zoneLeft}` : '—'}</Text>
-          <View style={styles.pachiCeilingBar}><View style={[styles.pachiCeilingFill, { width: `${Math.round(ceilingRatio * 100)}%` }]} /></View>
-        </View>
-        {/*
-          레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다.
-          ⚠️ 잭팟 그림에서 레버를 오려 써 봤는데 **배경이 같이 붙어 나와** 네모난 얼룩으로 보였습니다.
-          통짜 기계 그림에서 부품만 떼어 내는 건 안 됩니다. 코드로 그린 이쪽이 낫습니다.
-        */}
-        <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
-          <View style={styles.pachiLeverMount} />
-          <View style={styles.pachiLeverStick} />
-          <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
-        </Pressable>
+        <View pointerEvents="none" style={[styles.pachiFill, webGradient('linear-gradient(180deg, rgba(0,0,0,0.66) 0%, rgba(0,0,0,0.05) 36%, rgba(0,0,0,0.05) 64%, rgba(0,0,0,0.66) 100%)')]} />
+        <View pointerEvents="none" style={styles.pachiPaylineBar} />
       </View>
 
-      {/* 아래 그림판. 위 화면과 같은 사진의 아래쪽입니다. */}
-      <View style={styles.pachiArtPanel}>
-        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
-        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)')]} />
-        {/* ⚠️ 이름은 기계 바깥 간판에 있습니다. 여기서는 안 씁니다. */}
+      {/* 빨간 판 — 기계 이름. 실제 기계도 여기에 제목이 붙습니다. */}
+      <View style={styles.pachiRedPanel}>
+        <PachiArch text={`${photo.name} 슬롯`} />
       </View>
-      <PachiBulbs count={22} lit={twinkle} />
-      {/* 동전 받이. 안쪽이 어두워 파인 것처럼 보입니다. */}
-      <View style={[styles.pachiTray, webGradient('linear-gradient(180deg, #0A0C11 0%, #1B1F27 40%, #0A0C11 100%)')]}>
-        <View style={styles.pachiTrayHole} />
-      </View>
+
+      {/* 사진 속 레버 자리. 안 보이지만 눌립니다. */}
+      <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverSpot, pressed && styles.pachiSpotPressed]} />
+
+      {/* 사진 속 버튼 셋. 왼쪽부터 1·2·3입니다. */}
+      {[0, 1, 2].map((index) => (
+        <Pressable
+          key={index}
+          disabled={!spinning || stopped[index]}
+          onPress={() => stopReel(index)}
+          style={({ pressed }) => [styles.pachiButtonSpot, { left: `${37.5 + index * 10.7}%` }, pressed && styles.pachiSpotPressed]}
+        />
+      ))}
+
+      {/* 한 번에 멈추기. 사진에 자리가 없어 오른쪽 빈 곳에 작게 답니다. */}
+      <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiAllSpot, pressed && styles.pachiSpotPressed, !spinning && styles.disabledCard]}>
+        <Text style={styles.pachiAllText}>ALL</Text>
+      </Pressable>
+
+      {/* 지금 무슨 구간인지. 통상일 때는 아무 말도 안 합니다. */}
+      {machine.phase !== '통상' && (
+        <View style={styles.pachiPhaseTag}>
+          <Text style={styles.pachiPhaseText}>{machine.phase} · 남은 {machine.phase === 'AT' ? machine.atLeft : machine.zoneLeft}</Text>
+        </View>
+      )}
     </View>
 
     <Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} onPress={() => onBetChange(amount)} level={option.bets.indexOf(amount) + 1} />)}</View>
@@ -9293,7 +9252,25 @@ const styles = StyleSheet.create({
    * ⚠️ 높이를 다 더하면 위 화면 196 + 릴 176 + 조작대 92 + 그림판 96 + 받침 12 = 572입니다.
    * 여기에 코인 줄 56과 베팅·규칙이 붙어 화면(746) 안에 들어갑니다. 하나를 키우면 다른 것을 줄이세요.
    */
-  pachiPage: { padding: 14, paddingBottom: 26, gap: 12 },
+  pachiPage: { padding: 14, paddingBottom: 26, gap: 10 },
+  /**
+   * 기계 사진. **가로를 꽉 채우고 높이는 사진 비율(291:409)을 따릅니다.**
+   * 안에 얹는 것들은 다 비율(%)로 자리를 잡아서, 화면이 커도 작아도 같이 늘어납니다.
+   */
+  pachiMachine: { width: '100%', aspectRatio: 291 / 409, alignSelf: 'center' },
+  pachiCabinetImage: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
+  pachiFill: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
+  // 비워 둔 세 자리(사진에서 재서 넣은 값입니다)
+  pachiWhitePanel: { position: 'absolute', left: '12.4%', top: '13.7%', width: '76.3%', height: '11.0%', overflow: 'hidden' },
+  pachiWindow: { position: 'absolute', left: '14.8%', top: '29.3%', width: '70.8%', height: '19.1%', flexDirection: 'row', overflow: 'hidden' },
+  pachiRedPanel: { position: 'absolute', left: '7.6%', top: '73.8%', width: '86.6%', height: '22.5%', alignItems: 'center', justifyContent: 'center' },
+  // 사진 속 부품 위에 겹치는 누름 자리. 보이지 않습니다.
+  pachiLeverSpot: { position: 'absolute', left: '15%', top: '60%', width: '14%', height: '11%', borderRadius: 999 },
+  pachiButtonSpot: { position: 'absolute', top: '62%', width: '9%', height: '7%', borderRadius: 999 },
+  pachiAllSpot: { position: 'absolute', right: '6%', top: '61%', width: '13%', height: '8%', alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderWidth: 1, borderColor: 'rgba(255,214,120,0.8)' },
+  pachiSpotPressed: { backgroundColor: 'rgba(255,255,255,0.28)' },
+  pachiPhaseTag: { position: 'absolute', left: '14.8%', top: '25%', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(12,6,2,0.85)', borderWidth: 1, borderColor: '#F4D06A' },
+  pachiPhaseText: { color: '#FFE9A6', fontSize: 10, fontWeight: '900' },
   // 기계 몸통. 위는 밝고 아래는 어두운 테두리로 금속처럼 보이게 합니다.
   pachiCabinet: { borderRadius: 18, overflow: 'hidden', borderWidth: 3, borderTopColor: '#6E7686', borderLeftColor: '#575E6B', borderRightColor: '#3A404B', borderBottomColor: '#23272F', backgroundColor: '#14161B', shadowColor: '#000', shadowOpacity: 0.65, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
@@ -9312,7 +9289,7 @@ const styles = StyleSheet.create({
   pachiSign: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, backgroundColor: '#241636', borderBottomWidth: 1, borderBottomColor: '#0D0714' },
   pachiSignDeco: { width: 42, height: 42 },
   pachiArchRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 6 },
-  pachiArchText: { color: '#FFE9A6', fontSize: 21, fontWeight: '900', letterSpacing: 1, textShadowColor: '#C9971F', textShadowRadius: 12 },
+  pachiArchText: { color: '#FFF4CF', fontSize: 19, fontWeight: '900', letterSpacing: 1, textShadowColor: '#C9971F', textShadowRadius: 12 },
   pachiTopCaption: { position: 'absolute', left: 12, bottom: 10, right: 12 },
   pachiTopTitle: { color: '#FFE9A6', fontSize: 24, fontWeight: '900', letterSpacing: 2, textShadowColor: '#000', textShadowRadius: 8 },
   pachiTopLine: { color: '#F2F4FF', fontSize: 12, fontWeight: '800', marginTop: 2, textShadowColor: '#000', textShadowRadius: 6 },
@@ -9333,8 +9310,10 @@ const styles = StyleSheet.create({
   // 창 안쪽. 테두리를 굵게 두고 안쪽 그늘을 넣어 유리 뒤로 들어가 보이게 합니다.
   pachiReelWindow: { height: 152, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#FCF8EE', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
   pachiReel: { flex: 1, alignItems: 'center', overflow: 'hidden' },
+  // 사진 속 창이 낮아서 한 칸도 낮습니다.
+  pachiCellPhoto: { height: 26 },
   // 창보다 한 칸 위에서 시작하는 띠. 이 띠가 통째로 내려옵니다.
-  pachiReelStrip: { alignItems: 'center', marginTop: -pachiCellHeight },
+  pachiReelStrip: { alignItems: 'center' },
   // 칸 하나. 심볼이 커도 작아도 이 높이는 안 바뀝니다.
   pachiCell: { height: pachiCellHeight, alignItems: 'center', justifyContent: 'center' },
   pachiReelDivider: { borderRightWidth: 1, borderRightColor: 'rgba(0,0,0,0.13)' },
