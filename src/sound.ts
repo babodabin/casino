@@ -23,6 +23,12 @@ export type Tone = {
   dur: number;
   /** 크기(0~1). 다 합쳐도 1을 넘지 않게 둡니다. */
   gain: number;
+  /**
+   * 잡음을 **얼마나 좁게** 거를지(noise에만 씁니다). 안 주면 0.8입니다.
+   * ⚠️ 넓게 거르면(0.8) 온갖 음이 섞여 '툭' 하고 뭉갭니다.
+   * 좁게 거를수록(6 이상) 한 음만 남아 '짝' 하고 날카로워집니다.
+   */
+  sharp?: number;
 };
 
 /**
@@ -54,10 +60,14 @@ export const soundCues: Record<SoundCue, Tone[]> = {
    * 시작이 세고 곧바로 죽습니다. 나무판을 치는 느낌이 나게 낮은 쪽을 남깁니다.
    */
   slap: [
-    // 높은 쪽이 서야 '짝'이 됩니다. 낮게만 두면 '툭'으로 들립니다.
-    { wave: 'noise', freq: 3200, at: 0, dur: 0.028, gain: 0.4 },
-    { wave: 'noise', freq: 1400, at: 0, dur: 0.045, gain: 0.3 },
-    { wave: 'triangle', freq: 260, at: 0, dur: 0.06, gain: 0.12 },
+    /**
+     * ⚠️ '툭'이 아니라 '짝'이 되려면 **좁게 걸러야** 합니다.
+     * 넓게 거른 잡음은 아무리 높은 음을 넣어도 뭉개져서 낮은 소리로 들립니다.
+     * 4kHz 언저리만 아주 좁게(sharp 9) 남기고, 아주 짧게 끊습니다.
+     */
+    { wave: 'noise', freq: 4200, at: 0, dur: 0.02, gain: 0.5, sharp: 9 },
+    { wave: 'noise', freq: 2600, at: 0, dur: 0.03, gain: 0.4, sharp: 7 },
+    { wave: 'square', freq: 900, at: 0, dur: 0.012, gain: 0.16 },
   ],
   // 패를 섞는 소리. 잡음을 여러 번 겹쳐 스치는 느낌을 냅니다.
   shuffle: [

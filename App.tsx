@@ -81,7 +81,7 @@ function playCue(cue: SoundCue) {
       const band = ctx.createBiquadFilter();
       band.type = 'bandpass';
       band.frequency.value = tone.freq;
-      band.Q.value = 0.8;
+      band.Q.value = tone.sharp ?? 0.8;
       source.connect(band);
       band.connect(gain);
       source.start(now + tone.at);
@@ -1847,8 +1847,9 @@ function useReveal() {
  * 내 카드는 눈으로 읽어야 하지만 남의 카드는 뒷면이라 읽을 것이 없습니다.
  * ⚠️ 사람이 늘면 기다림이 곱해집니다. 네 명 판 첫 거리가 3×200 + 9×100 = 1.5초입니다.
  */
-const DEAL_MINE_MS = 200;
-const DEAL_THEIRS_MS = 100;
+const DEAL_MINE_MS = 260;
+// ⚠️ 100은 너무 빨라 넉 자리에 도는 것이 안 보이고 '한꺼번에 나타났다'로 보였습니다.
+const DEAL_THEIRS_MS = 170;
 /**
  * 다 깔리기까지의 목표 시간. **장수가 많으면 도구가 스스로 간격을 줄여** 이 안에 끝냅니다.
  * 차이니즈 포커는 네 명이 13장씩 52장이라 위 간격 그대로면 6.5초가 걸립니다.
@@ -2723,16 +2724,6 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
 
       {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
       <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
-        {/*
-          레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다.
-          ⚠️ 잭팟 그림에서 레버를 오려 써 봤는데 **배경이 같이 붙어 나와** 네모난 얼룩으로 보였습니다.
-          통짜 기계 그림에서 부품만 떼어 내는 건 안 됩니다. 코드로 그린 이쪽이 낫습니다.
-        */}
-        <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
-          <View style={styles.pachiLeverMount} />
-          <View style={styles.pachiLeverStick} />
-          <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
-        </Pressable>
         <View style={styles.pachiStopRow}>{[0, 1, 2].map((index) => (
           <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
             {/* 보내 주신 실물 버튼 사진입니다. 흰 배경은 지웠습니다. */}
@@ -2746,12 +2737,27 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
           <Text style={styles.pachiAllText}>ALL</Text>
         </Pressable>
       </View>
+        {/* ⚠️ 레버는 **오른쪽 끝**입니다. 보내 주신 기계 사진도 레버가 오른쪽에 있습니다. */}
+        {/*
+          ⚠️ **`통상 · 1G · 천장 999G`를 뺐습니다.**(2026-09-02) 실제 기계에는 그 숫자가 없습니다 —
+          가게가 기계 위에 다는 데이터 카운터에 나오는 값입니다. 화면만 복잡했습니다.
+          AT·찬스존처럼 **지금 뭔가 일어나는 중일 때만** 알려 줍니다.
+        */}
         <View style={styles.pachiMeter}>
-          <Text style={styles.pachiMeterName}>{machine.phase}</Text>
-          <Text style={styles.pachiMeterValue}>{machine.phase === 'AT' ? `남은 ${machine.atLeft}` : machine.phase === '찬스존' ? `남은 ${machine.zoneLeft}` : `${machine.games}G`}</Text>
+          <Text style={styles.pachiMeterName}>{machine.phase === '통상' ? 'READY' : machine.phase}</Text>
+          <Text style={styles.pachiMeterValue}>{machine.phase === 'AT' ? `남은 ${machine.atLeft}` : machine.phase === '찬스존' ? `남은 ${machine.zoneLeft}` : '—'}</Text>
           <View style={styles.pachiCeilingBar}><View style={[styles.pachiCeilingFill, { width: `${Math.round(ceilingRatio * 100)}%` }]} /></View>
-          <Text style={styles.pachiMeterSmall}>천장 {pachiToCeiling(machine)}G</Text>
         </View>
+        {/*
+          레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다.
+          ⚠️ 잭팟 그림에서 레버를 오려 써 봤는데 **배경이 같이 붙어 나와** 네모난 얼룩으로 보였습니다.
+          통짜 기계 그림에서 부품만 떼어 내는 건 안 됩니다. 코드로 그린 이쪽이 낫습니다.
+        */}
+        <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
+          <View style={styles.pachiLeverMount} />
+          <View style={styles.pachiLeverStick} />
+          <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
+        </Pressable>
       </View>
 
       {/* 아래 그림판. 위 화면과 같은 사진의 아래쪽입니다. */}
@@ -3089,7 +3095,11 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
    *
    * ⚠️ `outerTrim`을 줘야 자리를 잽니다 — 웹에서는 `onLayout`이 안 불립니다(4번 참고).
    */
-  const fit=useCardFit({rows:4,spare:400,sideSpare:70,outerTrim:48,biggest:'mid',smallest:'mini'});
+  /**
+   * ⚠️ 손패를 **두 줄**로 바꿨으니 세는 줄도 넷이 아니라 **다섯**입니다(놓는 줄 셋 + 손패 둘).
+   * 넷으로 세면 카드가 커져서 판이 화면 밖으로 밀려납니다(재 보니 927 > 812).
+   */
+  const fit=useCardFit({rows:5,spare:360,sideSpare:70,outerTrim:48,biggest:'mid',smallest:'mini'});
   // 세 줄은 **겹치지 않고 나란히** 놓습니다. 다섯 장이 안 들어가면 한 단계 내립니다.
   const rowSize:CardSize=fit.crowdedFor(5,fit.fit)?(fit.fit==='mid'?'small':'mini'):fit.fit;
   /**
@@ -8628,7 +8638,7 @@ const styles = StyleSheet.create({
   pokerBoardFan: { marginLeft: -27 },
   pokerTable: { flex: 1, backgroundColor: colors.bg },
   // 아래 여백 42는 탭바가 없는 화면이라 필요 없습니다. 줄 사이 틈도 12면 넉넉합니다.
-  pokerPage: { flexGrow: 1, padding: 16, paddingBottom: 20, gap: 12, alignItems: 'center' },
+  pokerPage: { flexGrow: 1, padding: 14, paddingBottom: 18, gap: 8, alignItems: 'center' },
   pokerSeat: { color: '#F8E6B0', fontSize: 16, fontWeight: '900', marginTop: 5 },
   pokerActionRow: { width: '100%', flexDirection: 'row', gap: 8, marginTop: 12 },
   secondaryButton: { flex: 1, minHeight: 52, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, borderRadius: 14, backgroundColor: '#2C1B2E', borderWidth: 1, borderColor: '#7A5A3A' },
@@ -8641,7 +8651,11 @@ const styles = StyleSheet.create({
   paiGowSummaryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
   paiGowShowdownButton: { flex: 1, width: undefined },
   // ⚠️ 아래 여백을 두면 줄마다 26씩 벌어져 세 줄이 78을 먹습니다. 쪽 틈(12)으로 충분합니다.
-  chineseRow: { ...feltLook, width: '100%', gap: 6 },
+  /**
+   * 놓는 줄 셋. **얇게** 둡니다 — 두꺼운 펠트 테(7)와 여백(11)이 줄마다 36을 먹어서
+   * 세 줄이면 108입니다. 그만큼 판이 화면 밖으로 밀렸습니다(재 보니 927 > 812).
+   */
+  chineseRow: { ...feltLook, width: '100%', gap: 3, borderWidth: 4, paddingHorizontal: 8, paddingVertical: 6 },
   chineseRowActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
   chineseRowWon: { borderColor: '#3FA96A' },
   chineseRowLost: { borderColor: '#B4413F' },
@@ -8649,11 +8663,11 @@ const styles = StyleSheet.create({
   chineseRowName: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   chineseRowLabel: { flex: 1, color: '#A08FA0', fontSize: 12, fontWeight: '700' },
   chineseRowMark: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, overflow: 'hidden', backgroundColor: '#3B2839' },
-  chineseSlotRow: { flexDirection: 'row', gap: 6 },
+  chineseSlotRow: { flexDirection: 'row', gap: 5 },
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#A08FA0', fontSize: 12, fontWeight: '700' },
   // ⚠️ 접히지 않습니다. 겹치는 정도를 폭에 맞춰 재기 때문에 열세 장이 한 줄에 들어갑니다.
-  chineseHandRow: { ...feltLook, width: '100%', flexDirection: 'row', alignItems: 'center' },
+  chineseHandRow: { ...feltLook, width: '100%', flexDirection: 'row', alignItems: 'center', borderWidth: 4, paddingVertical: 6 },
   /** 이미 펠트 위에 올라가 있는 줄. 펠트를 두 번 겹치지 않게 맨 모양으로 둡니다. */
   handRowPlain: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
