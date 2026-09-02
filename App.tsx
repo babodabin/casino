@@ -2666,11 +2666,11 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       {/* 위 화면. 실제 기계의 연출용 LCD 자리입니다. */}
       <View style={styles.pachiTopScreen}>
         {/*
-          사진을 **자르지 않고 통째로** 보여 줍니다(contain).
-          뒤에는 같은 사진을 꽉 채워(cover) 어둡게 깔아, 남는 좌우가 검은 띠로 비지 않게 합니다.
+          사진을 **꽉 채웁니다**(cover).
+          ⚠️ 전에는 통째로 보이라고 contain으로 뒀는데, 세로 사진이라 좌우가 남아 **작아 보였습니다.**
+          꽉 채우면 위아래가 조금 잘리는 대신 실물 기계의 연출 화면처럼 보입니다.
         */}
-        <Image source={photo.image} style={[styles.pachiTopPhoto, styles.pachiTopBackdrop]} resizeMode="cover" />
-        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="contain" />
+        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
         <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.5) 100%)')]} />
         <View pointerEvents="none" style={styles.pachiGlassStreak} />
         <PachiSparkle left={22} top={26} size={16} delay={0} twinkle={twinkle} />
@@ -9303,7 +9303,7 @@ const styles = StyleSheet.create({
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
 
   // 위 화면 — 연출용 LCD
-  pachiTopScreen: { height: 208, backgroundColor: '#05060A', overflow: 'hidden' },
+  pachiTopScreen: { height: 244, backgroundColor: '#05060A', overflow: 'hidden' },
   pachiTopPhoto: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   // 뒤에 까는 바탕. 흐릿하게 어두워야 앞의 사진이 떠 보입니다.
   pachiTopBackdrop: { opacity: 0.45 },
@@ -9330,12 +9330,14 @@ const styles = StyleSheet.create({
   pachiReelBezel: { paddingHorizontal: 15, paddingVertical: 5, backgroundColor: '#AEB6C3', borderTopWidth: 2, borderTopColor: '#F4F7FB', borderBottomWidth: 3, borderBottomColor: '#5A6270' },
   // 테에 박힌 나사. 여섯 개씩 위아래로 박습니다.
   pachiBezelRivetRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingVertical: 3 },
-  pachiRivet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8A92A1', borderTopWidth: 1, borderTopColor: '#E4E9F0', borderBottomWidth: 1, borderBottomColor: '#4A515D' },
+  // 그림자를 주면 나사가 박혀 있는 것처럼 보입니다.
+  pachiRivet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8A92A1', borderTopWidth: 1, borderTopColor: '#E4E9F0', borderBottomWidth: 1, borderBottomColor: '#4A515D', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
   // 기계 어깨
   pachiShoulder: { height: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2F3A', borderBottomWidth: 1, borderBottomColor: '#0D1015' },
   pachiShoulderText: { color: '#C6CEDC', fontSize: 10, fontWeight: '900', letterSpacing: 4 },
   // 창 안쪽. 테두리를 굵게 두고 안쪽 그늘을 넣어 유리 뒤로 들어가 보이게 합니다.
-  pachiReelWindow: { height: 152, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#FCF8EE', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
+  // 창 바탕을 어둡게 두면 심볼이 떠 보입니다(밝은 크림색이면 금색 7이 묻힙니다).
+  pachiReelWindow: { height: 152, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#EDE7D8', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
   pachiReel: { flex: 1, alignItems: 'center', overflow: 'hidden' },
   // 창보다 한 칸 위에서 시작하는 띠. 이 띠가 통째로 내려옵니다.
   pachiReelStrip: { alignItems: 'center', marginTop: -pachiCellHeight },
@@ -9361,7 +9363,8 @@ const styles = StyleSheet.create({
   // 그림은 작아도 **누르는 자리는 크게**. 안 눌린다고 하셔서 키웠습니다.
   pachiLeverBase: { width: 46, height: 66, alignItems: 'center', justifyContent: 'flex-end' },
   // 누르면 살짝 들어갑니다. 실물 버튼 느낌은 여기서 옵니다.
-  pachiPressed: { transform: [{ scale: 0.93 }], opacity: 0.85 },
+  // 0.93은 너무 훅 들어갑니다. 0.96이 실물 버튼에 가깝습니다.
+  pachiPressed: { transform: [{ scale: 0.96 }], opacity: 0.8 },
   // 조작대에 박힌 받침. 아래가 넓고 어둡습니다.
   pachiLeverMount: { position: 'absolute', bottom: 0, width: 34, height: 13, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: '#31373F', borderTopWidth: 1, borderTopColor: '#5A616D' },
   pachiLeverStick: { position: 'absolute', bottom: 10, width: 7, height: 34, borderRadius: 4, backgroundColor: '#A8B0BE', borderRightWidth: 2, borderRightColor: '#6C7381' },
