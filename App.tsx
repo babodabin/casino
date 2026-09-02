@@ -7426,7 +7426,12 @@ function BaccaratGameScreen({
           **뱅커 카드가 판 밖으로 잘려 안 보였습니다.** 재서 넣은 값입니다 —
           테두리줄 65 · 이름 24×2 · 카드 80×2 · 규칙 16 · 안내 22 · 여백 38 = 349.
         */}
-        <DealerTable height={330}>
+        {/*
+          ⚠️ 판을 **길게** 둡니다. 반원 테이블은 아래 두 귀퉁이가 60만큼 둥글게 깎여 있어서,
+          맨 아래에 놓인 것은 그 곡선에 잘립니다. 뱅커 카드 줄이 딱 바닥에 닿아 잘리고 있었습니다.
+          372는 안에 든 것(330)보다 42 길어서 뱅커 줄 아래에 그만큼 빈 자리가 생깁니다.
+        */}
+        <DealerTable height={372}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>PLAYER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
           <View style={[styles.dealerCardRow, styles.baccaratCardRow]}>{/* ⚠️ **깔린 만큼만** 그립니다. 덮인 카드를 미리 놓아 두면 몇 장짜리 판인지가
               그 자리에서 새어 나갑니다 — 세 번째 장이 올지 말지가 바카라의 재미입니다. */}
@@ -9729,7 +9734,7 @@ const styles = StyleSheet.create({
   baccaratWaiting: { color: '#82A69E', fontSize: 13, fontWeight: '700' },
   baccaratResult: { paddingVertical: 5, paddingHorizontal: 14, flexDirection: 'row', gap: 10, alignItems: 'center', borderRadius: 18, borderWidth: 1 },
   // 결과가 없어도 이만큼은 비워 둡니다.
-  baccaratResultSlot: { height: 56, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  baccaratResultSlot: { height: 54, width: '100%', alignItems: 'center', justifyContent: 'center' },
   baccaratPushCard: { backgroundColor: '#202D35', borderColor: '#70808A' },
   baccaratBetRow: { flexDirection: 'row', gap: 8 },
   baccaratBetArea: { flex: 1, minHeight: 104, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#27303A', borderWidth: 1, borderColor: '#59636E' },
