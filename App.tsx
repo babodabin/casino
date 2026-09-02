@@ -231,35 +231,37 @@ const pachiCellHeight = 40;
  *
  * 실제 기계가 그렇듯 위 화면은 연출용이고 아래는 그림판입니다.
  * ⚠️ 당첨될 때마다 다음 짝으로 넘어갑니다 — 돌릴 때마다 바꾸면 정신이 없습니다.
- * 원본은 세로 사진이라 위 화면은 얼굴이 있는 위쪽에서 3:2로, 아래 그림판은 아래쪽에서
- * 3:1로 잘라 넣었습니다.
+ * ⚠️ `ratio`는 **사진 자체의 가로÷세로**입니다(제가 파일을 재서 넣었습니다).
+ * 이 값이 있어야 사진을 **창 폭에 딱 맞춰 위에서부터** 그릴 수 있습니다 —
+ * 그러면 좌우는 한 점도 안 잘리고, 넘치는 아래(다리)만 잘립니다.
+ * ⚠️ 사진을 더 넣으면 그 사진의 비율도 재서 적어야 합니다.
  */
 /**
  * 기계 위 화면에 걸리는 사진. **파일 이름에서 그룹 이름을 읽어 왔습니다.**
  * ⚠️ 당첨될 때마다 다음 장으로 넘어갑니다 — 돌릴 때마다 바꾸면 정신이 없습니다.
  * 사진은 세로가 길어서 **자르지 않고 통째로** 보여 줍니다(뒤에 같은 사진을 꽉 채워 깔아 바탕을 만듭니다).
  */
-const pachiPhotos: { name: string; image: number }[] = [
-  { name: '리센느', image: require('./assets/pachislot/star-1.jpg') },
-  { name: '리센느', image: require('./assets/pachislot/star-2.jpg') },
-  { name: '리센느', image: require('./assets/pachislot/star-3.jpg') },
-  { name: '리센느', image: require('./assets/pachislot/star-4.jpg') },
-  { name: '아이브', image: require('./assets/pachislot/star-5.jpg') },
-  { name: '아이브', image: require('./assets/pachislot/star-6.jpg') },
-  { name: '아이브', image: require('./assets/pachislot/star-7.jpg') },
-  { name: '아이브', image: require('./assets/pachislot/star-8.jpg') },
-  { name: '아일릿', image: require('./assets/pachislot/star-9.jpg') },
-  { name: '아일릿', image: require('./assets/pachislot/star-10.jpg') },
-  { name: '아일릿', image: require('./assets/pachislot/star-11.jpg') },
-  { name: '아일릿', image: require('./assets/pachislot/star-12.jpg') },
-  { name: '에스파', image: require('./assets/pachislot/star-13.jpg') },
-  { name: '에스파', image: require('./assets/pachislot/star-14.jpg') },
-  { name: '에스파', image: require('./assets/pachislot/star-15.jpg') },
-  { name: '하츠투하츠', image: require('./assets/pachislot/star-16.jpg') },
-  { name: '하츠투하츠', image: require('./assets/pachislot/star-17.jpg') },
-  { name: '하츠투하츠', image: require('./assets/pachislot/star-18.jpg') },
-  { name: '하츠투하츠', image: require('./assets/pachislot/star-19.jpg') },
-  { name: '하츠투하츠', image: require('./assets/pachislot/star-20.jpg') },
+const pachiPhotos: { name: string; image: number; ratio: number }[] = [
+  { name: '리센느', image: require('./assets/pachislot/star-1.jpg'), ratio: 1.535 },
+  { name: '리센느', image: require('./assets/pachislot/star-2.jpg'), ratio: 0.714 },
+  { name: '리센느', image: require('./assets/pachislot/star-3.jpg'), ratio: 0.667 },
+  { name: '리센느', image: require('./assets/pachislot/star-4.jpg'), ratio: 0.667 },
+  { name: '아이브', image: require('./assets/pachislot/star-5.jpg'), ratio: 0.749 },
+  { name: '아이브', image: require('./assets/pachislot/star-6.jpg'), ratio: 0.8 },
+  { name: '아이브', image: require('./assets/pachislot/star-7.jpg'), ratio: 0.667 },
+  { name: '아이브', image: require('./assets/pachislot/star-8.jpg'), ratio: 0.8 },
+  { name: '아일릿', image: require('./assets/pachislot/star-9.jpg'), ratio: 0.788 },
+  { name: '아일릿', image: require('./assets/pachislot/star-10.jpg'), ratio: 0.667 },
+  { name: '아일릿', image: require('./assets/pachislot/star-11.jpg'), ratio: 0.667 },
+  { name: '아일릿', image: require('./assets/pachislot/star-12.jpg'), ratio: 0.667 },
+  { name: '에스파', image: require('./assets/pachislot/star-13.jpg'), ratio: 0.703 },
+  { name: '에스파', image: require('./assets/pachislot/star-14.jpg'), ratio: 0.702 },
+  { name: '에스파', image: require('./assets/pachislot/star-15.jpg'), ratio: 0.714 },
+  { name: '하츠투하츠', image: require('./assets/pachislot/star-16.jpg'), ratio: 0.749 },
+  { name: '하츠투하츠', image: require('./assets/pachislot/star-17.jpg'), ratio: 0.674 },
+  { name: '하츠투하츠', image: require('./assets/pachislot/star-18.jpg'), ratio: 0.8 },
+  { name: '하츠투하츠', image: require('./assets/pachislot/star-19.jpg'), ratio: 0.667 },
+  { name: '하츠투하츠', image: require('./assets/pachislot/star-20.jpg'), ratio: 0.8 },
 ];
 
 /**
@@ -2547,6 +2549,14 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
   const [shown, setShown] = useState<PachiSpin | null>(null);
   // 레버를 당길 때 결과를 이미 정해 둡니다. 정지 버튼은 정해진 것을 한 줄씩 보여 줄 뿐입니다.
   const pending = useRef<PachiSpin | null>(null);
+  /**
+   * 사진 높이를 **픽셀로 계산**합니다. 폭은 기계 폭(화면 폭 − 좌우 여백 28)이고,
+   * 높이는 그 폭을 사진 비율로 나눈 값입니다.
+   * ⚠️ `aspectRatio`만 주면 이 자리에서는 안 먹고 **사진 원래 크기(960 등)로 그려집니다.**
+   */
+  const { width: screenWidth } = useWindowDimensions();
+  const photoWidth = Math.max(240, screenWidth - 28);
+
   /** 지금 붙어 있는 사진. 당첨될 때마다 **아무 장으로나** 바뀝니다(순서대로 돌지 않습니다). */
   const [photoIndex, setPhotoIndex] = useState(() => Math.floor(Math.random() * pachiPhotos.length));
   const photo = pachiPhotos[photoIndex % pachiPhotos.length];
@@ -2672,7 +2682,7 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
           ⚠️ 그냥 cover로 두면 가운데를 기준으로 잘라서 **얼굴이 잘립니다.**
           사진 상자를 창보다 길게(135%) 잡고 위에 붙이면, 잘리는 곳이 아래(다리)가 됩니다.
         */}
-        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
+        <Image source={photo.image} style={[styles.pachiTopPhoto, { width: photoWidth, height: Math.round(photoWidth / photo.ratio) }]} resizeMode="cover" />
         <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.5) 100%)')]} />
         <View pointerEvents="none" style={styles.pachiGlassStreak} />
         <PachiSparkle left={22} top={26} size={16} delay={0} twinkle={twinkle} />
@@ -9302,8 +9312,12 @@ const styles = StyleSheet.create({
 
   // 위 화면 — 연출용 LCD
   pachiTopScreen: { height: 388, backgroundColor: '#05060A', overflow: 'hidden' },
-  // 창보다 길게 잡고 위에 붙입니다. 넘치는 아래쪽(다리)이 잘립니다.
-  pachiTopPhoto: { position: 'absolute', left: 0, top: 0, width: '100%', height: '135%' },
+  /**
+   * 사진을 **창 폭에 맞추고 위에 붙입니다.** 높이는 사진 비율이 정합니다(`aspectRatio`).
+   * ⚠️ 높이를 %로 주면(전에 135%로 뒀습니다) 사진마다 비율이 달라 좌우가 잘리고,
+   * 그러면서 세로도 같이 잘려 **얼굴이 날아갔습니다.** 폭만 맞추면 좌우는 안 잘립니다.
+   */
+  pachiTopPhoto: { position: 'absolute', left: 0, top: 0 },
   // 뒤에 까는 바탕. 흐릿하게 어두워야 앞의 사진이 떠 보입니다.
   pachiTopBackdrop: { opacity: 0.45 },
   pachiScreenShade: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.08)' },
