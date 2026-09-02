@@ -442,12 +442,76 @@ test('낼 패가 거의 없거나 상대가 기준에 닿으면 스톱한다', (
   assert.equal(chooseComputerGoStop(rivalReady, 1, '전문가'), 'stop');
 });
 
-test('고를 여러 번 외친 뒤에는 더 안 간다', () => {
+test('보통은 두 번까지만 고를 외친다', () => {
   const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
   const hand = [card(5), card(6), card(7), card(9)];
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 1), 1, '보통'), 'go');
   assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 2), 1, '보통'), 'stop');
-  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 2), 1, '전문가'), 'go');
-  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 3), 1, '전문가'), 'stop');
+});
+
+test('전문가는 몇 고라는 천장이 없고 이익과 위험을 견줘 정한다', () => {
+  const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
+  const hand = [card(5), card(6), card(7), card(9)];
+  // 상대는 한 장씩만 남았고 나는 넉 장입니다. 3고를 외친 뒤에도 더 갑니다.
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 3), 1, '전문가'), 'go');
+  // 상대가 점수를 내고 있고 손패도 많이 남았으면, 같은 3고 자리에서도 고박이 무서워 멈춥니다.
+  const 열끗다섯 = [card(2, '열끗'), card(4, '열끗'), card(5, '열끗'), card(6, '열끗'), card(9, '열끗')];
+  const rivalHand = [card(10), card(11), card(12), card(1, '피'), card(2, '피'), card(3, '피')];
+  const rivalClose: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: rivalHand, captured: 열끗다섯, goCount: 0 },
+      { hand: [card(5), card(6)], captured: scoring, goCount: 3 },
+      { hand: rivalHand, captured: [], goCount: 0 },
+    ],
+    floor: [], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: 1, message: '',
+  };
+  assert.equal(chooseComputerGoStop(rivalClose, 1, '전문가'), 'stop');
+});
+
+test('전문가는 삼광이 눈앞이면 광부터 집는다', () => {
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(2)], captured: [], goCount: 0 },
+      // 광 두 장을 이미 모았습니다. 한 장만 더하면 삼광입니다.
+      { hand: [card(8, '광'), card(9, '띠')], captured: [card(1, '광'), card(3, '광')], goCount: 0 },
+      { hand: [card(7)], captured: [], goCount: 0 },
+    ],
+    floor: [card(8, '피'), card(9, '피')], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  // 보통은 바닥 값만 보고 띠를 낼 수도 있지만, 전문가는 삼광을 마무리합니다.
+  assert.equal(chooseComputerGoStopCard(round, 1, '전문가').kind, '광');
+});
+
+test('전문가는 상대 피가 적으면 피를 끊는다', () => {
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      // 상대 피가 두 장뿐입니다. 여기서 피를 끊으면 피박이 보입니다.
+      { hand: [card(2)], captured: [card(11, '피'), card(12, '피')], goCount: 0 },
+      { hand: [card(5, '피'), card(6, '띠')], captured: [], goCount: 0 },
+      { hand: [card(7)], captured: [card(10, '피'), card(11, '피'), card(12, '피')], goCount: 0 },
+    ],
+    floor: [card(5, '피'), card(6, '피')], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  assert.equal(chooseComputerGoStopCard(round, 1, '전문가').month, 5);
+});
+
+test('전문가는 못 먹을 때 광을 안 버리고 죽은 달부터 버린다', () => {
+  const nine = deck.filter((item) => item.month === 9);
+  const round: GoStopRound = {
+    mode: 'gostop',
+    players: [
+      { hand: [card(2)], captured: [], goCount: 0 },
+      // 바닥에 짝이 하나도 없습니다. 무엇을 버릴지가 실력입니다.
+      { hand: [card(1, '광'), nine[0]], captured: [], goCount: 0 },
+      { hand: [card(7)], captured: [nine[1], nine[2], nine[3]], goCount: 0 },
+    ],
+    floor: [card(11, '피')], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  // 9월은 넉 장이 이미 다 드러나 죽은 달입니다. 광 대신 그것을 버립니다.
+  assert.equal(chooseComputerGoStopCard(round, 1, '전문가').month, 9);
 });
 
 test('자리마다 실력이 다르고 맞고는 보통 하나다', () => {

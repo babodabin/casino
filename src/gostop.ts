@@ -317,10 +317,21 @@ function finishGoStopTurn(round: GoStopRound, players: GoStopPlayer[], floor: Hw
 export type GoStopLevel = '쉬움' | '보통' | '전문가';
 
 /**
- * 자리별 실력. 0번은 나라서 안 씁니다.
- * 고스톱(3인)은 컴퓨터 둘이 쉬움 · 전문가, 맞고(2인)는 하나가 보통입니다.
+ * 자리별 실력의 **기본값**입니다.
+ * ⚠️ 2026-09-01부터 화면은 이걸 안 씁니다 — **준비 화면에서 고른 실력을 자리 모두에** 씁니다.
+ * 자리마다 다른 실력을 주고 싶어지면 이 함수를 다시 쓰면 됩니다.
  */
 export const goStopLevels: GoStopLevel[] = ['보통', '쉬움', '전문가'];
+
+/**
+ * 실력마다 **무엇이 다른지** 한 줄로. 화면에도 이 글을 씁니다.
+ * ⚠️ 여기 적은 것과 코드가 어긋나면 안 됩니다. 고칠 때 같이 고치세요.
+ */
+export const goStopLevelNotes: Record<GoStopLevel, string> = {
+  쉬움: '가끔 두 번째 수 · 늘 스톱',
+  보통: '눈앞의 큰 패 · 2고까지',
+  전문가: '상대 패를 세고 피박까지 · 이익이 클 때만 고',
+};
 export const goStopLevelOf = (mode: GoStopMode, seat: number): GoStopLevel =>
   mode === 'matgo' ? '보통' : (goStopLevels[seat] ?? '보통');
 
@@ -335,19 +346,99 @@ export function chooseComputerGoStopCard(round: GoStopRound, playerIndex = round
   const player = round.players[playerIndex];
   if (!player?.hand.length) throw new Error('컴퓨터가 낼 손패가 없습니다.');
   const value = (card: HwatuCard) => card.kind === '광' ? 8 : card.kind === '열끗' ? 5 : card.kind === '띠' ? 4 : card.double ? 3 : 2;
+  const plan = level === '전문가' ? expertPlan(round, playerIndex) : null;
   const ordered = [...player.hand].sort((a, b) => {
     const score = (card: HwatuCard) => {
       const matches = sameMonth(round.floor, card.month);
       const capturedValue = matches.reduce((sum, item) => sum + value(item), 0);
       const sameInHand = sameMonth(player.hand, card.month).length;
       const preserveTriple = sameInHand === 3 && matches.length === 0 ? -10 : 0;
-      return matches.length * 20 + capturedValue + value(card) + preserveTriple;
+      const base = matches.length * 20 + capturedValue + value(card) + preserveTriple;
+      return plan ? base + expertBonus(plan, card, matches) : base;
     };
     return score(b) - score(a) || a.month - b.month;
   });
   // 쉬움은 셋에 한 번쯤 두 번째로 좋은 수를 냅니다. 사람이 이길 구석이 있어야 합니다.
   if (level === '쉬움' && random && ordered.length > 1 && random() < 0.34) return ordered[1];
   return ordered[0];
+}
+
+/**
+ * 전문가가 판을 읽은 것. **한 수 앞만 보지 않기 위해** 판 전체를 한 번 세어 둡니다.
+ *
+ * 세는 것 네 가지입니다.
+ *   1. **상대가 모은 것** — 상대 피가 적으면 피를 끊어 피박을, 광이 있으면 광을 뺏습니다
+ *   2. **내가 모은 것** — 삼광·고도리·홍단처럼 한 장이면 되는 역을 마무리합니다
+ *   3. **보이는 달** — 같은 달 넉 장이 다 드러났으면 그 달은 죽은 달이라 쥐고 있을 값이 없습니다
+ *   4. **내 손에 든 달** — 바닥에 없는 달을 버릴 때는 값이 싼 것부터 버립니다
+ */
+type ExpertPlan = {
+  seen: Map<number, number>;
+  rivalPi: number;
+  rivalBright: number;
+  myBright: number;
+  myGodori: number;
+  myRibbons: { 홍단: number; 청단: number; 초단: number };
+  myPi: number;
+};
+
+function expertPlan(round: GoStopRound, playerIndex: number): ExpertPlan {
+  const me = round.players[playerIndex];
+  const rivals = round.players.filter((_, seat) => seat !== playerIndex);
+  const seen = new Map<number, number>();
+  const note = (cards: HwatuCard[]) => cards.forEach((card) => seen.set(card.month, (seen.get(card.month) ?? 0) + 1));
+  note(round.floor);
+  note(me.hand);
+  round.players.forEach((player) => note(player.captured));
+  return {
+    seen,
+    // 여럿이 하면 제일 위험한 상대 하나를 봅니다.
+    rivalPi: Math.min(...rivals.map((player) => countByKind(player.captured).피), 99),
+    rivalBright: Math.max(0, ...rivals.map((player) => countByKind(player.captured).광)),
+    myBright: countByKind(me.captured).광,
+    myGodori: [2, 4, 8].filter((month) => me.captured.some((card) => card.kind === '열끗' && card.month === month)).length,
+    myRibbons: countRibbons(me.captured),
+    myPi: countByKind(me.captured).피,
+  };
+}
+
+/**
+ * 전문가가 얹는 값. 먹는 값(base)에 **판을 읽은 값**을 더합니다.
+ * 숫자는 한 장 먹는 값(2~8)과 견주어 정했습니다 — 역을 마무리하는 한 장이 제일 큽니다.
+ */
+function expertBonus(plan: ExpertPlan, card: HwatuCard, matches: HwatuCard[]): number {
+  let bonus = 0;
+  const taking = [card, ...matches];
+  for (const item of taking) {
+    if (item.kind === '광') {
+      // 삼광이 눈앞이면 크게, 상대 광을 끊는 것도 값이 됩니다.
+      bonus += plan.myBright === 2 ? 26 : 10;
+      if (plan.rivalBright >= 1) bonus += 6;
+    }
+    if (item.kind === '열끗' && [2, 4, 8].includes(item.month)) bonus += plan.myGodori === 2 ? 22 : 8;
+    if (item.kind === '띠') {
+      // 비띠는 역이 없어 세지 않습니다. 홍단·청단·초단만 두 장에서 한 장이면 마무리입니다.
+      const kind = item.ribbon;
+      if (kind === '홍단' || kind === '청단' || kind === '초단') {
+        if (plan.myRibbons[kind] === 2) bonus += 20;
+      }
+    }
+    if (item.kind === '피') {
+      // 상대 피가 여덟 아래면 피박이 보입니다. 이때 피 한 장의 값이 확 올라갑니다.
+      if (plan.rivalPi < 8) bonus += 7;
+      // 내 피가 아홉이면 한 장마다 곧바로 점수입니다.
+      if (plan.myPi >= 9) bonus += 5;
+    }
+  }
+  // 먹을 것이 없어 버리는 수라면, **죽은 달부터** 버립니다(넉 장이 이미 다 보이는 달).
+  if (matches.length === 0) {
+    const seen = plan.seen.get(card.month) ?? 0;
+    bonus += seen >= 3 ? 6 : 0;
+    // 광·열끗을 그냥 버리지 않습니다. 나중에 짝이 올 수 있습니다.
+    if (card.kind === '광') bonus -= 14;
+    if (card.kind === '열끗') bonus -= 6;
+  }
+  return bonus;
 }
 
 /**
@@ -376,12 +467,34 @@ export function chooseComputerGoStop(round: GoStopRound, playerIndex = round.tur
   if (handLeft <= 1) return 'stop';
   // 상대가 기준 점수에 닿았습니다. 다음 차례에 뒤집힐 수 있으니 굳힙니다.
   if (rivalBest >= threshold - 1) return 'stop';
-  // 고를 외칠수록 잃을 것이 커집니다. 보통은 두 번, 전문가는 세 번까지만 봅니다.
-  if (me.goCount >= (level === '전문가' ? 3 : 2)) return 'stop';
-  // 아직 낼 패가 넉넉하고 점수가 크지 않으면 더 갑니다.
-  const roomToGrow = handLeft >= (level === '전문가' ? 2 : 3);
-  const smallScore = score <= threshold + (level === '전문가' ? 3 : 1);
-  return roomToGrow && smallScore ? 'go' : 'stop';
+
+  /**
+   * 전문가는 **셈으로 정합니다.** 몇 고까지라는 천장이 없습니다.
+   *
+   * 더 가서 얻는 것: 고를 한 번 더 외치면 배수가 오르고, 남은 차례만큼 점수도 오릅니다.
+   * 더 가서 잃는 것: 상대가 뒤집으면 **고박**이라 내가 다 뭅니다.
+   * 두 값을 견줘 얻는 것이 클 때만 갑니다. 그래서 손패가 많고 상대가 멀면 4고도 부르고,
+   * 상대가 붙어 있으면 1고에서도 멈춥니다.
+   */
+  if (level === '전문가') {
+    const rivalHands = round.players.reduce((sum, player, seat) => seat === playerIndex ? sum : sum + player.hand.length, 0);
+    const rivals = Math.max(1, round.players.length - 1);
+    // 남은 차례에 점수가 더 오를 가망. 손패가 많고 바닥에 짝이 많을수록 큽니다.
+    const pairable = me.hand.filter((card) => round.floor.some((item) => item.month === card.month)).length;
+    const chanceToGrow = Math.min(0.9, (pairable + handLeft * 0.5) / Math.max(1, handLeft + 2));
+    // 상대가 나를 넘을 가망. 붙어 있을수록, 손패가 많을수록 큽니다.
+    const chanceToLose = Math.min(0.85, (rivalBest / Math.max(1, threshold)) * 0.55 + (rivalHands / Math.max(1, rivalHands + handLeft)) * 0.35);
+    const nowPoints = goStopPayoutPoints(score, me.goCount);
+    const goPoints = goStopPayoutPoints(score + 2, me.goCount + 1);
+    const gain = (goPoints - nowPoints) * chanceToGrow;
+    // 고박은 상대 몫까지 뭅니다. 사람 수만큼 곱해집니다.
+    const risk = nowPoints * rivals * chanceToLose;
+    return gain > risk ? 'go' : 'stop';
+  }
+
+  // 보통은 두 번까지만 보고, 점수가 크면 굳힙니다.
+  if (me.goCount >= 2) return 'stop';
+  return handLeft >= 3 && score <= threshold + 1 ? 'go' : 'stop';
 }
 
 /** 점수가 난 뒤 고를 수 있는 고/스톱. 고는 계속, 스톱은 즉시 승리입니다. */
