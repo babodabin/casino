@@ -59,12 +59,21 @@ test('리플레이가 나오면 다음 게임은 메달을 넣지 않는다', ()
 test('AT 중에는 메달이 줄지 않고 늘어난다', () => {
   let state = at({ phase: 'AT', atLeft: 1000, atSets: 1 });
   let net = 0;
-  for (let i = 0; i < 5000; i += 1) {
+  let games = 0;
+  /**
+   * ⚠️ **AT가 끝나면 멈춥니다.**
+   * 전에는 무조건 5000게임을 돌렸는데, AT는 1000게임이라 나머지 4000게임은 통상(순감)이었습니다.
+   * 그 4000게임 동안 AT에 다시 들어가느냐 마느냐에 따라 결과가 뒤집혀서
+   * **열두 번에 한 번쯤 떨어졌습니다.** 이 시험이 보려는 것은 'AT 중에' 늘어나는지입니다.
+   */
+  while (state.phase === 'AT' && games < 5000) {
     const spin = spinPachi(state, Math.random);
     net += spin.outMedals - spin.inMedals;
     state = spin.state;
+    games += 1;
   }
-  assert.equal(net > 0, true, `AT 5000게임에서 ${net}매`);
+  assert.equal(games > 900, true, `AT가 ${games}게임 만에 끝났습니다`);
+  assert.equal(net > 0, true, `AT ${games}게임에서 ${net}매`);
 });
 
 test('남은 게임 수를 바르게 알려준다', () => {
