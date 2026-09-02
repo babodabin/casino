@@ -54,8 +54,10 @@ export const soundCues: Record<SoundCue, Tone[]> = {
    * 시작이 세고 곧바로 죽습니다. 나무판을 치는 느낌이 나게 낮은 쪽을 남깁니다.
    */
   slap: [
-    { wave: 'noise', freq: 900, at: 0, dur: 0.05, gain: 0.3 },
-    { wave: 'triangle', freq: 320, at: 0, dur: 0.07, gain: 0.14 },
+    // 높은 쪽이 서야 '짝'이 됩니다. 낮게만 두면 '툭'으로 들립니다.
+    { wave: 'noise', freq: 3200, at: 0, dur: 0.028, gain: 0.4 },
+    { wave: 'noise', freq: 1400, at: 0, dur: 0.045, gain: 0.3 },
+    { wave: 'triangle', freq: 260, at: 0, dur: 0.06, gain: 0.12 },
   ],
   // 패를 섞는 소리. 잡음을 여러 번 겹쳐 스치는 느낌을 냅니다.
   shuffle: [

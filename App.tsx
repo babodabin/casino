@@ -266,6 +266,10 @@ const pachiPhotos: { name: string; image: number }[] = [
  * ⚠️ 이모지는 기기마다 다르게 그려집니다(아이폰과 안드로이드가 다릅니다).
  * 여기 없는 심볼이 오면 이모지로 떨어집니다 — 그림을 지우면 화면이 안 깨지고 이모지로 돌아갑니다.
  */
+const pachiStopButtonImage = require('./assets/pachislot/stopbutton.png');
+/** 간판 옆 장식. 보내 주신 그림입니다. */
+const pachiDecoImage = require('./assets/pachislot/deco-slot.png');
+
 const pachiSymbolImages: Record<string, number> = {
   '7️⃣': require('./assets/pachislot/sym-seven.png'),
   '🍒': require('./assets/pachislot/sym-cherry.png'),
@@ -331,6 +335,25 @@ function PachiSparkle({ left, top, size, delay, twinkle }: { left: number; top: 
     opacity: phase.interpolate({ inputRange: [0, 0.5, 1, 1.5, 2], outputRange: [0.15, 1, 0.15, 1, 0.15] }),
     transform: [{ rotate: phase.interpolate({ inputRange: [0, 2], outputRange: ['0deg', '180deg'] }) }],
   }]}>✦</Animated.Text>;
+}
+
+/**
+ * 글자를 **반원으로 휘어** 놓습니다. 간판 글씨입니다.
+ * 글자를 하나씩 돌리고 가운데일수록 위로 올려 아치를 만듭니다.
+ * (곡선 글꼴이 없어서 이렇게 만듭니다.)
+ */
+function PachiArch({ text }: { text: string }) {
+  const letters = [...text];
+  const middle = (letters.length - 1) / 2;
+  return <View style={styles.pachiArchRow}>
+    {letters.map((letter, index) => {
+      const away = index - middle;
+      const spread = middle === 0 ? 0 : away / middle;
+      return <Text key={index} style={[styles.pachiArchText, {
+        transform: [{ rotate: `${spread * 15}deg` }, { translateY: Math.abs(spread) * Math.abs(spread) * 12 }],
+      }]}>{letter}</Text>;
+    })}
+  </View>;
 }
 
 /** 웹에서만 먹는 그러데이션. 앱에서는 위에 깔린 단색이 그대로 보입니다. */
@@ -2515,12 +2538,14 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
   const [machine, setMachine] = useState<PachiState>(createPachiState);
   const [reels, setReels] = useState<PachiReels>(['🍒', '👑', '7️⃣']);
   const [stopped, setStopped] = useState<[boolean, boolean, boolean]>([true, true, true]);
+  /** 멈춘 릴을 **그 자리에서** 적어 두는 곳. 연달아 멈출 때 서로 덮어쓰지 않게 합니다. */
+  const stoppedRef = useRef<[boolean, boolean, boolean]>([true, true, true]);
   const [spinning, setSpinning] = useState(false);
   const [shown, setShown] = useState<PachiSpin | null>(null);
   // 레버를 당길 때 결과를 이미 정해 둡니다. 정지 버튼은 정해진 것을 한 줄씩 보여 줄 뿐입니다.
   const pending = useRef<PachiSpin | null>(null);
-  /** 지금 붙어 있는 사진. 당첨될 때마다 다음 장으로 넘어갑니다. */
-  const [photoIndex, setPhotoIndex] = useState(0);
+  /** 지금 붙어 있는 사진. 당첨될 때마다 **아무 장으로나** 바뀝니다(순서대로 돌지 않습니다). */
+  const [photoIndex, setPhotoIndex] = useState(() => Math.floor(Math.random() * pachiPhotos.length));
   const photo = pachiPhotos[photoIndex % pachiPhotos.length];
   /** 당첨 순간 화면을 번쩍이게 하는 값입니다. */
   const flash = useRef(new Animated.Value(0)).current;
@@ -2580,31 +2605,45 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
     playCue('lever');
     if (!free && !onPlaceBet(selectedBet)) return;
     pending.current = spinPachi(machine);
+    stoppedRef.current = [false, false, false];
     setStopped([false, false, false]); setShown(null); setSpinning(true);
   };
 
   const stopReel = (index: number) => {
-    if (!spinning || stopped[index] || !pending.current) return;
+    /**
+     * ⚠️ **`stopped` 상태 대신 `stoppedRef`를 봅니다.**
+     * ALL 버튼은 0.2초 간격으로 이 함수를 세 번 부르는데, 세 번 다 **누를 때의 옛 `stopped`**를
+     * 보고 있었습니다. 그래서 1번이 `[참,거짓,거짓]`을, 2번이 `[거짓,참,거짓]`을 덮어써서
+     * 마지막 하나만 남고 **판이 안 끝났습니다.** ref는 부르는 즉시 바뀌어 서로 안 덮습니다.
+     */
+    if (!spinning || stoppedRef.current[index] || !pending.current) return;
     playCue('clunk');
     const result = pending.current;
-    const nextStopped: [boolean, boolean, boolean] = [...stopped] as [boolean, boolean, boolean]; nextStopped[index] = true;
-    const nextReels: PachiReels = [...reels] as PachiReels; nextReels[index] = result.reels[index];
-    setStopped(nextStopped); setReels(nextReels);
+    const nextStopped: [boolean, boolean, boolean] = [...stoppedRef.current] as [boolean, boolean, boolean]; nextStopped[index] = true;
+    stoppedRef.current = nextStopped;
+    setStopped(nextStopped);
+    setReels((current) => { const next = [...current] as PachiReels; next[index] = result.reels[index]; return next; });
     if (nextStopped.every(Boolean)) {
       setSpinning(false); setShown(result); setMachine(result.state); onSettle(selectedBet, result);
       if (result.outMedals > 0) {
-        // 당첨된 판에서만 사진이 바뀝니다.
-        setPhotoIndex((value) => (value + 1) % pachiPhotos.length);
+        // 당첨된 판에서만 사진이 바뀝니다. 같은 장이 다시 나오지 않게 한 칸 이상 건너뜁니다.
+        setPhotoIndex((value) => (value + 1 + Math.floor(Math.random() * (pachiPhotos.length - 1))) % pachiPhotos.length);
         flash.setValue(1);
         Animated.timing(flash, { toValue: 0, duration: 700, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
       }
     }
   };
 
+  /** 세 릴을 차례로 멈춥니다. 0.2초씩 벌려야 촤르륵 서는 것으로 보입니다. */
+  const stopAll = () => {
+    if (!spinning) return;
+    [0, 1, 2].forEach((index) => { setTimeout(() => stopReel(index), index * 200); });
+  };
+
   const payout = shown ? Math.round(selectedBet * shown.outMedals / pachiBetMedals) : 0;
   const ceilingRatio = Math.min(1, machine.games / pachiCeiling);
 
-  return <View style={styles.pachislotScreen}><ScreenHeader title="일본식 파치슬롯(Pachislot)" onBack={onBack} /><ScrollView contentContainerStyle={styles.pachiPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.pachislotBright}><ScreenHeader title="일본식 파치슬롯(Pachislot)" onBack={onBack} /><ScrollView contentContainerStyle={styles.pachiPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>PACHISLOT</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View>
 
     {/*
@@ -2613,7 +2652,16 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       상태 글(통상 · 게임 수 · 천장)은 실제 기계처럼 **조작대 옆 작은 창**에 있습니다.
     */}
     <View style={[styles.pachiCabinet, machine.phase === 'AT' && styles.pachiCabinetAt]}>
-      <PachiBulbs lit={twinkle} />
+      {/*
+        간판. **기계 몸통의 맨 윗칸**입니다 — 글자만 떠 있으면 기계에 안 붙은 것처럼 보입니다.
+        실제 기계도 릴 위에 간판 판이 한 장 더 있습니다.
+      */}
+      <View style={[styles.pachiSign, webGradient('linear-gradient(180deg, #3A2145 0%, #1E1128 55%, #120A18 100%)')]}>
+        <Image source={pachiDecoImage} style={styles.pachiSignDeco} resizeMode="contain" />
+        <PachiArch text={`${photo.name} 슬롯`} />
+        <Image source={pachiDecoImage} style={styles.pachiSignDeco} resizeMode="contain" />
+      </View>
+      <PachiBulbs count={22} lit={twinkle} />
       {/* 위 화면. 실제 기계의 연출용 LCD 자리입니다. */}
       <View style={styles.pachiTopScreen}>
         {/*
@@ -2630,8 +2678,7 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
         <PachiSparkle left={54} top={132} size={18} delay={1.2} twinkle={twinkle} />
         <PachiSparkle left={310} top={86} size={15} delay={1.6} twinkle={twinkle} />
         <Animated.View pointerEvents="none" style={[styles.pachiFlash, { opacity: flash }]} />
-        {/* 위에는 **그룹 이름만** 씁니다. 게임 이름이나 안내 글은 넣지 않습니다. */}
-        <View style={styles.pachiTopCaption}><Text style={styles.pachiTopTitle}>{photo.name}</Text></View>
+        {/* ⚠️ 이름은 **기계 바깥 간판**에 있습니다. 여기에는 다시 쓰지 마세요. */}
         {payout > 0 ? <View style={styles.pachiWinTag}><Text style={styles.pachiWinTagText}>+{payout.toLocaleString()} WC · {shown?.outMedals}매</Text></View> : null}
         {free && <View style={styles.pachiReplayTag}><Text style={styles.pachiWinTagText}>리플레이</Text></View>}
         {shown?.byCeiling && <View style={styles.pachiCeilingTag}><Text style={styles.pachiWinTagText}>천장 도달</Text></View>}
@@ -2653,11 +2700,16 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
               <Animated.View style={[styles.pachiReelStrip, {
                 transform: [{ translateY: reelShift[index].interpolate({ inputRange: [0, 1], outputRange: [0, pachiCellHeight] }) }],
               }]}>
-                {/* 맨 위 한 칸은 창 밖에 있습니다. 띠가 내려오면 그 칸이 창 안으로 들어옵니다. */}
-                <PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={34} dim />
-                <PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={34} dim />
-                <PachiSymbol symbol={symbol} size={48} win={stopped[index] && Boolean(shown?.outMedals)} />
-                <PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={34} dim />
+                {/*
+                  ⚠️ **칸 높이를 못 박습니다.** 심볼 크기가 34·34·48·34로 서로 달라서 그냥 쌓으면
+                  가운데 심볼이 창 가운데보다 **34쯤 위로** 올라가 있었습니다.
+                  칸을 다 50으로 두면 세 번째 칸이 정확히 당첨 줄에 옵니다.
+                  맨 위 한 칸은 창 밖에 있다가, 띠가 내려오면 창 안으로 들어옵니다.
+                */}
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={34} dim /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={34} dim /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={symbol} size={46} win={stopped[index] && Boolean(shown?.outMedals)} /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={34} dim /></View>
               </Animated.View>
             </View>
           ))}
@@ -2679,9 +2731,17 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
         </Pressable>
         <View style={styles.pachiStopRow}>{[0, 1, 2].map((index) => (
           <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={[styles.pachiStopButton, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
-            <View style={styles.pachiStopInner}><Text style={styles.pachiStopText}>{index + 1}</Text></View>
+            {/* 보내 주신 실물 버튼 사진입니다. 흰 배경은 지웠습니다. */}
+            <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
+            <Text style={styles.pachiStopText}>{index + 1}</Text>
           </Pressable>
-        ))}</View>
+        ))}
+        {/* 하나씩 누르기 귀찮을 때. 누르면 1·2·3이 차례로 촤르륵 섭니다. */}
+        <Pressable disabled={!spinning} onPress={stopAll} style={[styles.pachiStopButton, styles.pachiAllButton, !spinning && styles.pachiStopButtonOff]}>
+          <Image source={pachiStopButtonImage} style={styles.pachiAllImage} resizeMode="contain" />
+          <Text style={styles.pachiAllText}>ALL</Text>
+        </Pressable>
+      </View>
         <View style={styles.pachiMeter}>
           <Text style={styles.pachiMeterName}>{machine.phase}</Text>
           <Text style={styles.pachiMeterValue}>{machine.phase === 'AT' ? `남은 ${machine.atLeft}` : machine.phase === '찬스존' ? `남은 ${machine.zoneLeft}` : `${machine.games}G`}</Text>
@@ -2694,9 +2754,9 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       <View style={styles.pachiArtPanel}>
         <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
         <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)')]} />
-        <Text style={styles.pachiArtText}>{photo.name}</Text>
+        {/* ⚠️ 이름은 기계 바깥 간판에 있습니다. 여기서는 안 씁니다. */}
       </View>
-      <PachiBulbs lit={twinkle} />
+      <PachiBulbs count={22} lit={twinkle} />
       {/* 동전 받이. 안쪽이 어두워 파인 것처럼 보입니다. */}
       <View style={[styles.pachiTray, webGradient('linear-gradient(180deg, #0A0C11 0%, #1B1F27 40%, #0A0C11 100%)')]}>
         <View style={styles.pachiTrayHole} />
@@ -3136,11 +3196,18 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
       {pending&&<RevealButton opened={reveal.opened} total={3} onPress={openNextRow} label="앞줄부터 열기"/>}
       {!result&&!pending&&<>
         <Text style={styles.sectionTitle}>남은 카드 {remaining.length}장 — 누르면 {chineseRowMeta.find(row=>row.key===target)!.name}에 놓입니다</Text>
-        {/* 손패는 한 줄에 다 들어가게 겹칩니다. 열세 장을 나란히 놓으면 두 줄로 접힙니다. */}
-        <View style={styles.chineseHandRow}>{remaining.map((card,index)=>{
-          const step=handStep(remaining.length,rowSize);
-          return <Pressable key={card.id} style={index?{marginLeft:step-cardSizeBox[rowSize].width}:null} onPress={()=>place(card.id)}><PlayingCard card={card} size={rowSize}/></Pressable>;
-        })}</View>
+        {/*
+          남은 카드는 **두 줄**입니다.
+          ⚠️ 한 줄에 열세 장을 넣으면 많이 겹쳐서 무슨 카드인지 안 보입니다(빅투와 같은 문제).
+          반씩 나누면 겹치는 정도가 반으로 줄어 숫자가 읽힙니다.
+        */}
+        {(()=>{const half=Math.ceil(remaining.length/2);
+          return [remaining.slice(0,half),remaining.slice(half)].map((row,rowIndex)=>row.length===0?null:
+            <View key={rowIndex} style={[styles.chineseHandRow,rowIndex?styles.bigTwoHandRowSecond:null]}>{row.map((card,index)=>{
+              const step=handStep(row.length,rowSize);
+              return <Pressable key={card.id} style={index?{marginLeft:step-cardSizeBox[rowSize].width}:null} onPress={()=>place(card.id)}><PlayingCard card={card} size={rowSize}/></Pressable>;
+            })}</View>);
+        })()}
         {mine?.foul&&<Text style={styles.paiGowWarning}>파울입니다. 뒷줄이 가운뎃줄보다, 가운뎃줄이 앞줄보다 세도록 다시 놓으세요.</Text>}
         <View style={styles.pokerActionRow}>
           <Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable>
@@ -6605,11 +6672,11 @@ function BlackjackGameScreen(props: {
   const handFit = useCardFit({
     rows: splitHand ? 3 : 2,
     /**
-     * 판 높이를 520으로 못 박았으니 카드 줄에 남는 자리도 정해집니다.
-     * 판 안에서 카드 말고 드는 자리가 322(테두리줄 65 · 이름 24×2 · 규칙 16 · 손님 85 · 내 칩 46 · 여백 38)라
-     * 두 줄이 나눠 쓸 자리는 198, 한 줄에 99입니다. 그래서 88짜리(mid)까지만 들어갑니다.
+     * 판 높이를 못 박았으니 카드 줄에 남는 자리도 정해집니다.
+     * ⚠️ 2026-09-02에 한 화면에 다 안 들어온다고 하셔서 **한 단 더 줄였습니다.**
+     * spare를 키울수록 카드가 작아집니다 — 610이면 70짜리(small)까지 내려옵니다.
      */
-    spare: splitHand ? 560 : 550,
+    spare: splitHand ? 620 : 610,
     across: Math.max(2, player.length, dealer.length, splitHand?.length ?? 0),
     // 재는 자리는 375인데 반원 테이블 안쪽은 301입니다(테두리 18 · 좌우 여백 28 · 판 여백 28).
     sideSpare: 74,
@@ -6625,6 +6692,13 @@ function BlackjackGameScreen(props: {
   const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
   const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 10, gap: handFit.crowded ? 0 : 6 }];
 
+  /**
+   * 딜러가 빛나야 하는지. **딜러가 그 판에서 모두를 이겼을 때만** 빛냅니다.
+   * ⚠️ 전에는 내가 지면 무조건 딜러가 빛났습니다. 손님이 이긴 판에서도 딜러가 빛나서
+   * 누가 이겼는지 거꾸로 보였습니다.
+   */
+  const dealerSwept = phase === 'result' && result === 'loss'
+    && guestHands.every((hand) => { const outcome = guestResult(hand, dealer); return outcome === 'loss' || outcome === 'push'; });
   const net = result ? netForResult(totalBet, result) : 0;
   const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
   // 딜러 카드는 앞장 한 장만 보이다가, 승부가 되면 뒷장과 뽑는 카드가 저절로 한 장씩 열립니다.
@@ -6671,14 +6745,18 @@ function BlackjackGameScreen(props: {
           ⚠️ 판 높이를 못 박습니다. 전에는 끝나면 결과 칸이 생기면서 판이 90쯤 **눌려**
           아래(내 자리 칩)가 잘렸습니다. 판은 언제나 같은 자리·같은 크기여야 합니다.
         */}
-        <DealerTable height={520}>
+        <DealerTable height={470}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
-            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(result==='loss'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
+            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
           {/* 같은 딜러를 상대하는 손님들. 한 줄만 쓰고 승·패는 얹기만 합니다. */}
+          {/*
+            손님은 **왼쪽·오른쪽 끝**에 붙입니다. 가운데는 딜러와 내 카드가 지나가는 길입니다.
+            이긴 손님은 금색으로 빛납니다 — 누가 이겼는지 한눈에 보여야 합니다.
+          */}
           <View style={styles.tableGuestRow}>{initial.seated.map((guest, seat) => {
             const hand = guestHands[seat] ?? [];
             // 아직 깔리는 중이면 놓인 만큼만 보입니다.
@@ -6690,7 +6768,7 @@ function BlackjackGameScreen(props: {
             return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
               {/* 손님 패를 실제로 보여 줍니다 — 10이 몇 장 빠졌는지 세려면 패가 보여야 합니다. */}
               <View style={styles.tableGuestCards}>{shown.map((card, index) => (
-                <View key={card.id} style={index ? { marginLeft: -22 } : null}><PlayingCard card={card} size="mini" /></View>
+                <View key={card.id} style={index ? { marginLeft: -26 } : null}><PlayingCard card={card} size="mini" /></View>
               ))}</View>
               <Text style={styles.tableGuestName}>{guest.name} · {handValue(shown)}</Text>
               {mark ? <Text style={styles.tableGuestMark}>{mark}</Text> : null}
@@ -7348,7 +7426,7 @@ function BaccaratGameScreen({
           **뱅커 카드가 판 밖으로 잘려 안 보였습니다.** 재서 넣은 값입니다 —
           테두리줄 65 · 이름 24×2 · 카드 80×2 · 규칙 16 · 안내 22 · 여백 38 = 349.
         */}
-        <DealerTable height={352}>
+        <DealerTable height={330}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>PLAYER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
           <View style={[styles.dealerCardRow, styles.baccaratCardRow]}>{/* ⚠️ **깔린 만큼만** 그립니다. 덮인 카드를 미리 놓아 두면 몇 장짜리 판인지가
               그 자리에서 새어 나갑니다 — 세 번째 장이 올지 말지가 바카라의 재미입니다. */}
@@ -7357,7 +7435,10 @@ function BaccaratGameScreen({
           <Text style={styles.dealerFeltRule}>PLAYER 1 TO 1 · BANKER 0.95 TO 1 · TIE 8 TO 1</Text>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>BANKER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
           <View style={[styles.dealerCardRow, styles.baccaratCardRow]}>{round ? round.banker.slice(0, openCount.banker).map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} size="small" emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
-          <View style={styles.baccaratSpotHint}><Text style={styles.dealerFeltRule}>{round ? '' : '아래에서 걸 자리를 고르세요'}</Text></View>
+          {/*
+            ⚠️ 안내 글을 여기 두면 **반원 테두리에 잘립니다**(2026-09-02에 실제로 잘렸습니다).
+            베팅 자리가 바로 아래 보이니 굳이 판 안에 적을 것이 없습니다.
+          */}
         </DealerTable>
 
         {/*
@@ -8428,7 +8509,7 @@ const styles = StyleSheet.create({
   teenPattiActionSlot: { width: '100%', height: 104, justifyContent: 'center' },
   fixedTableArea: { flex: 1, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10, justifyContent: 'space-between' },
   // 판이 눌리지 않게 아래 칸 높이도 못 박습니다(히트/스탠드 → 결과로 바뀌어도 그대로).
-  fixedActionArea: { width: '100%', height: 190, justifyContent: 'flex-start' },
+  fixedActionArea: { width: '100%', height: 180, justifyContent: 'flex-start' },
   gameActionsTight: { marginTop: 10 },
   gameActionButtonTight: { minHeight: 56 },
   stakeButtonTight: { minHeight: 42, marginTop: 8 },
@@ -9188,7 +9269,7 @@ const styles = StyleSheet.create({
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
 
   // 위 화면 — 연출용 LCD
-  pachiTopScreen: { height: 250, backgroundColor: '#05060A', overflow: 'hidden' },
+  pachiTopScreen: { height: 208, backgroundColor: '#05060A', overflow: 'hidden' },
   pachiTopPhoto: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   // 뒤에 까는 바탕. 흐릿하게 어두워야 앞의 사진이 떠 보입니다.
   pachiTopBackdrop: { opacity: 0.45 },
@@ -9196,6 +9277,12 @@ const styles = StyleSheet.create({
   // 유리에 비스듬히 드는 빛. 얹기만 해서 자리를 안 먹습니다.
   pachiGlassStreak: { position: 'absolute', left: -60, top: -40, width: 90, height: 320, backgroundColor: 'rgba(255,255,255,0.09)', transform: [{ rotate: '18deg' }] },
   pachiFlash: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#FFF7DA' },
+  // 간판 — 기계 바깥 위
+  // 기계 맨 윗칸. 아래로 갈수록 어두워져 몸통과 이어집니다.
+  pachiSign: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, backgroundColor: '#241636', borderBottomWidth: 1, borderBottomColor: '#0D0714' },
+  pachiSignDeco: { width: 42, height: 42 },
+  pachiArchRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 6 },
+  pachiArchText: { color: '#FFE9A6', fontSize: 21, fontWeight: '900', letterSpacing: 1, textShadowColor: '#C9971F', textShadowRadius: 12 },
   pachiTopCaption: { position: 'absolute', left: 12, bottom: 10, right: 12 },
   pachiTopTitle: { color: '#FFE9A6', fontSize: 24, fontWeight: '900', letterSpacing: 2, textShadowColor: '#000', textShadowRadius: 8 },
   pachiTopLine: { color: '#F2F4FF', fontSize: 12, fontWeight: '800', marginTop: 2, textShadowColor: '#000', textShadowRadius: 6 },
@@ -9218,6 +9305,8 @@ const styles = StyleSheet.create({
   pachiReel: { flex: 1, alignItems: 'center', overflow: 'hidden' },
   // 창보다 한 칸 위에서 시작하는 띠. 이 띠가 통째로 내려옵니다.
   pachiReelStrip: { alignItems: 'center', marginTop: -pachiCellHeight },
+  // 칸 하나. 심볼이 커도 작아도 이 높이는 안 바뀝니다.
+  pachiCell: { height: pachiCellHeight, alignItems: 'center', justifyContent: 'center' },
   pachiReelDivider: { borderRightWidth: 1, borderRightColor: 'rgba(0,0,0,0.13)' },
   pachiSymbol: { fontSize: 40, lineHeight: 48 },
   // 위아래 줄은 장식이라 흐리게 둡니다. 가운데 줄이 당첨 줄입니다.
@@ -9230,7 +9319,7 @@ const styles = StyleSheet.create({
 
   // 조작대 — 레버 · 정지 셋 · 작은 상태창
   pachiDeck: { height: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
-  pachiLeverBase: { width: 46, height: 70, alignItems: 'center', justifyContent: 'flex-end' },
+  pachiLeverBase: { width: 38, height: 70, alignItems: 'center', justifyContent: 'flex-end' },
   // 조작대에 박힌 받침. 아래가 넓고 어둡습니다.
   pachiLeverMount: { position: 'absolute', bottom: 0, width: 34, height: 13, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: '#31373F', borderTopWidth: 1, borderTopColor: '#5A616D' },
   pachiLeverStick: { position: 'absolute', bottom: 10, width: 7, height: 34, borderRadius: 4, backgroundColor: '#A8B0BE', borderRightWidth: 2, borderRightColor: '#6C7381' },
@@ -9238,20 +9327,26 @@ const styles = StyleSheet.create({
   // 공에 드는 빛 한 점. 이것 하나로 둥글어 보입니다.
   pachiLeverGloss: { position: 'absolute', left: 5, top: 4, width: 8, height: 6, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.6)' },
   // 기계에 박힌 전구 줄
-  pachiBulbRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 14, backgroundColor: '#0A0C11', borderTopWidth: 1, borderTopColor: '#20242C', borderBottomWidth: 1, borderBottomColor: '#20242C' },
+  pachiBulbRow: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', height: 10, backgroundColor: '#0A0C11', borderTopWidth: 1, borderTopColor: '#20242C', borderBottomWidth: 1, borderBottomColor: '#20242C' },
   // 전구는 빛 번짐(shadow)까지 줘야 켜져 보입니다. 자리는 안 늘어납니다.
-  pachiBulb: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#7FD8FF', shadowColor: '#7FD8FF', shadowOpacity: 0.95, shadowRadius: 6 },
+  // 굵으면 촌스러워집니다. 작고 빛만 세게.
+  pachiBulb: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#7FD8FF', shadowColor: '#7FD8FF', shadowOpacity: 1, shadowRadius: 7 },
   pachiBulbGold: { backgroundColor: '#FFD98A', shadowColor: '#FFD98A' },
   pachiBulbPink: { backgroundColor: '#FF9ED2', shadowColor: '#FF9ED2' },
   pachiSparkle: { position: 'absolute', color: '#FFF6D8', fontWeight: '900', textShadowColor: '#FFD98A', textShadowRadius: 10 },
-  pachiStopRow: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 12 },
+  pachiStopRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   // 실물 버튼처럼 둥글고, 위가 밝고 아래가 어둡습니다.
-  pachiStopButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1C2028', borderWidth: 2, borderTopColor: '#7C8494', borderLeftColor: '#5C6472', borderRightColor: '#333A44', borderBottomColor: '#20252D', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 5, shadowOffset: { width: 0, height: 3 } },
-  pachiStopInner: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: '#3FA9DE', borderWidth: 1, borderTopColor: '#B7E6FF', borderBottomColor: '#1B6E96', shadowColor: '#8FE3FF', shadowOpacity: 0.7, shadowRadius: 7 },
-  pachiStopButtonOff: { opacity: 0.42 },
-  pachiStopText: { color: '#08222E', fontSize: 15, fontWeight: '900' },
+  pachiStopButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  pachiStopImage: { position: 'absolute', width: 48, height: 48 },
+  pachiStopButtonOff: { opacity: 0.4 },
+  pachiStopText: { color: '#04361F', fontSize: 15, fontWeight: '900', marginTop: -4, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
+  // 한 번에 멈추는 버튼. 누르면 1·2·3이 차례로 촤르륵 섭니다.
+  // 3번 옆에 붙는 ALL. 같은 버튼 그림을 조금 작게 씁니다.
+  pachiAllButton: { width: 44, height: 44 },
+  pachiAllImage: { position: 'absolute', width: 44, height: 44 },
+  pachiAllText: { color: '#04361F', fontSize: 11, fontWeight: '900', marginTop: -3, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
   // 조작대 옆 작은 창. 예전에는 이 글이 화면 맨 위에 큰 판으로 있었습니다.
-  pachiMeter: { width: 92, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 7, backgroundColor: '#07110C', borderWidth: 1, borderColor: '#2F6B52', gap: 2 },
+  pachiMeter: { width: 76, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 7, backgroundColor: '#07110C', borderWidth: 1, borderColor: '#2F6B52', gap: 2 },
   pachiMeterName: { color: '#7BE0A8', fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   pachiMeterValue: { color: '#D6FFE8', fontSize: 15, fontWeight: '900' },
   pachiMeterSmall: { color: '#6FA88A', fontSize: 9, fontWeight: '800' },
@@ -9263,6 +9358,12 @@ const styles = StyleSheet.create({
   // 동전이 나오는 구멍
   pachiTrayHole: { width: 92, height: 8, borderRadius: 4, backgroundColor: '#05070A', borderTopWidth: 1, borderTopColor: '#252A33' },
 
+  /**
+   * ⚠️ 이 화면만 **앱 기본 바탕보다 밝습니다.**
+   * 기본 바탕(#150E16)에 검은 기계를 놓으니 화면 전체가 어두워 아무것도 안 보였습니다.
+   * 기계는 그대로 어둡게 두고 **뒤 바탕을 올렸습니다.**
+   */
+  pachislotBright: { flex: 1, backgroundColor: '#2A2233' },
   pachislotScreen: { flex: 1, backgroundColor: colors.bg },
   pachislotMachine: { backgroundColor: '#17305B', borderColor: '#D74C58' },
   stopButtonRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
@@ -9586,12 +9687,13 @@ const styles = StyleSheet.create({
   baccaratDealing: { opacity: 0.7 },
   baccaratGuestRow: { flexDirection: 'row', gap: 5, marginTop: 4, justifyContent: 'center' },
   // 블랙잭 손님 줄. 자리를 한 줄만 쓰고 승·패는 얹기만 합니다.
-  tableGuestRow: { flexDirection: 'row', gap: 6, marginVertical: 2, justifyContent: 'center' },
-  tableGuest: { minWidth: 78, paddingVertical: 3, paddingHorizontal: 6, borderRadius: 9, alignItems: 'center', gap: 2, backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
+  tableGuestRow: { flexDirection: 'row', marginVertical: 2, justifyContent: 'space-between', width: '100%' },
+  tableGuest: { minWidth: 70, paddingVertical: 2, paddingHorizontal: 5, borderRadius: 9, alignItems: 'center', gap: 1, backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
   tableGuestCards: { flexDirection: 'row', alignItems: 'center' },
   // 지금 카드를 받는 손님. 차례가 눈에 보여야 순서대로 도는 것이 읽힙니다.
   tableGuestTurn: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.6)' },
-  tableGuestWon: { borderColor: colors.gold },
+  // 이긴 손님은 금색으로 빛납니다.
+  tableGuestWon: { borderColor: colors.gold, backgroundColor: 'rgba(60,46,10,0.7)', shadowColor: colors.gold, shadowOpacity: 0.9, shadowRadius: 10 },
   tableGuestLost: { opacity: 0.45 },
   tableGuestName: { color: '#9FC4B4', fontSize: 9, fontWeight: '800' },
   tableGuestValue: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
