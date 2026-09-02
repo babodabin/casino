@@ -2235,7 +2235,7 @@ function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettl
     : offer.kind === 'slot' ? '조커를 한 장 더 들 수 있습니다'
     : `그 족보의 칩과 배수가 한 단 오릅니다`;
 
-  return <View style={styles.jokerScreen}><ScreenHeader title="발라트로 하드" onBack={onBack} /><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.jokerScreen}><ScreenHeader title="발라트로 하드" onBack={onBack} /><ScrollView contentContainerStyle={styles.balatroPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}>
       <View><Text style={styles.eyebrow}>{run ? `${blindOf(run)} 블라인드 · 목표 ${targetOf(run).toLocaleString()}점` : 'BALATRO HARD'}</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View>
       <View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>건 돈 {run ? Math.round(selectedBet * balatroStake(run)).toLocaleString() : selectedBet.toLocaleString()} WC</Text></View>
@@ -2310,7 +2310,7 @@ function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettl
       </>}
 
       {/* 족보 레벨. 올라간 것만 적습니다. */}
-      <Text style={styles.disclaimer}>{(Object.keys(run.levels) as (keyof typeof run.levels)[])
+      <Text style={styles.balatroLevels}>{(Object.keys(run.levels) as (keyof typeof run.levels)[])
         .filter((type) => run.levels[type] > 1)
         .map((type) => `${type} LV.${run.levels[type]} (${leveledBase(type, run.levels).chips}칩 ×${leveledBase(type, run.levels).mult})`)
         .join(' · ') || '같은 족보를 낼수록 그 족보가 세집니다'}</Text>
@@ -3337,15 +3337,17 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
   const [solved,setSolved]=useState<string[]>([]);
 
   const nextQuestion=()=>{
-    const done=question?[...solved,question.id]:solved;
-    setSolved(done);setSide(null);setOutcome(null);
-    setQuestion(pickPredictQuestion(predictQuestions,group,done));
+    setSide(null);setOutcome(null);
+    // 푼 문제는 답한 순간에 이미 담겼으니, 그것만 빼고 새 문제를 고릅니다.
+    setQuestion(pickPredictQuestion(predictQuestions,group,solved));
   };
   const answer=(pick:PredictSide)=>{
     if(!question||outcome||selectedBet>coins)return;
     if(!onPlaceBet(selectedBet))return;
     const settled=settlePredict(question,pick);
     setSide(pick);setOutcome(settled);
+    // ⚠️ 전에는 '다음 문제'를 눌러야 세어서, 답을 맞히고도 '푼 문제'가 한 판씩 늦게 올랐습니다.
+    setSolved((done)=>done.includes(question.id)?done:[...done,question.id]);
     onSettle(selectedBet,settled.multiplier,`${group} · ${question.title} · ${pick==='yes'?'예':'아니오'} 선택 · 정답 ${question.result==='yes'?'예':'아니오'}`);
   };
 
@@ -8700,8 +8702,8 @@ const styles = StyleSheet.create({
   // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
   // 화려한 실내 사진은 입구에만 두고, 게임 화면에는 재질만 가져옵니다.
   // 판 바깥(잔액·버튼·규칙)은 어둡게 두어야 눈이 판으로 갑니다.
-  feltTable: { width: '100%', padding: 7, borderRadius: 22, backgroundColor: '#6B3E20', borderWidth: 1, borderColor: '#8A5730' },
-  feltSurface: { borderRadius: 16, backgroundColor: '#0A4630', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 13, gap: 10, overflow: 'hidden' },
+  feltTable: { width: '100%', padding: 5, borderRadius: 22, backgroundColor: '#6B3E20', borderWidth: 1, borderColor: '#8A5730' },
+  feltSurface: { borderRadius: 16, backgroundColor: '#0A4630', borderWidth: 1, borderColor: 'rgba(209,166,60,0.38)', padding: 10, gap: 7, overflow: 'hidden' },
   // 테이블 위에 조명이 떨어진 것처럼 가운데를 살짝 밝힙니다.
   feltGlow: { position: 'absolute', top: '-45%', left: '8%', right: '8%', height: '110%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.055)' },
   feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
@@ -8712,14 +8714,14 @@ const styles = StyleSheet.create({
   balatroPickName: { color: colors.goldLight, fontSize: 18, fontWeight: '900' },
   balatroPickText: { color: colors.muted, fontSize: 12, lineHeight: 19 },
   // 블라인드 세 단
-  blindRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  blindStep: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 12, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
+  blindRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  blindStep: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 12, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border },
   blindStepNow: { borderColor: colors.gold, backgroundColor: colors.panel2 },
   blindStepDone: { opacity: 0.5 },
   blindStepName: { color: colors.muted, fontSize: 12, fontWeight: '900' },
   blindStepNameNow: { color: colors.goldLight },
   blindStepTarget: { color: colors.muted, fontSize: 10, marginTop: 2 },
-  bossBox: { padding: 12, borderRadius: 12, marginBottom: 10, backgroundColor: 'rgba(120,20,40,0.35)', borderWidth: 1, borderColor: '#8E2B44' },
+  bossBox: { padding: 8, borderRadius: 12, marginBottom: 4, backgroundColor: 'rgba(120,20,40,0.35)', borderWidth: 1, borderColor: '#8E2B44' },
   bossName: { color: '#FFC7B0', fontSize: 14, fontWeight: '900' },
   bossText: { color: '#F0D6CC', fontSize: 12, lineHeight: 18, marginTop: 3 },
   // 상점
@@ -8732,7 +8734,7 @@ const styles = StyleSheet.create({
   shopItemText: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   shopItemCost: { color: colors.goldLight, fontSize: 14, fontWeight: '900' },
   // 칩 × 배수를 눈에 보이게
-  mathRow: { alignItems: 'center', gap: 6, marginTop: 8 },
+  mathRow: { alignItems: 'center', gap: 3, marginTop: 2 },
   mathHand: { color: colors.goldLight, fontSize: 13, fontWeight: '900' },
   mathBoxes: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   mathChips: { minWidth: 74, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 10, alignItems: 'center', backgroundColor: '#123A5E', borderWidth: 1, borderColor: '#2E6E9E' },
@@ -8741,17 +8743,26 @@ const styles = StyleSheet.create({
   mathTimes: { color: colors.muted, fontSize: 15, fontWeight: '900' },
   mathTotal: { color: colors.goldLight, fontSize: 21, fontWeight: '900' },
   // 세 버튼이 자리를 똑같이 나눠 가집니다. 안 그러면 내기가 다 먹어 글자가 세로로 눕습니다.
-  balatroActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 4 },
+  balatroActionRow: { flexDirection: 'row', alignItems: 'stretch', gap: 8, marginTop: 2 },
+  /*
+   * 발라트로 하드 전용 바닥 여백입니다.
+   * ⚠️ `sicboPage`(padding 18 · 아래 46)를 쓰면 **보스 블라인드에서 87px이 넘쳐** 스크롤이 생겼습니다.
+   * 이 게임은 위에서 아래로 한눈에 봐야 해서 스크롤이 생기면 안 됩니다.
+   * ⚠️ 여기 숫자를 늘리면 다시 넘칩니다. 넣을 것이 생기면 다른 곳을 줄이세요.
+   */
+  balatroPage: { padding: 14, paddingBottom: 14 },
+  // 족보 레벨 줄. 공용 `disclaimer`의 위 여백 18은 이 화면에 너무 큽니다.
+  balatroLevels: { color: colors.muted, fontSize: 12, marginTop: 6 },
   balatroAction: { flex: 1, minWidth: 0 },
   jokerCardEmpty: { borderStyle: 'dashed', opacity: 0.6 },
   jokerScoreRow: { width: '100%', flexDirection: 'row', gap: 8 },
-  jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 10, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
+  jokerScoreBox: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 8, borderRadius: 11, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   jokerScoreLabel: { color: '#A08FA0', fontSize: 11, fontWeight: '800' },
   jokerScoreValue: { color: '#FFFFFF', fontSize: 19, fontWeight: '900', fontVariant: ['tabular-nums'] },
   jokerBar: { width: '100%', height: 8, borderRadius: 4, overflow: 'hidden', backgroundColor: '#1B2434' },
   jokerBarFill: { height: '100%', backgroundColor: colors.gold },
   jokerRow: { width: '100%', flexDirection: 'row', gap: 7 },
-  jokerCard: { flex: 1, gap: 3, padding: 9, borderRadius: 11, backgroundColor: 'rgba(42,34,14,0.6)', borderWidth: 1, borderColor: colors.gold },
+  jokerCard: { flex: 1, gap: 3, padding: 7, borderRadius: 11, backgroundColor: 'rgba(42,34,14,0.6)', borderWidth: 1, borderColor: colors.gold },
   jokerName: { color: colors.gold, fontSize: 13, fontWeight: '900' },
   jokerEffect: { color: '#C3CBD8', fontSize: 10, fontWeight: '700', lineHeight: 14 },
   // 펠트 위에 올라가는 글자라 금색을 조금 밝게 씁니다.
@@ -9227,7 +9238,9 @@ const styles = StyleSheet.create({
   pokerInlineResult: { color: '#FFF4C7', fontSize: 12, fontWeight: '800', textAlign: 'center', paddingHorizontal: 10, paddingVertical: 7, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.35)' },
   pokerBoardCard: { alignItems: 'center' },
   pokerCommonBadge: { position: 'absolute', bottom: -15, color: '#E8EDF6', fontSize: 9, fontWeight: '900', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 7, backgroundColor: '#33455C' },
-  holdemActions: { flexDirection: 'row', gap: 8 },
+  // ⚠️ 위 여백 18은 `fullWidthButton`과 **똑같이** 맞춘 값입니다.
+  // 판이 이 줄과 전체 폭 버튼 사이를 오갈 때, 여백이 다르면 그만큼 판 높이가 덜컹입니다.
+  holdemActions: { flexDirection: 'row', gap: 8, marginTop: 18 },
   holdemAction: { flex: 1, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.gold },
   holdemFold: { flex: 0.7, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: '#762A31' },
   holdemActionText: { color: '#FFF', fontWeight: '900' },
