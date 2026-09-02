@@ -873,7 +873,7 @@ function CasinoApp() {
     // 직접 처리하거나 각 화면의 스크롤 여백이 처리합니다.
     <View style={[styles.app, { paddingTop: Math.max(0, insets.top - topInsetTrim) }]}>
       <StatusBar style="light" />
-      {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} onOpenSettings={() => setTab('설정')} />}
+      {appScreen === 'tabs' && <Header coins={coins} totalPlays={totalPlays} />}
       <View style={styles.screen}>
         {appScreen === 'categoryCatalog' && (
           <CategoryCatalogScreen
@@ -1050,6 +1050,7 @@ function CasinoApp() {
             coins={coins}
             difficulty={difficulty}
             selectedBet={selectedBet}
+            motion={motion}
             onBack={() => setAppScreen('baccaratSetup')}
             onBetChange={setSelectedBet}
             onPlaceBet={placeBet}
@@ -1202,7 +1203,7 @@ function CasinoApp() {
  * 이름과 레벨은 여기서 뺐습니다 — 레벨은 기록 화면 맨 위에 크게 있고,
  * 이 줄은 세 덩이만 두어야 가운데 알약이 진짜 가운데에 옵니다.
  */
-function Header({ coins, totalPlays, onOpenSettings }: { coins: number; totalPlays: number; onOpenSettings: () => void }) {
+function Header({ coins, totalPlays }: { coins: number; totalPlays: number }) {
   const { level } = levelFromPlays(totalPlays);
   return (
     <View style={styles.header}>
@@ -1211,15 +1212,15 @@ function Header({ coins, totalPlays, onOpenSettings }: { coins: number; totalPla
         {/* 레벨은 원 위에 얹습니다. 자리를 안 먹고, 숫자만 덩그러니 있는 것보다 뜻이 분명합니다. */}
         <View style={styles.avatarLevel}><Text style={styles.avatarLevelText}>{level}</Text></View>
       </View>
-      <View style={styles.headerMiddle}>
-        <View style={styles.walletPill}>
-          <View style={styles.walletCoin}><Text style={styles.walletCoinMark}>₩</Text></View>
-          <Text style={styles.walletText}>{coins.toLocaleString()}</Text>
-        </View>
+      {/*
+        ⚠️ 오른쪽에 있던 설정(⚙)은 뺐습니다. 아래 바에 설정이 이미 있어 **같은 것이 둘**이었습니다.
+        비운 자리만큼 코인을 오른쪽으로 붙입니다.
+      */}
+      <View style={styles.headerMiddle} />
+      <View style={styles.walletPill}>
+        <View style={styles.walletCoin}><Text style={styles.walletCoinMark}>₩</Text></View>
+        <Text style={styles.walletText}>{coins.toLocaleString()}</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="설정" style={styles.headerRound} onPress={onOpenSettings}>
-        <Text style={styles.headerRoundIcon}>⚙</Text>
-      </Pressable>
     </View>
   );
 }
@@ -3116,6 +3117,10 @@ const fishName=(field:RaceFish[],id:number)=>{const fish=field.find(item=>item.i
 
 function YutStickView({face,tumbling}:{face:YutFace;tumbling:boolean}){
   return <View style={[styles.yutStick,face==='배'?styles.yutStickFlat:styles.yutStickRound,tumbling&&styles.yutStickTumbling]}>
+    {/* 반달로 깎은 나무처럼 보이게 하는 두 겹. 왼쪽이 밝고 오른쪽이 어둡습니다.
+        배(평평한 면)는 결이 옅고, 등(둥근 면)은 가운데가 볼록해 보이게 더 셉니다. */}
+    <View pointerEvents="none" style={[styles.yutStickShine,face==='등'&&styles.yutStickShineRound]} />
+    <View pointerEvents="none" style={[styles.yutStickShade,face==='등'&&styles.yutStickShadeRound]} />
     {face==='배'&&<View style={styles.yutStickMark}/>}
     <Text style={[styles.yutStickFaceText,face==='배'?styles.yutStickFaceFlatText:styles.yutStickFaceRoundText]}>{face}</Text>
   </View>;
@@ -6220,7 +6225,13 @@ function CrapsSetupScreen(props: { coins: number; difficulty: string; selectedBe
  */
 function Die({ value, rolling=false, index=0, size=88 }: { value: number; rolling?:boolean; index?:number; size?:number }) {
   const lift = Math.round(size * 0.08);
-  return <View style={[styles.die,{width:size,height:size,borderRadius:Math.round(size*0.19)},rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-lift:lift):0},{scale:rolling?1.08:1}]}]}><Text style={[styles.dieText,{fontSize:Math.round(size*0.75),lineHeight:Math.round(size*0.86)}]}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text></View>;
+  return <View style={[styles.die,{width:size,height:size,borderRadius:Math.round(size*0.19)},rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-lift:lift):0},{scale:rolling?1.08:1}]}]}>
+    {/* 입체로 보이게 하는 두 겹. 빛은 왼쪽 위에서 오고 오른쪽 아래에 그늘이 집니다.
+        자리를 안 먹게 둘 다 얹기만 합니다. */}
+    <View pointerEvents="none" style={[styles.dieShine,{borderRadius:Math.round(size*0.19)}]} />
+    <View pointerEvents="none" style={[styles.dieShade,{borderRadius:Math.round(size*0.19)}]} />
+    <Text style={[styles.dieText,{fontSize:Math.round(size*0.75),lineHeight:Math.round(size*0.86)}]}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text>
+  </View>;
 }
 
 function FaceDownCardDeck({label='DECK',small=false}:{label?:string;small?:boolean}){
@@ -6607,6 +6618,7 @@ function BaccaratGameScreen({
   coins,
   difficulty,
   selectedBet,
+  motion,
   onBack,
   onBetChange,
   onPlaceBet,
@@ -6619,6 +6631,7 @@ function BaccaratGameScreen({
   onBetChange: (value: number) => void;
   onPlaceBet: (stake: number) => boolean;
   onSettle: (bet: BaccaratBet, stake: number, winner: BaccaratWinner) => void;
+  motion: number;
 }) {
   const [bet, setBet] = useState<BaccaratBet>('player');
   const [round, setRound] = useState<ReturnType<typeof dealBaccaratRound> | null>(null);
@@ -6655,6 +6668,16 @@ function BaccaratGameScreen({
     setRound(dealBaccaratRound());
   };
   const flipNext = () => setFlipped((value) => Math.min(dealOrder.length, value + 1));
+  /**
+   * 카드는 **저절로** 한 장씩 열립니다. 누를 것이 없습니다.
+   * ⚠️ 몇 장이 남았는지는 알려 주지 않습니다 — 세 번째 장이 나올지 말지가
+   * 바카라의 재미인데, `3/6`처럼 적어 두면 그게 먼저 새어 나갑니다.
+   */
+  useEffect(() => {
+    if (!round || flipped >= dealOrder.length) return;
+    const timer = setTimeout(() => setFlipped((value) => Math.min(dealOrder.length, value + 1)), Math.max(120, Math.round(620 * motion)));
+    return () => clearTimeout(timer);
+  }, [round, flipped, dealOrder.length, motion]);
   const restart = () => { setRound(null); setFlipped(0); settledRef.current = false; };
 
   // 마지막 장까지 열린 뒤에 정산합니다.
@@ -6683,15 +6706,6 @@ function BaccaratGameScreen({
           <Text style={styles.dealerFeltRule}>PLAYER 1 TO 1 · BANKER 0.95 TO 1 · TIE 8 TO 1</Text>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>BANKER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
           <View style={styles.dealerCardRow}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} compact hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
-          {/* 같은 판에 앉은 손님들. 자리를 한 줄만 쓰고, 승부가 나면 각자 승·패가 붙습니다. */}
-          <View style={styles.baccaratGuestRow}>{guests.map((guest) => {
-            const outcome = allOpen && round ? (round.winner === guest.bet ? '승' : round.winner === 'tie' && guest.bet !== 'tie' ? '무' : '패') : '';
-            return <View key={guest.name} style={[styles.baccaratGuest, outcome === '승' && styles.baccaratGuestWon, outcome === '패' && styles.baccaratGuestLost]}>
-              <Text style={styles.baccaratGuestName}>{guest.name}</Text>
-              <Text style={styles.baccaratGuestBet}>{labels[guest.bet]} {guest.stake.toLocaleString()}</Text>
-              {outcome ? <Text style={styles.baccaratGuestMark}>{outcome}</Text> : null}
-            </View>;
-          })}</View>
           <View style={styles.baccaratSpotRow}>{(['player', 'tie', 'banker'] as BaccaratBet[]).map((option) => {
             const active = bet === option;
             return <Pressable key={option} disabled={Boolean(round)} onPress={() => setBet(option)} style={[styles.baccaratSpot, active && styles.baccaratSpotActive]}>
@@ -6701,13 +6715,23 @@ function BaccaratGameScreen({
             </Pressable>;
           })}</View>
         </DealerTable>
+        {/* ⚠️ 손님 줄은 **펠트 밖**에 둡니다. 안에 두면 반원 테이블이 자기 안쪽을 잘라
+          베팅 자리가 화면에서 사라졌습니다(2026-09-01에 실제로 잘렸습니다). */}
+        <View style={styles.baccaratGuestRow}>{guests.map((guest) => {
+          const outcome = allOpen && round ? (round.winner === guest.bet ? '승' : round.winner === 'tie' && guest.bet !== 'tie' ? '무' : '패') : '';
+          return <View key={guest.name} style={[styles.baccaratGuest, outcome === '승' && styles.baccaratGuestWon, outcome === '패' && styles.baccaratGuestLost]}>
+            <Text style={styles.baccaratGuestName}>{guest.name}</Text>
+            <Text style={styles.baccaratGuestBet}>{labels[guest.bet]} {guest.stake.toLocaleString()}</Text>
+            {outcome ? <Text style={styles.baccaratGuestMark}>{outcome}</Text> : null}
+          </View>;
+        })}</View>
 
         {round && allOpen && <View style={[styles.baccaratResult, net > 0 ? styles.rouletteWinCard : net < 0 ? styles.rouletteLossCard : styles.baccaratPushCard]}><Text style={styles.rouletteResultTitle}>{labels[round.winner]} 승리</Text><Text style={[styles.resultNet, net > 0 && styles.positive, net < 0 && styles.negative]}>{net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text></View>}
 
         {!round
           ? <Pressable disabled={selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction, selectedBet > coins && styles.disabledCard]} onPress={deal}><Text style={styles.primaryButtonText}>{labels[bet]}에 {selectedBet.toLocaleString()} WC 베팅</Text></Pressable>
           : !allOpen
-            ? <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={flipNext}><Text style={styles.primaryButtonText}>{flipped === 0 ? '카드 열기' : `다음 장 열기 · ${flipped}/${dealOrder.length}`}</Text></Pressable>
+            ? <View style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction, styles.baccaratDealing]}><Text style={styles.primaryButtonText}>카드를 여는 중…</Text></View>
             : <Pressable style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction]} onPress={restart}><Text style={styles.primaryButtonText}>다시 베팅하기</Text></Pressable>}
 
         <View style={styles.chipRow}>
@@ -6810,7 +6834,8 @@ function RouletteGameScreen({
     // 예전에는 두 단계로 나눠 돌렸는데, 1단계가 끝에서 105°/초까지 느려진 뒤
     // 2단계(Easing.out)가 318°/초로 시작해서 이어지는 자리에서 속도가 세 배로 튀었습니다.
     // "중간에 한 번 더 세게 돈다"는 게 그것입니다. 곡선 하나로 합쳐 없앴습니다.
-    const target = 360 * 6 + landing;
+    // 오래 도는 만큼 바퀴 수도 늘립니다. 여섯 바퀴를 9.4초에 돌면 느릿느릿해 보입니다.
+    const target = 360 * 12 + landing;
 
     wheelProgress.setValue(0);
     ballProgress.setValue(0);
@@ -6819,16 +6844,17 @@ function RouletteGameScreen({
     pendingSettle.current = () => onSettle(bet, selectedBet, number, betLabel);
 
     // 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
+    // 실제 룰렛은 공이 한참 돕니다. 4.2초는 너무 빨라 "돌았다"는 느낌이 안 났습니다.
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(4200 * motion)),
+      duration: Math.max(260, Math.round(8200 * motion)),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(4800 * motion)),
+      duration: Math.max(300, Math.round(9400 * motion)),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -6841,7 +6867,7 @@ function RouletteGameScreen({
 
   const wheelRotation = wheelProgress.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
   // 아홉 바퀴를 반대로 돕니다. 3240 = 360 × 9. 끝나는 자리는 다시 0도(맨 위)입니다.
-  const ballRotation = ballProgress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-3240deg'] });
+  const ballRotation = ballProgress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-6120deg'] });
   // 처음에는 바깥 테두리를 돌다가 마지막에 안쪽 칸으로 떨어집니다.
   const ballRadius = ballProgress.interpolate({ inputRange: [0, 0.78, 1], outputRange: [-140, -137, -124] });
   const shownNumber = phase === 'spinning' ? tickingNumber : resultNumber;
@@ -7660,7 +7686,11 @@ const styles = StyleSheet.create({
   playerCountNumberActive: { color: colors.goldLight },
   playerCountNote: { color: colors.muted, fontSize: 11, marginTop: 4 },
   setupOption: { width: '31%', minHeight: 64, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.18)' },
-  setupOptionActive: { backgroundColor: '#2E2512', borderColor: colors.gold },
+  /**
+   * 고른 칸. **바탕색을 확 바꾸지 않습니다** — 칙칙한 갈색으로 덮으면 거칠어 보입니다.
+   * 금색을 아주 옅게 깔고 테두리와 글씨만 금색으로 올립니다.
+   */
+  setupOptionActive: { backgroundColor: 'rgba(201,151,31,0.14)', borderColor: colors.gold, borderTopColor: colors.goldLight, shadowColor: '#FFD35F', shadowOpacity: 0.45, shadowRadius: 10 },
   setupOptionTitle: { color: colors.muted, fontSize: 14, fontWeight: '800' },
   setupOptionTitleActive: { color: colors.goldLight },
   setupOptionRange: { color: colors.muted, fontSize: 9, marginTop: 5 },
@@ -8512,7 +8542,15 @@ const styles = StyleSheet.create({
   diceMatPulled: { borderColor: colors.gold },
   throwHint: { color: '#B79A5A', fontSize: 11, fontWeight: '800', marginTop: 6, minHeight: 16, textAlign: 'center' },
   yutThrowHint: { color: '#B79A5A', fontSize: 11, fontWeight: '800', marginTop: 6, minHeight: 16 },
-  yutStick: { width: 34, height: 116, borderRadius: 17, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2 },
+  // 윷가락도 주사위와 같은 결로 깎아 둡니다 — 위·왼쪽은 밝고 아래·오른쪽은 어둡습니다.
+  // 그림자를 깔아 바닥에서 살짝 떠 보이게 합니다. 자리는 안 늘어납니다.
+  yutStick: { width: 34, height: 116, borderRadius: 17, overflow: 'hidden', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 8, borderWidth: 2, shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 8, shadowOffset: { width: 3, height: 5 } },
+  // 왼쪽에 드는 빛과 오른쪽에 지는 그늘. 얹기만 해서 자리를 안 먹습니다.
+  yutStickShine: { position: 'absolute', left: 0, top: 0, bottom: 0, right: '55%', backgroundColor: 'rgba(255,255,255,0.28)' },
+  yutStickShade: { position: 'absolute', left: '62%', top: 0, bottom: 0, right: 0, backgroundColor: 'rgba(60,40,16,0.26)' },
+  // 등은 둥근 면이라 가운데가 더 볼록해 보이게 밝은 띠를 좁게 둡니다.
+  yutStickShineRound: { right: '68%', backgroundColor: 'rgba(255,232,190,0.22)' },
+  yutStickShadeRound: { left: '52%', backgroundColor: 'rgba(0,0,0,0.34)' },
   yutStickFlat: { backgroundColor: '#EFE0C0', borderColor: '#B79A63' },
   yutStickRound: { backgroundColor: '#6B4A25', borderColor: '#3E2A13' },
   yutStickTumbling: { opacity: .72 },
@@ -8675,7 +8713,8 @@ const styles = StyleSheet.create({
   sicboBowl: { minHeight: 230, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 115, backgroundColor: '#621B22', borderWidth: 5, borderColor: '#D8B451' },
   // ⚠️ `scale`을 쓰지 않습니다 — 보이는 것만 줄고 자리는 그대로라 줄이 넘칩니다.
   //    크기는 `Die`의 size로 줍니다(식보 세 개는 66, 야찌 다섯 개는 52).
-  sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 16, justifyContent: 'center' },
+  // 사이가 8이면 세 개가 붙어 보입니다. 크랩스(18)와 비슷하게 벌립니다.
+  sicboDiceRow: { flexDirection: 'row', gap: 16, marginTop: 16, justifyContent: 'center' },
   // ⚠️ lineHeight를 안 주면 한글 윗부분이 잘립니다(파이 고우 결과 줄에서 봤습니다).
   // ⚠️ color가 없으면 글자가 검정으로 떨어져 어두운 바탕에서 거의 안 보입니다.
   //    파이 고우 결과 줄이 잘린 것처럼 보인 것이 이것이었습니다(승·패 색은 뒤에 덧씌웁니다).
@@ -8754,7 +8793,12 @@ const styles = StyleSheet.create({
   crapsTable: { minHeight: 270, alignItems: 'center', justifyContent: 'center', marginTop: 18, padding: 20, borderRadius: 42, backgroundColor: '#0A422D', borderWidth: 3, borderColor: '#D0A441' },
   crapsPointLabel: { position: 'absolute', top: 17, color: colors.goldLight, fontSize: 14, fontWeight: '900', letterSpacing: 2 },
   diceRow: { flexDirection: 'row', gap: 18, marginTop: 20 },
-  die: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#F5EEDA', borderWidth: 2, borderColor: '#C9B98D', shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 7 },
+  // 위·왼쪽 테두리는 밝게, 아래·오른쪽은 어둡게. 두 색만으로 모서리가 깎여 보입니다.
+  die: { width: 88, height: 88, alignItems: 'center', justifyContent: 'center', borderRadius: 17, overflow: 'hidden', backgroundColor: '#F5EEDA', borderWidth: 2, borderTopColor: '#FFFDF6', borderLeftColor: '#FBF6E7', borderRightColor: '#B4A171', borderBottomColor: '#9C8A5E', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 9, shadowOffset: { width: 3, height: 6 } },
+  // 왼쪽 위에서 드는 빛.
+  dieShine: { position: 'absolute', left: 0, top: 0, right: '30%', bottom: '38%', borderBottomRightRadius: 999, backgroundColor: 'rgba(255,255,255,0.5)' },
+  // 오른쪽 아래에 지는 그늘.
+  dieShade: { position: 'absolute', left: '40%', top: '48%', right: 0, bottom: 0, borderTopLeftRadius: 999, backgroundColor: 'rgba(120,102,60,0.16)' },
   dieRolling: { borderColor:'#FFE28A', shadowColor:'#FFD257', shadowOpacity:1, shadowRadius:12 },
   diceTableRolling: { shadowColor:'#FFE791', shadowOpacity:0.9, shadowRadius:18 },
   dieText: { color: '#161616', fontSize: 66, lineHeight: 76 },
@@ -8778,6 +8822,8 @@ const styles = StyleSheet.create({
   baccaratPage: { padding: 18, paddingBottom: 44 },
   // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
   // 손님 셋이 한 줄에 들어갑니다. 승·패는 얹기만 해서 자리를 안 늘립니다.
+  // 저절로 열리는 동안 버튼 자리를 지키는 칸. 누를 수 없어 옅게 둡니다.
+  baccaratDealing: { opacity: 0.7 },
   baccaratGuestRow: { flexDirection: 'row', gap: 5, marginTop: 4, justifyContent: 'center' },
   // 블랙잭 손님 줄. 자리를 한 줄만 쓰고 승·패는 얹기만 합니다.
   tableGuestRow: { flexDirection: 'row', gap: 6, marginVertical: 2, justifyContent: 'center' },
@@ -9070,7 +9116,8 @@ const styles = StyleSheet.create({
   statValue: { color: colors.text, fontSize: 22, fontWeight: '900' },
   difficultyRow: { flexDirection: 'row', gap: 7 },
   difficultyButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.panel },
-  difficultyActive: { backgroundColor: colors.gold, borderColor: colors.gold },
+  // 설정의 등급 고르기도 같은 결로 맞춥니다(전에는 금색으로 꽉 채워 튀었습니다).
+  difficultyActive: { backgroundColor: 'rgba(201,151,31,0.14)', borderColor: colors.gold, borderTopColor: colors.goldLight, shadowColor: '#FFD35F', shadowOpacity: 0.45, shadowRadius: 10 },
   difficultyText: { color: colors.muted, fontSize: 10, fontWeight: '800' },
   difficultyActiveText: { color: '#171107' },
   helperText: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
