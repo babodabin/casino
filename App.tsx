@@ -2723,21 +2723,25 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
 
       {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
       <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
-        {/* 레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다. */}
-        <Pressable disabled={spinning || blocked} onPress={pullLever} style={[styles.pachiLeverBase, (spinning || blocked) && styles.disabledCard]}>
+        {/*
+          레버. 축이 조작대에서 올라오고 그 위에 빨간 공이 붙습니다.
+          ⚠️ 잭팟 그림에서 레버를 오려 써 봤는데 **배경이 같이 붙어 나와** 네모난 얼룩으로 보였습니다.
+          통짜 기계 그림에서 부품만 떼어 내는 건 안 됩니다. 코드로 그린 이쪽이 낫습니다.
+        */}
+        <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
           <View style={styles.pachiLeverMount} />
           <View style={styles.pachiLeverStick} />
           <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
         </Pressable>
         <View style={styles.pachiStopRow}>{[0, 1, 2].map((index) => (
-          <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={[styles.pachiStopButton, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
+          <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
             {/* 보내 주신 실물 버튼 사진입니다. 흰 배경은 지웠습니다. */}
             <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
             <Text style={styles.pachiStopText}>{index + 1}</Text>
           </Pressable>
         ))}
         {/* 하나씩 누르기 귀찮을 때. 누르면 1·2·3이 차례로 촤르륵 섭니다. */}
-        <Pressable disabled={!spinning} onPress={stopAll} style={[styles.pachiStopButton, styles.pachiAllButton, !spinning && styles.pachiStopButtonOff]}>
+        <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiStopButton, styles.pachiAllButton, pressed && styles.pachiPressed, !spinning && styles.pachiStopButtonOff]}>
           <Image source={pachiStopButtonImage} style={styles.pachiAllImage} resizeMode="contain" />
           <Text style={styles.pachiAllText}>ALL</Text>
         </Pressable>
@@ -6734,9 +6738,11 @@ function BlackjackGameScreen(props: {
         누를 곳을 매번 찾아야 합니다. 새 게임에도 `ScreenHeader`를 쓰세요.
       */}
       <ScreenHeader title="블랙잭(Blackjack)" onBack={props.onExit} />
-      <View style={styles.rouletteStatusRow}>
+      {/* ⚠️ 이 줄은 판 바깥이라 좌우 여백을 따로 줘야 합니다. 없으면 코인 숫자가 화면 끝에 붙습니다. */}
+      <View style={[styles.rouletteStatusRow, styles.blackjackStatusRow]}>
         <Text style={styles.rouletteBalance}>{props.coins.toLocaleString()} WC</Text>
-        <View style={styles.gameBetPill}><CoinStack amount={totalBet} compact /><Text style={styles.gameBetText}>{phase === 'result' ? '정산 완료' : '베팅 중'}</Text></View>
+        {/* ⚠️ 칩 그림(44×49)을 넣었더니 이 줄이 넓어져 왼쪽 코인 숫자가 화면 밖으로 잘렸습니다. 글자만 씁니다. */}
+        <View style={styles.gameBetPill}><Text style={styles.gameBetText}>{totalBet.toLocaleString()} WC · {phase === 'result' ? '정산 완료' : '베팅 중'}</Text></View>
       </View>
 
       {/* 스크롤 없이 한 화면에 고정합니다. 위쪽은 테이블, 아래쪽은 버튼 자리로 나눕니다. */}
@@ -6767,8 +6773,12 @@ function BlackjackGameScreen(props: {
             const nowPlaying = phase === 'guests' && !dealing && guestTurn === seat;
             return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
               {/* 손님 패를 실제로 보여 줍니다 — 10이 몇 장 빠졌는지 세려면 패가 보여야 합니다. */}
+              {/*
+                ⚠️ 겹치는 정도를 **-26에서 -14로** 줄였습니다. 많이 겹치니 무늬(♥ ♠ ♣ ♦)가
+                가려져서 10이 몇 장 빠졌는지 셀 수가 없었습니다. 셀 수 있으라고 보여 주는 패입니다.
+              */}
               <View style={styles.tableGuestCards}>{shown.map((card, index) => (
-                <View key={card.id} style={index ? { marginLeft: -26 } : null}><PlayingCard card={card} size="mini" /></View>
+                <View key={card.id} style={index ? { marginLeft: -14 } : null}><PlayingCard card={card} size="mini" /></View>
               ))}</View>
               <Text style={styles.tableGuestName}>{guest.name} · {handValue(shown)}</Text>
               {mark ? <Text style={styles.tableGuestMark}>{mark}</Text> : null}
@@ -9201,6 +9211,7 @@ const styles = StyleSheet.create({
   standButton: { backgroundColor: '#1B304E', borderWidth: 1, borderColor: '#46658F' },
   doubleButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#182B24' },
   splitButton: { marginTop: 10, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderWidth: 1, borderColor: '#7AA6D8', backgroundColor: '#17283D' },
+  blackjackStatusRow: { paddingHorizontal: 14 },
   blackjackStakeRow: { flexDirection: 'row', gap: 8 },
   blackjackStakeButton: { flex: 1 },
   insurancePanel: { marginTop: 16, padding: 16, borderRadius: 16, borderWidth: 1, borderColor: colors.gold, backgroundColor: '#17271F' },
@@ -9324,7 +9335,9 @@ const styles = StyleSheet.create({
 
   // 조작대 — 레버 · 정지 셋 · 작은 상태창
   pachiDeck: { height: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, gap: 8, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
-  pachiLeverBase: { width: 38, height: 70, alignItems: 'center', justifyContent: 'flex-end' },
+  pachiLeverBase: { width: 40, height: 74, alignItems: 'center', justifyContent: 'flex-end' },
+  // 누르면 살짝 들어갑니다. 실물 버튼 느낌은 여기서 옵니다.
+  pachiPressed: { transform: [{ scale: 0.93 }], opacity: 0.85 },
   // 조작대에 박힌 받침. 아래가 넓고 어둡습니다.
   pachiLeverMount: { position: 'absolute', bottom: 0, width: 34, height: 13, borderTopLeftRadius: 8, borderTopRightRadius: 8, backgroundColor: '#31373F', borderTopWidth: 1, borderTopColor: '#5A616D' },
   pachiLeverStick: { position: 'absolute', bottom: 10, width: 7, height: 34, borderRadius: 4, backgroundColor: '#A8B0BE', borderRightWidth: 2, borderRightColor: '#6C7381' },
@@ -9341,7 +9354,8 @@ const styles = StyleSheet.create({
   pachiSparkle: { position: 'absolute', color: '#FFF6D8', fontWeight: '900', textShadowColor: '#FFD98A', textShadowRadius: 10 },
   pachiStopRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   // 실물 버튼처럼 둥글고, 위가 밝고 아래가 어둡습니다.
-  pachiStopButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  // 버튼 아래 그림자. 이것 하나로 판에 붙어 있지 않고 **올라와 있는** 것으로 보입니다.
+  pachiStopButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.75, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
   pachiStopImage: { position: 'absolute', width: 48, height: 48 },
   pachiStopButtonOff: { opacity: 0.4 },
   pachiStopText: { color: '#04361F', fontSize: 15, fontWeight: '900', marginTop: -4, textShadowColor: 'rgba(255,255,255,0.55)', textShadowRadius: 4 },
@@ -9693,7 +9707,7 @@ const styles = StyleSheet.create({
   baccaratGuestRow: { flexDirection: 'row', gap: 5, marginTop: 4, justifyContent: 'center' },
   // 블랙잭 손님 줄. 자리를 한 줄만 쓰고 승·패는 얹기만 합니다.
   tableGuestRow: { flexDirection: 'row', marginVertical: 2, justifyContent: 'space-between', width: '100%' },
-  tableGuest: { minWidth: 70, paddingVertical: 2, paddingHorizontal: 5, borderRadius: 9, alignItems: 'center', gap: 1, backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
+  tableGuest: { minWidth: 84, paddingVertical: 2, paddingHorizontal: 4, borderRadius: 9, alignItems: 'center', gap: 1, backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
   tableGuestCards: { flexDirection: 'row', alignItems: 'center' },
   // 지금 카드를 받는 손님. 차례가 눈에 보여야 순서대로 도는 것이 읽힙니다.
   tableGuestTurn: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.6)' },
