@@ -2724,7 +2724,15 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
 
       {/* 조작대. 왼쪽에 레버, 가운데 정지 셋, 오른쪽에 작은 상태창입니다. */}
       {/*
-        조작대. **위는 안내 줄, 아래는 버튼 줄**입니다.
+        ⚠️ **아래 그림판을 뺐습니다**(2026-09-02). 위 화면이 320으로 커지면서 같은 사진을
+        두 번 보여 주는 꼴이 됐고, 그만큼 버튼이 화면 밖으로 밀려 못 누르게 됐습니다.
+        기계 높이는 화면(812)에서 위 바 48 · 코인 줄 60을 뺀 만큼만 씁니다.
+      */}
+      {/*
+        조작대. **기계 맨 아래**에 둡니다.
+        ⚠️ 실제 기계는 릴 바로 밑에 버튼이 있지만, 우리는 **위 화면 사진을 크게 보이려고**
+        아래로 내렸습니다. 조작대가 가운데 있으면 그만큼 사진이 눌려 얼굴이 잘립니다.
+        위는 안내 줄, 아래는 버튼 줄입니다.
         ⚠️ 안내 줄에 `READY`처럼 뜻 모를 말을 쓰지 마세요 — **지금 뭘 해야 하는지**를 적습니다.
         ⚠️ 버튼은 손가락으로 누르는 것이라 44보다 작으면 안 됩니다(58로 뒀습니다).
       */}
@@ -2764,12 +2772,6 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
         </View>
       </View>
 
-      {/* 아래 그림판. 위 화면과 같은 사진의 아래쪽입니다. */}
-      <View style={styles.pachiArtPanel}>
-        <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
-        <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.45) 100%)')]} />
-        {/* ⚠️ 이름은 기계 바깥 간판에 있습니다. 여기서는 안 씁니다. */}
-      </View>
       <PachiBulbs count={22} lit={twinkle} />
       {/* 동전 받이. 안쪽이 어두워 파인 것처럼 보입니다. */}
       <View style={[styles.pachiTray, webGradient('linear-gradient(180deg, #0A0C11 0%, #1B1F27 40%, #0A0C11 100%)')]}>
@@ -9303,7 +9305,7 @@ const styles = StyleSheet.create({
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
 
   // 위 화면 — 연출용 LCD
-  pachiTopScreen: { height: 244, backgroundColor: '#05060A', overflow: 'hidden' },
+  pachiTopScreen: { height: 310, backgroundColor: '#05060A', overflow: 'hidden' },
   pachiTopPhoto: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
   // 뒤에 까는 바탕. 흐릿하게 어두워야 앞의 사진이 떠 보입니다.
   pachiTopBackdrop: { opacity: 0.45 },
@@ -9399,7 +9401,7 @@ const styles = StyleSheet.create({
   pachiMeterSmall: { color: '#6FA88A', fontSize: 9, fontWeight: '800' },
 
   // 아래 그림판과 받침
-  pachiArtPanel: { height: 74, backgroundColor: '#0A0B10', overflow: 'hidden', justifyContent: 'flex-end' },
+  pachiArtPanel: { height: 58, backgroundColor: '#0A0B10', overflow: 'hidden', justifyContent: 'flex-end' },
   pachiArtText: { color: 'rgba(255,241,198,0.92)', fontSize: 13, fontWeight: '900', letterSpacing: 4, textAlign: 'center', marginBottom: 7, textShadowColor: '#000', textShadowRadius: 7 },
   pachiTray: { height: 22, backgroundColor: '#0C0E12', borderTopWidth: 2, borderTopColor: '#3A404B', alignItems: 'center', justifyContent: 'center' },
   // 동전이 나오는 구멍
