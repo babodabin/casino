@@ -223,7 +223,8 @@ type GameRecord = {
 /** 릴이 도는 동안만 쓰는 그림입니다. 결과는 레버를 당길 때 이미 정해져 있습니다. */
 const pachiSpinSymbols = ['🍒', '🍋', '👑', '⭐', '💎', '7️⃣', '🔁'] as const;
 /** 릴 한 칸의 높이. 띠가 이만큼씩 내려옵니다. 창 높이(152)를 세 칸으로 나눈 값입니다. */
-const pachiCellHeight = 50;
+/** 릴 한 칸. 창 높이(120)를 세 칸으로 나눈 값입니다. 창을 바꾸면 이것도 바꾸세요. */
+const pachiCellHeight = 40;
 
 /**
  * 파치슬롯 기계에 붙는 사진. **위 화면과 아래 그림판이 한 짝**입니다.
@@ -2667,9 +2668,9 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
       {/* 위 화면. 실제 기계의 연출용 LCD 자리입니다. */}
       <View style={styles.pachiTopScreen}>
         {/*
-          사진을 **꽉 채웁니다**(cover).
-          ⚠️ 전에는 통째로 보이라고 contain으로 뒀는데, 세로 사진이라 좌우가 남아 **작아 보였습니다.**
-          꽉 채우면 위아래가 조금 잘리는 대신 실물 기계의 연출 화면처럼 보입니다.
+          사진을 꽉 채우되 **위에서부터** 채웁니다.
+          ⚠️ 그냥 cover로 두면 가운데를 기준으로 잘라서 **얼굴이 잘립니다.**
+          사진 상자를 창보다 길게(135%) 잡고 위에 붙이면, 잘리는 곳이 아래(다리)가 됩니다.
         */}
         <Image source={photo.image} style={styles.pachiTopPhoto} resizeMode="cover" />
         <View pointerEvents="none" style={[styles.pachiScreenShade, webGradient('linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 42%, rgba(0,0,0,0.5) 100%)')]} />
@@ -2708,10 +2709,10 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
                   칸을 다 50으로 두면 세 번째 칸이 정확히 당첨 줄에 옵니다.
                   맨 위 한 칸은 창 밖에 있다가, 띠가 내려오면 창 안으로 들어옵니다.
                 */}
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={34} dim /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={34} dim /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={symbol} size={46} win={stopped[index] && Boolean(shown?.outMedals)} /></View>
-                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={34} dim /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -2)} size={26} dim /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, -1)} size={26} dim /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={symbol} size={36} win={stopped[index] && Boolean(shown?.outMedals)} /></View>
+                <View style={styles.pachiCell}><PachiSymbol symbol={pachiNeighbour(symbol, 1)} size={26} dim /></View>
               </Animated.View>
             </View>
           ))}
@@ -2738,17 +2739,6 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
         ⚠️ 버튼은 손가락으로 누르는 것이라 44보다 작으면 안 됩니다(58로 뒀습니다).
       */}
       <View style={[styles.pachiDeck, webGradient('linear-gradient(180deg, #454C58 0%, #2B303A 18%, #22262E 70%, #14171D 100%)')]}>
-        <View style={styles.pachiGuide}>
-          <Text style={styles.pachiGuideText}>
-            {machine.phase === 'AT' ? `AT · 남은 ${machine.atLeft}게임`
-              : machine.phase === '찬스존' ? `찬스존 · 남은 ${machine.zoneLeft}게임`
-              : spinning ? '버튼을 눌러 하나씩 멈추세요'
-              : blocked ? '코인이 모자랍니다'
-              : '레버를 당기세요'}
-          </Text>
-          {payout > 0 ? <Text style={styles.pachiGuideWin}>+{payout.toLocaleString()} WC</Text> : null}
-        </View>
-
         {/*
           버튼 줄은 **사진 한 장**입니다(1024×198을 900×174로 줄였습니다).
           제가 그린 버튼보다 훨씬 낫습니다 — 그 위에 **안 보이는 누름 자리**만 겹칩니다.
@@ -9311,8 +9301,9 @@ const styles = StyleSheet.create({
   pachiCabinetAt: { borderTopColor: '#F4D06A', borderLeftColor: '#C9971F', borderRightColor: '#8A6714', shadowColor: '#F4C86A' },
 
   // 위 화면 — 연출용 LCD
-  pachiTopScreen: { height: 310, backgroundColor: '#05060A', overflow: 'hidden' },
-  pachiTopPhoto: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' },
+  pachiTopScreen: { height: 388, backgroundColor: '#05060A', overflow: 'hidden' },
+  // 창보다 길게 잡고 위에 붙입니다. 넘치는 아래쪽(다리)이 잘립니다.
+  pachiTopPhoto: { position: 'absolute', left: 0, top: 0, width: '100%', height: '135%' },
   // 뒤에 까는 바탕. 흐릿하게 어두워야 앞의 사진이 떠 보입니다.
   pachiTopBackdrop: { opacity: 0.45 },
   pachiScreenShade: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.08)' },
@@ -9321,10 +9312,10 @@ const styles = StyleSheet.create({
   pachiFlash: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: '#FFF7DA' },
   // 간판 — 기계 바깥 위
   // 기계 맨 윗칸. 아래로 갈수록 어두워져 몸통과 이어집니다.
-  pachiSign: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 56, backgroundColor: '#241636', borderBottomWidth: 1, borderBottomColor: '#0D0714' },
-  pachiSignDeco: { width: 42, height: 42 },
-  pachiArchRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 6 },
-  pachiArchText: { color: '#FFE9A6', fontSize: 21, fontWeight: '900', letterSpacing: 1, textShadowColor: '#C9971F', textShadowRadius: 12 },
+  pachiSign: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 40, backgroundColor: '#241636', borderBottomWidth: 1, borderBottomColor: '#0D0714' },
+  pachiSignDeco: { width: 28, height: 28 },
+  pachiArchRow: { flexDirection: 'row', alignItems: 'flex-end', paddingBottom: 4 },
+  pachiArchText: { color: '#FFE9A6', fontSize: 15, fontWeight: '900', letterSpacing: 1, textShadowColor: '#C9971F', textShadowRadius: 12 },
   pachiTopCaption: { position: 'absolute', left: 12, bottom: 10, right: 12 },
   pachiTopTitle: { color: '#FFE9A6', fontSize: 24, fontWeight: '900', letterSpacing: 2, textShadowColor: '#000', textShadowRadius: 8 },
   pachiTopLine: { color: '#F2F4FF', fontSize: 12, fontWeight: '800', marginTop: 2, textShadowColor: '#000', textShadowRadius: 6 },
@@ -9349,7 +9340,7 @@ const styles = StyleSheet.create({
   pachiShoulderText: { color: '#C6CEDC', fontSize: 10, fontWeight: '900', letterSpacing: 4 },
   // 창 안쪽. 테두리를 굵게 두고 안쪽 그늘을 넣어 유리 뒤로 들어가 보이게 합니다.
   // 창 바탕을 어둡게 두면 심볼이 떠 보입니다(밝은 크림색이면 금색 7이 묻힙니다).
-  pachiReelWindow: { height: 152, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#EDE7D8', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
+  pachiReelWindow: { height: 120, flexDirection: 'row', borderRadius: 6, overflow: 'hidden', backgroundColor: '#EDE7D8', borderWidth: 3, borderTopColor: '#0E1116', borderLeftColor: '#171B22', borderRightColor: '#171B22', borderBottomColor: '#39404A' },
   pachiReel: { flex: 1, alignItems: 'center', overflow: 'hidden' },
   // 창보다 한 칸 위에서 시작하는 띠. 이 띠가 통째로 내려옵니다.
   pachiReelStrip: { alignItems: 'center', marginTop: -pachiCellHeight },
