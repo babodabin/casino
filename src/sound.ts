@@ -10,7 +10,7 @@
  *   - 나머지는 음높이가 있는 소리입니다. 이길 때 올라가고 질 때 내려갑니다
  */
 
-export type SoundCue = 'card' | 'chip' | 'flip' | 'roll' | 'win' | 'lose' | 'slap' | 'shuffle' | 'tile';
+export type SoundCue = 'card' | 'chip' | 'flip' | 'roll' | 'win' | 'lose' | 'slap' | 'shuffle' | 'tile' | 'lever' | 'clunk';
 
 export type Tone = {
   /** 소리결. noise는 음높이가 없는 잡음입니다. */
@@ -69,6 +69,17 @@ export const soundCues: Record<SoundCue, Tone[]> = {
     { wave: 'noise', freq: 1500, at: 0, dur: 0.04, gain: 0.24 },
     { wave: 'triangle', freq: 640, at: 0, dur: 0.05, gain: 0.1 },
   ],
+  /** 레버를 당길 때. 쇠가 걸렸다 풀리는 소리라 짧게 두 번 납니다. */
+  lever: [
+    { wave: 'noise', freq: 700, at: 0, dur: 0.04, gain: 0.24 },
+    { wave: 'square', freq: 180, at: 0.02, dur: 0.06, gain: 0.1 },
+    { wave: 'noise', freq: 1100, at: 0.09, dur: 0.05, gain: 0.18 },
+  ],
+  /** 릴이 멈출 때. 무거운 것이 자리에 걸리는 '덜컹'입니다. */
+  clunk: [
+    { wave: 'noise', freq: 420, at: 0, dur: 0.06, gain: 0.28 },
+    { wave: 'triangle', freq: 130, at: 0, dur: 0.1, gain: 0.16 },
+  ],
   // 이길 때. 도 · 미 · 솔로 올라갑니다.
   win: [
     { wave: 'triangle', freq: 523.25, at: 0, dur: 0.12, gain: 0.16 },
@@ -93,4 +104,7 @@ export const vibrationFor: Partial<Record<SoundCue, number>> = {
   chip: 8,
   // 치는 손맛. 화투는 때리는 것이라 짧게 한 번 울립니다.
   slap: 12,
+  // 레버와 릴 정지는 손에 걸리는 느낌이 있어야 기계 같습니다.
+  lever: 16,
+  clunk: 10,
 };
