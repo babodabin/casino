@@ -74,6 +74,53 @@ export function dealInitialRound(deck: Card[]) {
   return { deck: remaining, player, dealer };
 }
 
+/**
+ * 같은 판에 앉은 다른 손님.
+ * **딜러 한 사람이 모두를 상대합니다** — 손님마다 제 패를 받아 각자 딜러와 겨룹니다.
+ * ⚠️ 손님이 이기든 지든 **내 정산에는 영향이 없습니다.** 같은 슈에서 카드만 나눠 받습니다.
+ */
+export type BlackjackGuest = { name: string; hand: Card[]; result?: RoundResult };
+
+/**
+ * 손님 몫까지 같이 돌립니다. 실제 테이블처럼 **딜러가 마지막**입니다.
+ * guests가 0이면 예전과 똑같습니다(나 두 장 · 딜러 두 장).
+ */
+export function dealTableRound(deck: Card[], guests: number) {
+  if (deck.length < 4 + guests * 2) throw new Error('카드가 부족합니다.');
+  const remaining = [...deck];
+  const player = [remaining.shift()!, remaining.shift()!];
+  const hands = Array.from({ length: guests }, () => [remaining.shift()!, remaining.shift()!]);
+  const dealer = [remaining.shift()!, remaining.shift()!];
+  return { deck: remaining, player, guests: hands, dealer };
+}
+
+/**
+ * 손님은 기본 전략의 제일 쉬운 꼴로 둡니다 — **17 미만이면 더 받습니다.**
+ * 딜러와 같은 규칙이라 따로 배울 것이 없고, 옆자리가 무엇을 하는지 바로 읽힙니다.
+ */
+export function playGuestHand(deck: Card[], hand: Card[]) {
+  let remaining = [...deck];
+  let held = [...hand];
+  while (handValue(held) < 17 && remaining.length > 0) {
+    const drawn = drawCard(remaining, held);
+    remaining = drawn.deck;
+    held = drawn.hand;
+  }
+  return { deck: remaining, hand: held };
+}
+
+/** 손님 한 명과 딜러를 견줍니다. 규칙은 나와 똑같습니다. */
+export function guestResult(hand: Card[], dealer: Card[]): RoundResult {
+  const mine = handValue(hand);
+  const theirs = handValue(dealer);
+  if (mine > 21) return 'loss';
+  if (isBlackjack(hand) && !isBlackjack(dealer)) return 'blackjack';
+  if (theirs > 21) return 'win';
+  if (mine > theirs) return 'win';
+  if (mine < theirs) return 'loss';
+  return 'push';
+}
+
 export function drawCard(deck: Card[], hand: Card[]) {
   if (deck.length === 0) throw new Error('카드가 부족합니다.');
   const [card, ...remaining] = deck;

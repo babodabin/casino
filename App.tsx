@@ -34,7 +34,9 @@ const carLogoSources: Record<number, any> = {
 import {
   createDeck,
   canSplit,
-  dealInitialRound,
+  dealTableRound,
+  guestResult,
+  playGuestHand,
   drawCard,
   handValue,
   insurancePayout,
@@ -103,7 +105,7 @@ import { createFishRouletteField, fishPositionAt, fishRouletteBetDetails, fishRo
 import { biteDelay,fightStep,findFishingSpot,fishingPayout,fishingSpots,pickFish,startFight,type FightAction,type FightState,type Fish,type FishingSpotId} from './src/screenfishing';
 import { luckyFishCaveCount, luckyFishCaves, luckyFishForks, luckyFishMultiplier, luckyFishOffset, luckyFishProbability, swimLuckyFish, type LuckyFishPath } from './src/luckyfish';
 import {compareTeenPatti,dealTeenPatti,evaluateTeenPatti} from './src/teenpatti';
-import { arrangePaiGow, dealPaiGow, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
+import { arrangePaiGow, dealPaiGowTable, evaluatePaiGowTwo, isValidPaiGowSplit, resolvePaiGow, splitPaiGow, type PaiGowSplit } from './src/paigow';
 import { createHorseField, horseBetLabels, horseTicketOdds, requiredHorseSelections, settleHorseTicket, simulateHorseRace, type Horse, type HorseBetType, type HorseRaceResult, type HorseTicket } from './src/horseracing';
 import { createCycleField, cycleBetLabels, cycleTicketOdds, requiredCycleSelections, settleCycleTicket, simulateCycleRace, type CycleBetType, type CycleRaceResult, type CycleTicket, type Cyclist } from './src/cycling';
 import { boatBetLabels, boatTicketOdds, createBoatField, requiredBoatSelections, settleBoatTicket, simulateBoatRace, type BoatBetType, type BoatRaceResult, type BoatRacer, type BoatTicket } from './src/boatracing';
@@ -2328,7 +2330,7 @@ function SicBoGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBet
   // 그릇을 위로 쓸면 주사위를 던집니다. 버튼도 그대로 있습니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling || selectedBet > coins);
   const optionButton = (candidate: SicBoBet, title: string, odds: string) => <Pressable key={`${candidate.type}-${'value' in candidate ? candidate.value : title}`} onPress={() => choose(candidate)} style={[styles.sicboBetButton, selected(candidate) && styles.sicboBetActive]}>{selected(candidate) && <CoinStack amount={selectedBet} compact />}<Text style={styles.sicboBetTitle}>{title}</Text><Text style={styles.sicboOdds}>{odds}</Text></Pressable>;
-  return <View style={styles.sicboScreen}><ScreenHeader title="식보(骰寶, Sic Bo)" onBack={onBack} /><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>SIC BO</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View><View {...panHandlers} style={[styles.sicboBowl,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling ? 'SHAKING' : `합계 ${dice[0] + dice[1] + dice[2]}`}</Text><View style={[styles.sicboDiceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{dice.map((value, index) => <Die key={index} value={value} rolling={rolling} index={index}/>)}</View><Text style={styles.throwHint}>{rolling?'':pull>0?'놓으면 굴러갑니다':'그릇을 위로 쓸어 던지세요'}</Text>{net !== null && <Text style={[styles.sicboResult, net > 0 ? styles.positive : styles.negative]}>{net > 0 ? '당첨' : '미당첨'} · {net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text>}</View><Pressable disabled={rolling || selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, styles.sicboRollButton, (rolling || selectedBet > coins) && styles.disabledCard]} onPress={() => roll()}><Text style={styles.primaryButtonText}>{rolling ? '주사위 흔드는 중…' : `${sicBoBetLabel(bet)}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable>
+  return <View style={styles.sicboScreen}><ScreenHeader title="식보(骰寶, Sic Bo)" onBack={onBack} /><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>SIC BO</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{betTierName(difficulty)}</Text></View></View><View {...panHandlers} style={[styles.sicboBowl,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling ? 'SHAKING' : `합계 ${dice[0] + dice[1] + dice[2]}`}</Text><View style={[styles.sicboDiceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{dice.map((value, index) => <Die key={index} value={value} rolling={rolling} index={index} size={66}/>)}</View><Text style={styles.throwHint}>{rolling?'':pull>0?'놓으면 굴러갑니다':'그릇을 위로 쓸어 던지세요'}</Text>{net !== null && <Text style={[styles.sicboResult, net > 0 ? styles.positive : styles.negative]}>{net > 0 ? '당첨' : '미당첨'} · {net > 0 ? '+' : ''}{net.toLocaleString()} WC</Text>}</View><Pressable disabled={rolling || selectedBet > coins} style={[styles.primaryButton, styles.rouletteSpinButton, styles.sicboRollButton, (rolling || selectedBet > coins) && styles.disabledCard]} onPress={() => roll()}><Text style={styles.primaryButtonText}>{rolling ? '주사위 흔드는 중…' : `${sicBoBetLabel(bet)}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable>
     <Text style={styles.sectionTitle}>기본 베팅</Text><View style={styles.sicboFourGrid}>{optionButton({ type: 'big' }, '대 11–17', '1:1')}{optionButton({ type: 'small' }, '소 4–10', '1:1')}{optionButton({ type: 'odd' }, '홀수', '1:1')}{optionButton({ type: 'even' }, '짝수', '1:1')}</View>
     <Text style={styles.sectionTitle}>특정 합계</Text><View style={styles.sicboNumberGrid}>{Array.from({ length: 14 }, (_, index) => index + 4).map((value) => optionButton({ type: 'total', value }, String(value), value === 4 || value === 17 ? '50:1' : '6~18:1'))}</View>
     <Text style={styles.sectionTitle}>특정 숫자</Text><View style={styles.sicboNumberGrid}>{[1,2,3,4,5,6].map((value) => optionButton({ type: 'single', value }, String(value), '1~3개'))}</View>
@@ -2355,7 +2357,7 @@ function YahtzeeGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
   return <View style={styles.sicboScreen}><ScreenHeader title="야찌(Yahtzee)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD DICE GAME</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{completed}/13칸</Text></View></View>
     {!started?<><View style={styles.sicboBowl}><Text style={styles.sicboResult}>한 판은 13라운드입니다</Text><Text style={styles.slotRuleText}>200점 이상 2배 · 250점 이상 3배</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={begin}><Text style={styles.primaryButtonText}>{selectedBet.toLocaleString()} WC로 시작</Text></Pressable></>:
-    <><View {...panHandlers} style={[styles.sicboBowl,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':finished?'게임 종료':rollCount===0?'새 라운드':`${rollCount}/3회 굴림`}</Text><View style={[styles.sicboDiceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{dice.map((value,index)=><Pressable key={index} disabled={rollCount===0||finished||rolling} onPress={()=>setHeld((current)=>current.map((item,i)=>i===index?!item:item))} style={[styles.yahtzeeDieButton,held[index]&&styles.yahtzeeHeld]}><Die value={value} rolling={rolling&&!held[index]} index={index}/><Text style={styles.yahtzeeHoldText}>{held[index]?'KEEP':'보관'}</Text></Pressable>)}</View><Text style={styles.sicboResult}>현재 {total}점{yahtzeeUpperBonus(card)>0?' · 상단 보너스 +35':''}</Text></View>
+    <><View {...panHandlers} style={[styles.sicboBowl,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':finished?'게임 종료':rollCount===0?'새 라운드':`${rollCount}/3회 굴림`}</Text><View style={[styles.sicboDiceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{dice.map((value,index)=><Pressable key={index} disabled={rollCount===0||finished||rolling} onPress={()=>setHeld((current)=>current.map((item,i)=>i===index?!item:item))} style={[styles.yahtzeeDieButton,held[index]&&styles.yahtzeeHeld]}><Die value={value} rolling={rolling&&!held[index]} index={index} size={52}/><Text style={styles.yahtzeeHoldText}>{held[index]?'KEEP':'보관'}</Text></Pressable>)}</View><Text style={styles.sicboResult}>현재 {total}점{yahtzeeUpperBonus(card)>0?' · 상단 보너스 +35':''}</Text></View>
     {!finished?<Pressable disabled={rollCount>=3||rolling} style={[styles.primaryButton,styles.rouletteSpinButton,(rollCount>=3||rolling)&&styles.disabledCard]} onPress={()=>roll()}><Text style={styles.primaryButtonText}>{rolling?'주사위 굴리는 중…':rollCount===0?'주사위 굴리기':rollCount<3?'나머지 다시 굴리기':'점수칸을 선택하세요'}</Text></Pressable>:<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={begin}><Text style={styles.primaryButtonText}>새 게임 시작</Text></Pressable>}
     <View style={styles.yahtzeeSummary}><Text style={styles.slotRulesTitle}>점수 현황</Text><Text style={styles.slotRuleText}>상단 {yahtzeeUpperSubtotal(card)}/63 · 보너스 {yahtzeeUpperBonus(card)} · 총점 {total}</Text></View>
     <View style={styles.sicboFourGrid}>{yahtzeeCategories.map((category)=>{const saved=card[category];const preview=rollCount>0?scoreYahtzeeCategory(category,dice):0;return <Pressable key={category} disabled={saved!==undefined||rollCount===0||finished} onPress={()=>choose(category)} style={[styles.sicboBetButton,saved!==undefined&&styles.disabledCard]}><Text style={styles.sicboBetTitle}>{yahtzeeCategoryLabels[category]}</Text><Text style={styles.sicboOdds}>{saved!==undefined?`${saved}점`:rollCount>0?`선택 시 ${preview}점`:'—'}</Text></Pressable>;})}</View>
@@ -2410,7 +2412,7 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
 }
 
 function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}){
-  const [round,setRound]=useState<{player:Card[];dealer:Card[]}|null>(null);
+  const [round,setRound]=useState<{player:Card[];dealer:Card[];guests:Card[][]}|null>(null);
   const [lowIds,setLowIds]=useState<string[]>([]);
   const [dealerSplit,setDealerSplit]=useState<PaiGowSplit|null>(null);
   const [outcome,setOutcome]=useState<ReturnType<typeof resolvePaiGow>|null>(null);
@@ -2449,7 +2451,13 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   // 겹쳐야만 들어갈 때만 겹칩니다. 자리가 남으면 나란히 놓아 카드가 다 보입니다.
   const fan=dealerCrowded?{marginLeft:cardFanMargin(dealerSize)}:null;
   const cardRow=[styles.dealerCardRow,{minHeight:cardSizeBox[dealerSize].height+16,gap:dealerCrowded?0:6}];
-  const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGow());setLowIds([]);setDealerSplit(null);setOutcome(null);};
+  /**
+   * 같은 딜러를 상대하는 손님 둘.
+   * ⚠️ **자리를 한 칸도 안 씁니다.** 이 화면은 남는 자리가 12뿐이라(4번 참고)
+   * 손님 줄을 새로 두면 판이 잘립니다. 그래서 딜러 이름줄과 결과 줄에 **얹어서만** 보여 줍니다.
+   */
+  const guestCount=2;
+  const start=()=>{if(!onPlaceBet(selectedBet))return;reveal.reset();setPending(null);setRound(dealPaiGowTable(guestCount));setLowIds([]);setDealerSplit(null);setOutcome(null);};
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
   useAutoStart(() => start());
   const toggle=(id:string)=>{if(outcome)return;setLowIds(current=>current.includes(id)?current.filter(item=>item!==id):current.length<2?[...current,id]:current);};
@@ -2480,6 +2488,14 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
   };
   const valid=chosenLow.length===2&&isValidPaiGowSplit(chosenHigh,chosenLow);
   const playerSplit=valid?splitPaiGow(round!.player,lowIds):null;
+  // 손님들도 같은 딜러와 겨룹니다. 자동 배치로 두고 **결과만 한 줄에 붙입니다**(자리를 안 먹습니다).
+  const guestLine=outcome&&dealerSplit&&round
+    ? ' · '+round.guests.map((hand,index)=>{
+        const seat=arrangePaiGow(hand);
+        const done=resolvePaiGow(seat,dealerSplit);
+        return '손님 '+(index+1)+' '+(done.result==='win'?'승':done.result==='push'?'무':'패');
+      }).join(' · ')
+    : '';
   const showdown=()=>{if(!round||!playerSplit||pending||outcome||dealing)return;const house=arrangePaiGow(round.dealer),resolved=resolvePaiGow(playerSplit,house);setDealerSplit(house);reveal.reset();setPending(resolved);};
   const openNext=()=>{
     if(!pending||!playerSplit)return;
@@ -2494,7 +2510,7 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
-      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:'승부 전 비공개'}</Text></View>
+      <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatNote}>{outcome&&dealerSplit?`${dealerSplit.highRank.label} / ${dealerSplit.lowRank.label}`:pending?`${reveal.opened}장 공개`:`손님 ${guestCount}명 · 승부 전 비공개`}</Text></View>
       <View style={cardRow}>{round.dealer.slice(0,deal.countFor(1)).map((card,index)=><View key={card.id} style={index?fan:null}><PlayingCard card={card} size={dealerSize} hidden={index>=reveal.opened} emphasis={outcome?(outcome.result==='loss'?'winner':'dim'):undefined}/></View>)}</View>
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>내 카드</Text><Text style={styles.dealerSeatNote}>로우로 보낼 2장 선택 · {lowIds.length}/2</Text></View>
       {/* ⚠️ 하이 줄은 위 여백 16입니다. 이긴 카드가 위로 16 들려 이름줄을 덮기 때문입니다.
@@ -2506,7 +2522,7 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     {/* 승·패는 제목 옆에 붙입니다. 아래에 한 줄 더 두면 그만큼 판이 잘립니다. */}
     <View style={styles.paiGowHandSummary}><View style={styles.highLowResult}><View style={styles.paiGowSummaryHead}><Text style={styles.highLowResultTitle}>하이 · 5장</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.high==='win'?'승':'패'}</Text>}</View><Text style={styles.slotRuleText}>{playerSplit?.highRank.label??(lowIds.length===2?'파울 배치':'2장을 선택하세요')}</Text></View><View style={styles.highLowResult}><View style={styles.paiGowSummaryHead}><Text style={styles.highLowResultTitle}>로우 · 2장</Text>{outcome&&<Text style={styles.paiGowResultMark}>{outcome.low==='win'?'승':'패'}</Text>}</View><Text style={styles.slotRuleText}>{chosenLow.length===2?evaluatePaiGowTwo(chosenLow).label:'—'}</Text></View></View>
     {pending?<RevealButton opened={reveal.opened} total={7} onPress={openNext} label="딜러 패 열기"/>:!outcome?<><View style={styles.pokerActionRow}><Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable><Pressable disabled={!valid} style={[styles.primaryButton,styles.paiGowShowdownButton,!valid&&styles.disabledCard]} onPress={showdown}><Text style={styles.primaryButtonText}>승부 보기</Text></Pressable></View>{lowIds.length===2&&!valid&&<Text style={styles.paiGowWarning}>파울: 하이 핸드가 로우 핸드보다 강하도록 다시 선택하세요.</Text>}</>:
-    <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
+    <><Text style={styles.sicboResult}>{outcome.result==='win'?'두 패를 모두 이겼습니다':outcome.result==='push'?'한 패씩 이겨 무승부입니다':'두 패 모두 딜러가 이겼습니다'}{guestLine}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>다시 하기</Text></Pressable></>}</>}
   </View></View>;
 }
 
@@ -5862,7 +5878,23 @@ function BlackjackGameScreen(props: {
   onPlayAgain: () => void;
   onExit: () => void;
 }) {
-  const initial = useRef(dealInitialRound(shuffleDeck(createDeck()))).current;
+  /**
+   * 자리에 앉는 손님 수. **딜러 한 사람이 모두를 상대합니다.**
+   * ⚠️ 손님이 이기든 지든 내 정산에는 영향이 없습니다. 같은 슈에서 카드만 나눠 받습니다.
+   */
+  const guestCount = 2;
+  const initial = useRef((() => {
+    const dealt = dealTableRound(shuffleDeck(createDeck()), guestCount);
+    // 손님은 앉자마자 제 패를 끝까지 뽑아 둡니다(17 미만이면 더 받는 규칙).
+    // 결과는 딜러가 다 열릴 때 같이 보여 줍니다.
+    let rest = dealt.deck;
+    const seated = dealt.guests.map((hand, index) => {
+      const played = playGuestHand(rest, hand);
+      rest = played.deck;
+      return { name: `손님 ${index + 1}`, hand: played.hand };
+    });
+    return { deck: rest, player: dealt.player, dealer: dealt.dealer, seated };
+  })()).current;
   const [deck, setDeck] = useState(initial.deck);
   const [player, setPlayer] = useState(initial.player);
   const [dealer, setDealer] = useState(initial.dealer);
@@ -6064,6 +6096,17 @@ function BlackjackGameScreen(props: {
           </View>
 
           <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
+          {/* 같은 딜러를 상대하는 손님들. 한 줄만 쓰고 승·패는 얹기만 합니다. */}
+          <View style={styles.tableGuestRow}>{initial.seated.map((guest) => {
+            const done = phase === 'result';
+            const outcome = done ? guestResult(guest.hand, dealer) : null;
+            const mark = outcome === 'blackjack' ? 'BJ' : outcome === 'win' ? '승' : outcome === 'loss' ? '패' : outcome === 'push' ? '무' : '';
+            return <View key={guest.name} style={[styles.tableGuest, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
+              <Text style={styles.tableGuestName}>{guest.name}</Text>
+              <Text style={styles.tableGuestValue}>{done ? handValue(guest.hand) : `${guest.hand.length}장`}</Text>
+              {mark ? <Text style={styles.tableGuestMark}>{mark}</Text> : null}
+            </View>;
+          })}</View>
 
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : '플레이어'}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
           <View style={handRow}>
@@ -6168,8 +6211,16 @@ function CrapsSetupScreen(props: { coins: number; difficulty: string; selectedBe
   return <View style={styles.detailScreen}><ScreenHeader title="크랩스(Craps) 준비" onBack={props.onBack} /><ScrollView {...useScrollMemory('CrapsSetupScreen')} contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}><View style={styles.crapsSetupHero}><Text style={styles.crapsHeroDice}>⚄ ⚂</Text><Text style={styles.detailLead}>주사위 합으로 승부</Text><Text style={styles.gameListDescription}>두 주사위를 굴리고 포인트가 7보다 먼저 나올지 예측합니다.</Text></View><CrapsRules /><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item) => <Pressable key={item.name} style={[styles.setupOption, props.difficulty === item.name && styles.setupOptionActive]} onPress={() => props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle, props.difficulty === item.name && styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={props.selectedBet === amount} onPress={() => props.onBetChange(amount)} />)}</View><View style={styles.setupSummary}><Row title="보유 코인" value={`${props.coins.toLocaleString()} WC`} /><View style={styles.separator} /><Row title="베팅 등급" value={betTierName(props.difficulty)} /><View style={styles.separator} /><Row title="선택 베팅" value={`${props.selectedBet.toLocaleString()} WC`} /></View><Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>크랩스(Craps) 시작</Text></Pressable></ScrollView></View>;
 }
 
-function Die({ value, rolling=false, index=0 }: { value: number; rolling?:boolean; index?:number }) {
-  return <View style={[styles.die,rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-7:6):0},{scale:rolling?1.08:1}]}]}><Text style={styles.dieText}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text></View>;
+/**
+ * 주사위 한 개. `size`로 크기를 정합니다(기본 88).
+ *
+ * ⚠️ 전에는 크기를 `transform: scale`로 줄였습니다. 그러면 **보이는 것만 작아지고
+ * 자리는 88 그대로**라 다섯 개를 놓는 야찌에서 줄이 넘치고 사이가 뻥 떴습니다.
+ * 크기를 진짜로 바꿔야 자리도 같이 줄어듭니다.
+ */
+function Die({ value, rolling=false, index=0, size=88 }: { value: number; rolling?:boolean; index?:number; size?:number }) {
+  const lift = Math.round(size * 0.08);
+  return <View style={[styles.die,{width:size,height:size,borderRadius:Math.round(size*0.19)},rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-lift:lift):0},{scale:rolling?1.08:1}]}]}><Text style={[styles.dieText,{fontSize:Math.round(size*0.75),lineHeight:Math.round(size*0.86)}]}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text></View>;
 }
 
 function FaceDownCardDeck({label='DECK',small=false}:{label?:string;small?:boolean}){
@@ -6692,6 +6743,15 @@ function RouletteGameScreen({
   const [phase, setPhase] = useState<'betting' | 'spinning' | 'result'>('betting');
   const [resultNumber, setResultNumber] = useState<number | null>(null);
   const wheelProgress = useRef(new Animated.Value(0)).current;
+  /**
+   * 공. 0에서 1까지 가면서 **휠과 반대로** 아홉 바퀴를 돌고 마지막에 안쪽으로 떨어집니다.
+   *
+   * ⚠️ 전에는 공이 판 맨 위에 **가만히 붙어** 있었습니다. 휠만 도니까 공이 도는 것처럼
+   * 안 보였습니다. 실제 룰렛은 공이 휠 반대로 돌다가 속도가 죽으면 칸으로 떨어집니다.
+   * ⚠️ 끝나는 자리는 **반드시 맨 위(0도)** 여야 합니다 — 당첨 숫자가 맨 위 마커 아래로
+   * 오도록 휠을 멈추기 때문에, 공도 거기 있어야 읽는 자리가 맞습니다.
+   */
+  const ballProgress = useRef(new Animated.Value(0)).current;
   const difficultyOption = difficultyOptions.find((item) => item.name === difficulty) ?? difficultyOptions[2];
   const outsideBets: { label: string; bet: RouletteBet; color?: string }[] = [
     { label: '빨강', bet: { type: 'red' }, color: '#A8323A' },
@@ -6753,9 +6813,18 @@ function RouletteGameScreen({
     const target = 360 * 6 + landing;
 
     wheelProgress.setValue(0);
+    ballProgress.setValue(0);
     setPhase('spinning');
     setResultNumber(null);
     pendingSettle.current = () => onSettle(bet, selectedBet, number, betLabel);
+
+    // 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
+    Animated.timing(ballProgress, {
+      toValue: 1,
+      duration: Math.max(260, Math.round(4200 * motion)),
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
@@ -6771,6 +6840,10 @@ function RouletteGameScreen({
   };
 
   const wheelRotation = wheelProgress.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
+  // 아홉 바퀴를 반대로 돕니다. 3240 = 360 × 9. 끝나는 자리는 다시 0도(맨 위)입니다.
+  const ballRotation = ballProgress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-3240deg'] });
+  // 처음에는 바깥 테두리를 돌다가 마지막에 안쪽 칸으로 떨어집니다.
+  const ballRadius = ballProgress.interpolate({ inputRange: [0, 0.78, 1], outputRange: [-140, -137, -124] });
   const shownNumber = phase === 'spinning' ? tickingNumber : resultNumber;
   const shownColor = shownNumber === null ? null : rouletteColor(shownNumber);
 
@@ -6785,7 +6858,10 @@ function RouletteGameScreen({
 
         <View style={styles.rouletteStage}>
           <View style={styles.rouletteMarker} />
-          <View style={styles.rouletteBall} />
+          {/* 가운데에 점 하나를 두고 그 점을 돌리면 공이 원을 그립니다. 자리는 안 먹습니다. */}
+          <Animated.View pointerEvents="none" style={[styles.rouletteBallOrbit, { transform: [{ rotate: ballRotation }] }]}>
+            <Animated.View style={[styles.rouletteBall, { transform: [{ translateY: ballRadius }] }]} />
+          </Animated.View>
           <View style={[styles.rouletteWheel, phase === 'spinning' && styles.rouletteWheelSpinning]}>
             <Animated.View style={[styles.rouletteWheelRing, { transform: [{ rotate: wheelRotation }] }]}>
               {europeanWheelOrder.map((number, index) => {
@@ -8597,12 +8673,15 @@ const styles = StyleSheet.create({
 
   sicboPage: { padding: 18, paddingBottom: 46 },
   sicboBowl: { minHeight: 230, alignItems: 'center', justifyContent: 'center', marginTop: 18, borderRadius: 115, backgroundColor: '#621B22', borderWidth: 5, borderColor: '#D8B451' },
-  sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 22, transform: [{ scale: 0.75 }] },
+  // ⚠️ `scale`을 쓰지 않습니다 — 보이는 것만 줄고 자리는 그대로라 줄이 넘칩니다.
+  //    크기는 `Die`의 size로 줍니다(식보 세 개는 66, 야찌 다섯 개는 52).
+  sicboDiceRow: { flexDirection: 'row', gap: 8, marginTop: 16, justifyContent: 'center' },
   // ⚠️ lineHeight를 안 주면 한글 윗부분이 잘립니다(파이 고우 결과 줄에서 봤습니다).
   // ⚠️ color가 없으면 글자가 검정으로 떨어져 어두운 바탕에서 거의 안 보입니다.
   //    파이 고우 결과 줄이 잘린 것처럼 보인 것이 이것이었습니다(승·패 색은 뒤에 덧씌웁니다).
   sicboResult: { color: colors.text, fontSize: 16, lineHeight: 26, fontWeight: '900' },
-  yahtzeeDieButton: { alignItems:'center', gap:5, padding:4, borderRadius:12, borderWidth:2, borderColor:'transparent' },
+  // 다섯 개가 한 줄에 들어가야 합니다. 52짜리 다섯 개에 여백까지 (52+8)×5 + 틈 32 = 332 ≤ 359.
+  yahtzeeDieButton: { alignItems:'center', gap:3, padding:3, borderRadius:10, borderWidth:2, borderColor:'transparent' },
   yahtzeeHeld: { backgroundColor:'rgba(225,182,63,0.22)', borderColor:'#E1B63F', transform:[{translateY:-8}] },
   yahtzeeHoldText: { color:'#F3D77B', fontSize:9, fontWeight:'900' },
   yahtzeeSummary: { marginVertical:14, padding:14, borderRadius:14, backgroundColor:'#101C27', borderWidth:1, borderColor:'#314355' },
@@ -8700,6 +8779,14 @@ const styles = StyleSheet.create({
   // 펠트에 그려진 베팅 자리. 고른 자리에 지금 걸 칩이 올라갑니다.
   // 손님 셋이 한 줄에 들어갑니다. 승·패는 얹기만 해서 자리를 안 늘립니다.
   baccaratGuestRow: { flexDirection: 'row', gap: 5, marginTop: 4, justifyContent: 'center' },
+  // 블랙잭 손님 줄. 자리를 한 줄만 쓰고 승·패는 얹기만 합니다.
+  tableGuestRow: { flexDirection: 'row', gap: 6, marginVertical: 2, justifyContent: 'center' },
+  tableGuest: { minWidth: 66, paddingVertical: 3, paddingHorizontal: 6, borderRadius: 9, alignItems: 'center', backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
+  tableGuestWon: { borderColor: colors.gold },
+  tableGuestLost: { opacity: 0.45 },
+  tableGuestName: { color: '#9FC4B4', fontSize: 9, fontWeight: '800' },
+  tableGuestValue: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
+  tableGuestMark: { position: 'absolute', right: 3, top: 0, color: '#FFE080', fontSize: 10, fontWeight: '900' },
   baccaratGuest: { minWidth: 72, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 9, alignItems: 'center', backgroundColor: 'rgba(4,40,26,0.45)', borderWidth: 1, borderColor: '#2F6B52' },
   baccaratGuestWon: { borderColor: colors.gold },
   baccaratGuestLost: { opacity: 0.45 },
@@ -8741,7 +8828,9 @@ const styles = StyleSheet.create({
   difficultyBadgeText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
   rouletteStage: { height: 330, alignItems: 'center', justifyContent: 'center' },
   rouletteMarker: { position: 'absolute', zIndex: 6, top: 2, width: 0, height: 0, borderLeftWidth: 12, borderRightWidth: 12, borderTopWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFE39A' },
-  rouletteBall: { position: 'absolute', zIndex: 6, top: 30, width: 13, height: 13, borderRadius: 7, backgroundColor: '#FFFDF5', borderWidth: 1, borderColor: '#B99B4E', shadowColor: '#000000', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  // 공이 도는 궤도. 크기가 없는 점이라 자리를 안 먹고, 이걸 돌리면 공이 원을 그립니다.
+  rouletteBallOrbit: { position: 'absolute', zIndex: 6, width: 0, height: 0, alignItems: 'center', justifyContent: 'center' },
+  rouletteBall: { position: 'absolute', width: 13, height: 13, borderRadius: 7, backgroundColor: '#FFFDF5', borderWidth: 1, borderColor: '#B99B4E', shadowColor: '#000000', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   rouletteWheel: { width: 316, height: 316, alignItems: 'center', justifyContent: 'center', borderRadius: 158, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
   rouletteWheelSpinning: { borderColor: '#FFE39A' },
   rouletteWheelRing: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: '#141C1A', borderWidth: 2, borderColor: '#E0C276' },

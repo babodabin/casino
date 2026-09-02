@@ -59,6 +59,20 @@ export function dealPaiGow(random:()=>number=Math.random) {
   return { player:deck.slice(0,7), dealer:deck.slice(7,14) };
 }
 
+/**
+ * 손님까지 같이 돌립니다. **딜러 한 사람이 모두를 상대합니다.**
+ * 한 벌은 52장이고 한 사람이 일곱 장을 받으니 **딜러까지 여섯 자리**가 최대입니다.
+ * ⚠️ 손님이 이기든 지든 **내 정산에는 영향이 없습니다.** 같은 덱에서 나눠 받을 뿐입니다.
+ */
+export function dealPaiGowTable(guests: number, random:()=>number=Math.random) {
+  const seats = Math.max(0, Math.min(4, guests));
+  const deck = shuffleDeck(createDeck(), random);
+  const player = deck.slice(0, 7);
+  const guestHands = Array.from({ length: seats }, (_, index) => deck.slice(7 + index * 7, 14 + index * 7));
+  const dealer = deck.slice(7 + seats * 7, 14 + seats * 7);
+  return { player, guests: guestHands, dealer };
+}
+
 export function resolvePaiGow(player:PaiGowSplit,dealer:PaiGowSplit):{result:PaiGowResult;high:'win'|'loss';low:'win'|'loss'} {
   // 같은 패는 뱅커가 이기는 일반 규칙을 적용합니다.
   const high=compareHands(player.highRank,dealer.highRank)>0?'win':'loss';

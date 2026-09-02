@@ -12,6 +12,10 @@ import {
   playDealer,
   resolveRound,
   type Card,
+  dealTableRound,
+  playGuestHand,
+  guestResult,
+  shuffleDeck,
 } from '../src/blackjack.ts';
 
 const card = (rank: Card['rank'], suit: Card['suit'] = '♠'): Card => ({ id: `${suit}-${rank}`, rank, suit });
@@ -95,4 +99,50 @@ test('스플릿한 손의 21도 딜러 블랙잭에는 진다', () => {
 
   assert.equal(resolveRound(twentyOne, dealerBlackjack), 'push');
   assert.equal(resolveRound(twentyOne, dealerBlackjack, false), 'loss');
+});
+
+test('손님 몫까지 같이 돌리고 딜러가 마지막에 받는다', () => {
+  const deck = shuffleDeck(createDeck(), () => 0.4);
+  const dealt = dealTableRound(deck, 2);
+  assert.equal(dealt.player.length, 2);
+  assert.equal(dealt.guests.length, 2);
+  assert.equal(dealt.guests.every((hand) => hand.length === 2), true);
+  assert.equal(dealt.dealer.length, 2);
+  // 같은 카드가 두 자리에 가면 안 됩니다.
+  const ids = [...dealt.player, ...dealt.guests.flat(), ...dealt.dealer].map((card) => card.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.equal(dealt.deck.length, deck.length - 8);
+  // 손님이 없으면 예전과 똑같습니다.
+  const alone = dealTableRound(deck, 0);
+  assert.equal(alone.guests.length, 0);
+  assert.equal(alone.deck.length, deck.length - 4);
+});
+
+test('손님은 17 미만이면 더 받고 17부터 멈춘다', () => {
+  const deck = shuffleDeck(createDeck(), () => 0.31);
+  const played = playGuestHand(deck, [
+    { id: 'g1', suit: '♠', rank: '5' },
+    { id: 'g2', suit: '♥', rank: '6' },
+  ]);
+  assert.equal(handValue(played.hand) >= 17 || played.hand.length > 2, true);
+  // 이미 17이면 한 장도 안 받습니다.
+  const stands = playGuestHand(deck, [
+    { id: 'g3', suit: '♠', rank: '10' },
+    { id: 'g4', suit: '♥', rank: '7' },
+  ]);
+  assert.equal(stands.hand.length, 2);
+  assert.equal(stands.deck.length, deck.length);
+});
+
+test('손님과 딜러를 견주는 규칙은 나와 같다', () => {
+  const two = (a: string, b: string) => [
+    { id: a + '1', suit: '♠' as const, rank: a as never },
+    { id: b + '2', suit: '♥' as const, rank: b as never },
+  ];
+  assert.equal(guestResult(two('10', '9'), two('10', '8')), 'win');
+  assert.equal(guestResult(two('10', '8'), two('10', '9')), 'loss');
+  assert.equal(guestResult(two('10', '9'), two('10', '9')), 'push');
+  assert.equal(guestResult(two('A', 'K'), two('10', '9')), 'blackjack');
+  // 21을 넘기면 딜러가 무엇이든 집니다.
+  assert.equal(guestResult([...two('10', '9'), { id: 'x', suit: '♦', rank: '5' }], two('10', '2')), 'loss');
 });
