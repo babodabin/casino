@@ -3115,15 +3115,31 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
 const shellCupColor='#B4552F';
 const fishName=(field:RaceFish[],id:number)=>{const fish=field.find(item=>item.id===id);return fish?`${fish.id}. ${fish.name}`:`${id}번`;};
 
-function YutStickView({face,tumbling}:{face:YutFace;tumbling:boolean}){
-  return <View style={[styles.yutStick,face==='배'?styles.yutStickFlat:styles.yutStickRound,tumbling&&styles.yutStickTumbling]}>
+/**
+ * 윷가락 하나. 던지는 동안 **원근을 걸고 긴 축으로 굴러갑니다**(rotateY).
+ * 윷가락은 반달 모양이라 좌우로 뒤집히는 것이 실제 모습에 가깝습니다.
+ * ⚠️ 주사위와 같은 한계입니다 — 진짜 입체가 아니라 한 면을 3D로 돌리는 데까지입니다.
+ */
+function YutStickView({face,tumbling,index=0}:{face:YutFace;tumbling:boolean;index?:number}){
+  const roll = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!tumbling) { Animated.timing(roll, { toValue: 0, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(); return; }
+    const spin = Animated.loop(Animated.timing(roll, { toValue: 1, duration: 460 + index * 70, easing: Easing.linear, useNativeDriver: true }));
+    roll.setValue(0);
+    spin.start();
+    return () => { spin.stop(); };
+  }, [tumbling, index, roll]);
+  const spinY = roll.interpolate({ inputRange: [0, 1], outputRange: ['0deg', index % 2 === 0 ? '360deg' : '-360deg'] });
+  const tilt = roll.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['0deg', '18deg', '0deg'] });
+  const hop = roll.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -14, 0] });
+  return <Animated.View style={[styles.yutStick,face==='배'?styles.yutStickFlat:styles.yutStickRound,tumbling&&styles.yutStickTumbling,{transform:[{perspective:260},{rotateY:spinY},{rotateZ:tilt},{translateY:tumbling?hop:0}]}]}>
     {/* 반달로 깎은 나무처럼 보이게 하는 두 겹. 왼쪽이 밝고 오른쪽이 어둡습니다.
         배(평평한 면)는 결이 옅고, 등(둥근 면)은 가운데가 볼록해 보이게 더 셉니다. */}
     <View pointerEvents="none" style={[styles.yutStickShine,face==='등'&&styles.yutStickShineRound]} />
     <View pointerEvents="none" style={[styles.yutStickShade,face==='등'&&styles.yutStickShadeRound]} />
     {face==='배'&&<View style={styles.yutStickMark}/>}
     <Text style={[styles.yutStickFaceText,face==='배'?styles.yutStickFaceFlatText:styles.yutStickFaceRoundText]}>{face}</Text>
-  </View>;
+  </Animated.View>;
 }
 
 function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
@@ -3164,7 +3180,7 @@ function YutBetGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>YUT · 도 개 걸 윷 모</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{throwing?'윷을 던지는 중':outcome?`결과 ${outcome}`:'결과를 고르세요'}</Text></View></View>
     <View {...panHandlers} style={[styles.yutMat,pull>0&&styles.yutMatPulled]}>
       {/* 쓸어 올린 만큼 윷이 따라 올라옵니다. 자리를 안 먹게 옮기기만 합니다. */}
-      <View style={[styles.yutStickRow,{transform:[{translateY:-Math.round(pull*16)}]}]}>{sticks.map((face,index)=><YutStickView key={index} face={face} tumbling={throwing}/>)}</View>
+      <View style={[styles.yutStickRow,{transform:[{translateY:-Math.round(pull*16)}]}]}>{sticks.map((face,index)=><YutStickView key={index} face={face} tumbling={throwing} index={index}/>)}</View>
       <Text style={[styles.yutOutcomeText,won&&styles.yutOutcomeWin]}>{throwing?'…':outcome??'준비'}</Text>
       <Text style={styles.yutOutcomeDetail}>{throwing?'윷가락이 구르는 중입니다':pull>0?'놓으면 날아갑니다 · 세게 쓸수록 오래 구릅니다':outcome?`배 ${sticks.filter(face=>face==='배').length}개 · ${won?`${yutPayout[choice]}배 적중`:'미적중'}`:'배가 위로 오는 개수로 결과가 정해집니다'}</Text>
       <Text style={styles.yutThrowHint}>{throwing?'':'판을 위로 쓸어 던지세요'}</Text>
@@ -6223,15 +6239,42 @@ function CrapsSetupScreen(props: { coins: number; difficulty: string; selectedBe
  * 자리는 88 그대로**라 다섯 개를 놓는 야찌에서 줄이 넘치고 사이가 뻥 떴습니다.
  * 크기를 진짜로 바꿔야 자리도 같이 줄어듭니다.
  */
+/**
+ * 주사위 한 개. `size`로 크기를 정합니다(기본 88).
+ *
+ * 굴리는 동안은 **원근을 걸고 앞뒤(rotateX)·좌우(rotateY)로 뒹굽니다.** 던진 것처럼 보이라고
+ * 옆으로 미는 대신 축을 걸어 돌립니다.
+ *
+ * ⚠️ **정육면체(여섯 면이 있는 진짜 입체)는 못 만듭니다.** React Native에는
+ * `transform-style: preserve-3d`가 없어서 자식을 부모의 3D 공간에 놓을 수가 없습니다.
+ * 면을 여섯 개 만들어도 전부 한 평면으로 눌립니다. 그래서 **한 면을 3D로 굴리는** 데까지입니다.
+ */
 function Die({ value, rolling=false, index=0, size=88 }: { value: number; rolling?:boolean; index?:number; size?:number }) {
+  const tumble = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!rolling) {
+      // 멈추면 눈이 정면을 보게 되돌립니다.
+      Animated.timing(tumble, { toValue: 0, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+      return;
+    }
+    // 주사위마다 조금씩 다르게 돌아야 한 덩이로 안 보입니다.
+    const spin = Animated.loop(Animated.timing(tumble, { toValue: 1, duration: 520 + index * 90, easing: Easing.linear, useNativeDriver: true }));
+    tumble.setValue(0);
+    spin.start();
+    return () => { spin.stop(); };
+  }, [rolling, index, tumble]);
   const lift = Math.round(size * 0.08);
-  return <View style={[styles.die,{width:size,height:size,borderRadius:Math.round(size*0.19)},rolling&&styles.dieRolling,{transform:[{rotate:rolling?`${(value*47+index*71)%360}deg`:'0deg'},{translateY:rolling?(index%2===0?-lift:lift):0},{scale:rolling?1.08:1}]}]}>
+  // 앞뒤로 한 바퀴, 좌우로 한 바퀴 반. 두 축이 같이 돌아야 뒹구는 것처럼 보입니다.
+  const spinX = tumble.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+  const spinY = tumble.interpolate({ inputRange: [0, 1], outputRange: ['0deg', index % 2 === 0 ? '540deg' : '-540deg'] });
+  const hop = tumble.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -lift * 2, 0] });
+  return <Animated.View style={[styles.die,{width:size,height:size,borderRadius:Math.round(size*0.19)},rolling&&styles.dieRolling,{transform:[{perspective:size*4},{rotateX:spinX},{rotateY:spinY},{translateY:rolling?hop:0},{scale:rolling?1.06:1}]}]}>
     {/* 입체로 보이게 하는 두 겹. 빛은 왼쪽 위에서 오고 오른쪽 아래에 그늘이 집니다.
         자리를 안 먹게 둘 다 얹기만 합니다. */}
     <View pointerEvents="none" style={[styles.dieShine,{borderRadius:Math.round(size*0.19)}]} />
     <View pointerEvents="none" style={[styles.dieShade,{borderRadius:Math.round(size*0.19)}]} />
     <Text style={[styles.dieText,{fontSize:Math.round(size*0.75),lineHeight:Math.round(size*0.86)}]}>{['','⚀','⚁','⚂','⚃','⚄','⚅'][value]}</Text>
-  </View>;
+  </Animated.View>;
 }
 
 function FaceDownCardDeck({label='DECK',small=false}:{label?:string;small?:boolean}){
@@ -6702,10 +6745,12 @@ function BaccaratGameScreen({
 
         <DealerTable>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>PLAYER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.player.slice(0, openCount.player)) : '–'}</Text></View>
-          <View style={styles.dealerCardRow}>{round ? round.player.map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} compact hidden={index >= openCount.player} emphasis={shownEmphasis('player')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+          <View style={styles.dealerCardRow}>{/* ⚠️ **깔린 만큼만** 그립니다. 덮인 카드를 미리 놓아 두면 몇 장짜리 판인지가
+              그 자리에서 새어 나갑니다 — 세 번째 장이 올지 말지가 바카라의 재미입니다. */}
+            {round ? round.player.slice(0, openCount.player).map((card, index) => <PlayingCard key={`bp-${card.id}-${index}`} card={card} compact emphasis={shownEmphasis('player')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
           <Text style={styles.dealerFeltRule}>PLAYER 1 TO 1 · BANKER 0.95 TO 1 · TIE 8 TO 1</Text>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>BANKER</Text><Text style={styles.dealerSeatScore}>{round ? baccaratScore(round.banker.slice(0, openCount.banker)) : '–'}</Text></View>
-          <View style={styles.dealerCardRow}>{round ? round.banker.map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} compact hidden={index >= openCount.banker} emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
+          <View style={styles.dealerCardRow}>{round ? round.banker.slice(0, openCount.banker).map((card, index) => <PlayingCard key={`bb-${card.id}-${index}`} card={card} compact emphasis={shownEmphasis('banker')} />) : <Text style={styles.baccaratWaiting}>카드 대기</Text>}</View>
           <View style={styles.baccaratSpotRow}>{(['player', 'tie', 'banker'] as BaccaratBet[]).map((option) => {
             const active = bet === option;
             return <Pressable key={option} disabled={Boolean(round)} onPress={() => setBet(option)} style={[styles.baccaratSpot, active && styles.baccaratSpotActive]}>
