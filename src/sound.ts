@@ -10,7 +10,7 @@
  *   - 나머지는 음높이가 있는 소리입니다. 이길 때 올라가고 질 때 내려갑니다
  */
 
-export type SoundCue = 'card' | 'chip' | 'flip' | 'roll' | 'win' | 'lose';
+export type SoundCue = 'card' | 'chip' | 'flip' | 'roll' | 'win' | 'lose' | 'slap' | 'shuffle' | 'tile';
 
 export type Tone = {
   /** 소리결. noise는 음높이가 없는 잡음입니다. */
@@ -48,6 +48,27 @@ export const soundCues: Record<SoundCue, Tone[]> = {
     { wave: 'noise', freq: 1400, at: 0.17, dur: 0.05, gain: 0.14 },
     { wave: 'noise', freq: 1000, at: 0.27, dur: 0.06, gain: 0.12 },
   ],
+  /**
+   * 화투를 **치는** 소리. "탁."
+   * ⚠️ 카드 소리(`card`)와 다릅니다 — 화투는 놓는 것이 아니라 바닥에 때리는 것이라
+   * 시작이 세고 곧바로 죽습니다. 나무판을 치는 느낌이 나게 낮은 쪽을 남깁니다.
+   */
+  slap: [
+    { wave: 'noise', freq: 900, at: 0, dur: 0.05, gain: 0.3 },
+    { wave: 'triangle', freq: 320, at: 0, dur: 0.07, gain: 0.14 },
+  ],
+  // 패를 섞는 소리. 잡음을 여러 번 겹쳐 스치는 느낌을 냅니다.
+  shuffle: [
+    { wave: 'noise', freq: 2200, at: 0, dur: 0.1, gain: 0.14 },
+    { wave: 'noise', freq: 1800, at: 0.09, dur: 0.1, gain: 0.15 },
+    { wave: 'noise', freq: 2500, at: 0.19, dur: 0.1, gain: 0.14 },
+    { wave: 'noise', freq: 1600, at: 0.3, dur: 0.12, gain: 0.12 },
+  ],
+  // 마작패를 놓는 소리. 화투보다 단단하고 높습니다.
+  tile: [
+    { wave: 'noise', freq: 1500, at: 0, dur: 0.04, gain: 0.24 },
+    { wave: 'triangle', freq: 640, at: 0, dur: 0.05, gain: 0.1 },
+  ],
   // 이길 때. 도 · 미 · 솔로 올라갑니다.
   win: [
     { wave: 'triangle', freq: 523.25, at: 0, dur: 0.12, gain: 0.16 },
@@ -70,4 +91,6 @@ export const vibrationFor: Partial<Record<SoundCue, number>> = {
   win: 40,
   lose: 18,
   chip: 8,
+  // 치는 손맛. 화투는 때리는 것이라 짧게 한 번 울립니다.
+  slap: 12,
 };

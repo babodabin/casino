@@ -361,14 +361,14 @@ const STORAGE_KEYS = {
 };
 
 
-/** 게임 진행 속도. 숫자는 애니메이션 길이에 곱하는 배수입니다. */
+/**
+ * 게임 진행 속도.
+ * ⚠️ **설정에서 뺐습니다**(2026-09-02) — 서른두 게임 가운데 다섯 개에만 걸려서
+ * 고른 대로 되지 않는 설정이었습니다. 예전 백업 파일에 이 값이 들어 있어서
+ * **읽고 다시 저장하는 자리만 남겨 둡니다.** 화면에는 안 나옵니다.
+ */
 export type GameSpeed = '느림' | '보통' | '빠름';
-const gameSpeedOptions: { name: GameSpeed; factor: number; detail: string }[] = [
-  { name: '느림', factor: 1.8, detail: '연출을 길게 보고 싶을 때' },
-  { name: '보통', factor: 1, detail: '기본 속도' },
-  { name: '빠름', factor: 0.45, detail: '결과를 빨리 확인하고 싶을 때' },
-];
-const gameSpeedFactor = (speed: GameSpeed) => gameSpeedOptions.find((option) => option.name === speed)?.factor ?? 1;
+const gameSpeedNames: GameSpeed[] = ['느림', '보통', '빠름'];
 
 /** 접근성 설정. 저장되는 값 전부입니다. */
 export type AccessibilityOptions = {
@@ -593,7 +593,7 @@ function CasinoApp() {
           const parsed = JSON.parse(savedPreferences) as Partial<{ sound: boolean; vibration: boolean; gameSpeed: GameSpeed; accessibility: Partial<AccessibilityOptions> }>;
           if (typeof parsed.sound === 'boolean') setSound(parsed.sound);
           if (typeof parsed.vibration === 'boolean') setVibration(parsed.vibration);
-          if (parsed.gameSpeed && gameSpeedOptions.some((option) => option.name === parsed.gameSpeed)) setGameSpeed(parsed.gameSpeed);
+          if (parsed.gameSpeed && gameSpeedNames.includes(parsed.gameSpeed)) setGameSpeed(parsed.gameSpeed);
           if (parsed.accessibility) setAccessibility({ ...DEFAULT_ACCESSIBILITY, ...parsed.accessibility });
         } catch {
           AsyncStorage.removeItem(STORAGE_KEYS.preferences).catch(() => {});
@@ -655,7 +655,13 @@ function CasinoApp() {
   }, [accessibility.largeText, accessibility.highContrast]);
 
   // 애니메이션 길이에 곱하는 배수 하나로 룰렛·슬롯·파치슬롯·식보 연출을 모두 조절합니다.
-  const motion = accessibility.reduceMotion ? 0.08 : gameSpeedFactor(gameSpeed);
+  /**
+   * 연출 길이에 곱하는 값.
+   * ⚠️ 2026-09-02에 **게임 진행 속도 설정을 뺐습니다** — 서른두 게임 가운데 다섯 개
+   * (룰렛 · 바카라 · 슬롯 · 파치슬롯 · 식보)에만 걸려서, 고른 대로 안 되는 설정이었습니다.
+   * 남은 것은 접근성의 '애니메이션 줄이기' 하나입니다.
+   */
+  const motion = accessibility.reduceMotion ? 0.08 : 1;
 
   // 노치와 홈 인디케이터가 차지하는 높이. 웹에서는 CSS env()를 재서 가져옵니다.
   // (네이티브에서는 0으로 두고 화면이 알아서 처리하게 합니다.)
@@ -764,7 +770,7 @@ function CasinoApp() {
     if (preferences) {
       if (typeof preferences.sound === 'boolean') setSound(preferences.sound);
       if (typeof preferences.vibration === 'boolean') setVibration(preferences.vibration);
-      if (preferences.gameSpeed && gameSpeedOptions.some((option) => option.name === preferences.gameSpeed)) setGameSpeed(preferences.gameSpeed);
+      if (preferences.gameSpeed && gameSpeedNames.includes(preferences.gameSpeed)) setGameSpeed(preferences.gameSpeed);
       if (preferences.accessibility) setAccessibility({ ...DEFAULT_ACCESSIBILITY, ...preferences.accessibility });
     }
     setPendingImport(null);
@@ -4689,7 +4695,14 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
   const profile=mahjongProfiles[mode];
   type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean;otherRonSeats?:number[];onPassRon?:()=>void;kanRefundTransfers?:SichuanKanTransfer[]};
   type MahjongRoundResult={winner:number|null;winners?:number[];method:'론'|'쯔모'|'유국'|'유국만관';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
-  const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready'); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [deadWall,setDeadWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
+  const [phase,setPhase]=useState<'ready'|'playing'|'result'>('ready');
+  /**
+   * 판이 끝나면 결과와 '다음 국' 단추가 **화면 아래로 밀려납니다**(재 보니 929~954, 화면은 794).
+   * 마작판은 원래 길어서 그렇습니다. 끝나는 순간 저절로 내려서 보여 줍니다.
+   * ⚠️ 이 화면 하나를 마작 네 종류가 같이 씁니다. 여기 고치면 네 개가 같이 고쳐집니다.
+   */
+  const boardScroll=useRef<ScrollView|null>(null);
+  useEffect(()=>{if(phase==='playing')return;const timer=setTimeout(()=>boardScroll.current?.scrollToEnd({animated:true}),140);return ()=>clearTimeout(timer);},[phase]); const [player,setPlayer]=useState<MahjongTile[]>([]); const [opponents,setOpponents]=useState<MahjongTile[][]>([[],[],[]]); const [wall,setWall]=useState<MahjongTile[]>([]); const [deadWall,setDeadWall]=useState<MahjongTile[]>([]); const [rivers,setRivers]=useState<MahjongTile[][]>([[],[],[],[]]); const [drawnId,setDrawnId]=useState(''); const [message,setMessage]=useState('동1국을 시작하세요');
   const [openMelds,setOpenMelds]=useState<MahjongTile[][]>([]); const [pendingCall,setPendingCall]=useState<PendingCall|null>(null);
   const [riichiDeclared,setRiichiDeclared]=useState(false); const [choosingRiichi,setChoosingRiichi]=useState(false); const [riichiPoints,setRiichiPoints]=useState(25000); const [riichiMarker,setRiichiMarker]=useState('');
   const [doubleRiichiDeclared,setDoubleRiichiDeclared]=useState(false);
@@ -5226,7 +5239,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
           : choosingRiichi
             ? {step:'리치 선언',title:'노랗게 표시된 패를 하나 버리세요',detail:'각 선택지 아래에 그 패를 버렸을 때 기다리는 패가 표시됩니다. 선언 뒤에는 새로 뽑은 패만 버립니다.'}
             : {step:'내 차례',title:'밝게 올라온 패를 확인하고 한 장을 버리세요',detail:mode==='sichuan'?`정결한 ${suitNames[voidSuits[0]]}가 남아 있다면 그 종류부터 버리세요.`:'이어질 숫자나 같은 그림을 남기고, 몸통을 만들기 어려운 패를 누르세요.'};
-  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
+  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView ref={boardScroll} contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
     {/* 요령 한 줄은 도움말을 폈을 때만 보입니다. 판이 화면에 들어오는 것이 먼저입니다. */}
     {/* ⚠️ 사천의 정결 고르기 상자가 떠 있을 때는 이 줄을 뺍니다 — 같은 말을 두 번 하는 데다
         둘을 같이 두면 판이 47만큼 넘쳐 아래가 잘렸습니다. */}
@@ -5492,6 +5505,8 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
   // 친 패를 잠깐 보여 준 뒤 저절로 가져갑니다. 누를 필요 없이 보이기만 하면 됩니다.
   useEffect(()=>{
     if(!slap)return;
+    // 화투는 놓는 것이 아니라 치는 것입니다. 패가 바닥에 닿는 순간에 소리를 냅니다.
+    playCue('slap');
     setSlapPop(true);
     const pop=setTimeout(()=>setSlapPop(false),260);
     const timer=setTimeout(()=>takeSlap(),1200);
@@ -5517,6 +5532,7 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
 
   const start=()=>{
     if(!onPlaceBet(selectedBet))return;
+    playCue('shuffle');
     const next=dealGoStop(mode,Math.random,deckStyle,firstTurn);setRound(next);setSettled(false);setPendingPlay(null);setSlap(null);setSettleNote(null);
     if(next.finished)finish(next,true);
   };
@@ -7725,28 +7741,7 @@ function SettingsScreen(props: {
   pendingImport: { summary: string } | null;
   totalPlays: number;
 }) {
-  const [detail, setDetail] = useState<'speed' | 'accessibility' | null>(null);
-
-  if (detail === 'speed') return (
-    <Page>
-      <View style={styles.analysisHeader}>
-        <Pressable accessibilityRole="button" accessibilityLabel="뒤로" style={styles.analysisBack} onPress={() => setDetail(null)}><Text style={styles.analysisBackText}>‹</Text></Pressable>
-        <Text style={styles.pageTitle}>게임 진행 속도</Text>
-      </View>
-      <Text style={styles.helperText}>룰렛이 도는 시간, 슬롯 릴이 멈추는 시간, 주사위가 구르는 시간에 바로 적용됩니다.</Text>
-      <View style={styles.panel}>
-        {gameSpeedOptions.map((option, index) => (
-          <React.Fragment key={option.name}>
-            <Pressable accessibilityRole="button" onPress={() => props.setGameSpeed(option.name)}>
-              <Row title={option.name} subtitle={option.detail} value={props.gameSpeed === option.name ? '● 사용 중' : `${option.factor}배`} positive={props.gameSpeed === option.name} />
-            </Pressable>
-            {index < gameSpeedOptions.length - 1 && <View style={styles.separator} />}
-          </React.Fragment>
-        ))}
-      </View>
-      {props.accessibility.reduceMotion && <Text style={styles.helperText}>지금은 접근성의 &lsquo;애니메이션 줄이기&rsquo;가 켜져 있어 속도 설정보다 그쪽이 우선합니다.</Text>}
-    </Page>
-  );
+  const [detail, setDetail] = useState<'accessibility' | null>(null);
 
   if (detail === 'accessibility') return (
     <Page>
@@ -7848,8 +7843,6 @@ function SettingsScreen(props: {
         <ToggleRow icon="♪" title="효과음" value={props.sound} onValueChange={props.setSound} />
         <View style={styles.separator} />
         <ToggleRow icon="≈" title="진동" value={props.vibration} onValueChange={props.setVibration} />
-        <View style={styles.separator} />
-        <Pressable accessibilityRole="button" onPress={() => setDetail('speed')}><Row icon="▷" title="게임 진행 속도" value={`${props.gameSpeed}  ›`} /></Pressable>
         <View style={styles.separator} />
         <Pressable accessibilityRole="button" onPress={() => setDetail('accessibility')}><Row icon="◐" title="접근성" subtitle={accessibilitySummary(props.accessibility)} value="설정  ›" /></Pressable>
       </View>
@@ -8808,8 +8801,9 @@ const styles = StyleSheet.create({
   mahjongRecommendMark: { position: 'absolute', bottom: -10, color: '#B8F3C6', backgroundColor: '#205B35', fontSize: 6, fontWeight: '900', paddingHorizontal: 3, borderRadius: 4, overflow: 'hidden' },
   mahjongActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   mahjongRiichiButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#9E2029', borderWidth: 2, borderColor: '#F0C75B' },
-  mahjongCallPanel: { marginTop: 10, padding: 10, borderRadius: 14, backgroundColor: '#173E31', borderWidth: 1, borderColor: '#D6B95D' },
-  mahjongCallTitle: { color: '#FFF0B5', fontSize: 12, fontWeight: '900', textAlign: 'center', marginBottom: 8 },
+  // ⚠️ 반응 칸(치·퐁·론)이 뜨면 판이 화면 아래로 12px 넘쳤습니다. 여백을 그만큼 줄였습니다.
+  mahjongCallPanel: { marginTop: 4, padding: 7, borderRadius: 14, backgroundColor: '#173E31', borderWidth: 1, borderColor: '#D6B95D' },
+  mahjongCallTitle: { color: '#FFF0B5', fontSize: 12, fontWeight: '900', textAlign: 'center', marginBottom: 5 },
   mahjongCallButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6 },
   mahjongCallButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#28614D' },
   mahjongRonButton: { minHeight: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#B3232C', borderWidth: 1, borderColor: '#F0C75B' },
