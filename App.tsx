@@ -3227,13 +3227,14 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
           ⚠️ 한 줄에 열세 장을 넣으면 많이 겹쳐서 무슨 카드인지 안 보입니다(빅투와 같은 문제).
           반씩 나누면 겹치는 정도가 반으로 줄어 숫자가 읽힙니다.
         */}
-        {(()=>{const half=Math.ceil(remaining.length/2);
+        {/* ⚠️ **판(펠트)은 하나**입니다. 줄만 둘로 나눕니다 — 판을 둘로 나누면 테가 두 겹 보여 지저분합니다. */}
+        <View style={styles.chineseHandRow}>{(()=>{const half=Math.ceil(remaining.length/2);
           return [remaining.slice(0,half),remaining.slice(half)].map((row,rowIndex)=>row.length===0?null:
-            <View key={rowIndex} style={[styles.chineseHandRow,rowIndex?styles.bigTwoHandRowSecond:null]}>{row.map((card,index)=>{
+            <View key={rowIndex} style={[styles.chineseHandLine,rowIndex?styles.chineseHandLineSecond:null]}>{row.map((card,index)=>{
               const step=handStep(row.length,rowSize);
               return <Pressable key={card.id} style={index?{marginLeft:step-cardSizeBox[rowSize].width}:null} onPress={()=>place(card.id)}><PlayingCard card={card} size={rowSize}/></Pressable>;
             })}</View>);
-        })()}
+        })()}</View>
         {mine?.foul&&<Text style={styles.paiGowWarning}>파울입니다. 뒷줄이 가운뎃줄보다, 가운뎃줄이 앞줄보다 세도록 다시 놓으세요.</Text>}
         <View style={styles.pokerActionRow}>
           <Pressable style={styles.secondaryButton} onPress={recommend}><Text style={styles.secondaryButtonText}>추천 배치</Text></Pressable>
@@ -6567,19 +6568,30 @@ function BlackjackGameScreen(props: {
   };
 
   /**
-   * 손님 차례. **한 명씩, 한 장씩** 받습니다(17 미만이면 더 받는 규칙 그대로).
-   * 다 받으면 내 차례가 됩니다. 손님이 먼저 하는 것은 일부러입니다 —
-   * 내가 고르기 전에 **10이 몇 장 빠졌는지 볼 수 있어야** 셈이 됩니다.
+   * 손님 차례. **자리를 돌아가며 한 장씩** 받습니다.
+   *
+   * ⚠️ 전에는 손님 1이 17이 될 때까지 혼자 다 받고, 그다음 손님 2가 혼자 다 받았습니다.
+   * 규칙으로는 맞지만 보고 있으면 **한 사람만 계속 받는 것처럼** 보입니다.
+   * 이제 손님 1 → 손님 2 → 손님 1 → … 로 돌면서 한 장씩 받고,
+   * 17이 넘은 손님은 건너뜁니다. 다 서면 내 차례입니다.
+   *
+   * 손님이 나보다 먼저 하는 것은 일부러입니다 — 내가 고르기 전에
+   * **10이 몇 장 빠졌는지 볼 수 있어야** 셈이 됩니다.
    */
   useEffect(() => {
     if (phase !== 'guests' || dealing || insuranceOpen) return;
-    if (guestTurn >= guestCount) { setPhase('player'); return; }
-    const hand = guestHands[guestTurn] ?? [];
+    // 아직 더 받아야 하는 손님이 있는지 봅니다.
+    const needsCard = guestHands.map((hand) => handValue(hand) < 17);
+    if (!needsCard.some(Boolean) || deck.length === 0) { setPhase('player'); return; }
+    // 지금 자리부터 오른쪽으로 돌면서 더 받을 손님을 찾습니다.
+    let seat = guestTurn % guestCount;
+    for (let step = 0; step < guestCount && !needsCard[seat]; step += 1) seat = (seat + 1) % guestCount;
     const timer = setTimeout(() => {
-      if (handValue(hand) >= 17 || deck.length === 0) { setGuestTurn((seat) => seat + 1); return; }
-      const next = drawCard(deck, hand);
+      const next = drawCard(deck, guestHands[seat] ?? []);
       setDeck(next.deck);
-      setGuestHands((hands) => hands.map((item, index) => (index === guestTurn ? next.hand : item)));
+      setGuestHands((hands) => hands.map((item, index) => (index === seat ? next.hand : item)));
+      // 한 장 받았으면 다음 자리로 넘깁니다.
+      setGuestTurn(seat + 1);
     }, GUEST_TURN_MS);
     return () => clearTimeout(timer);
   }, [phase, dealing, insuranceOpen, guestTurn, guestHands, deck]);
@@ -6792,7 +6804,7 @@ function BlackjackGameScreen(props: {
             const done = phase === 'result';
             const outcome = done ? guestResult(hand, dealer) : null;
             const mark = outcome === 'blackjack' ? 'BJ' : outcome === 'win' ? '승' : outcome === 'loss' ? '패' : outcome === 'push' ? '무' : '';
-            const nowPlaying = phase === 'guests' && !dealing && guestTurn === seat;
+            const nowPlaying = phase === 'guests' && !dealing && guestTurn % guestCount === seat && handValue(hand) < 17;
             return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
               {/* 손님 패를 실제로 보여 줍니다 — 10이 몇 장 빠졌는지 세려면 패가 보여야 합니다. */}
               {/*
@@ -8679,7 +8691,10 @@ const styles = StyleSheet.create({
   chineseEmptySlot: { width: 58, height: 88, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: '#3A4459' },
   chineseOpponentLine: { color: '#A08FA0', fontSize: 12, fontWeight: '700' },
   // ⚠️ 접히지 않습니다. 겹치는 정도를 폭에 맞춰 재기 때문에 열세 장이 한 줄에 들어갑니다.
-  chineseHandRow: { ...feltLook, width: '100%', flexDirection: 'row', alignItems: 'center', borderWidth: 4, paddingVertical: 6 },
+  // 판 하나 안에 줄 둘. 판을 둘로 나누면 테가 두 겹 보입니다.
+  chineseHandRow: { ...feltLook, width: '100%', borderWidth: 4, paddingVertical: 6, gap: 4 },
+  chineseHandLine: { flexDirection: 'row', alignItems: 'center' },
+  chineseHandLineSecond: {},
   /** 이미 펠트 위에 올라가 있는 줄. 펠트를 두 번 겹치지 않게 맨 모양으로 둡니다. */
   handRowPlain: { width: '100%', flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   // 게임판은 실제 테이블처럼 나무 테두리 안에 초록 펠트를 깝니다.
