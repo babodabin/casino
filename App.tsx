@@ -266,7 +266,8 @@ const pachiPhotos: { name: string; image: number }[] = [
  * ⚠️ 이모지는 기기마다 다르게 그려집니다(아이폰과 안드로이드가 다릅니다).
  * 여기 없는 심볼이 오면 이모지로 떨어집니다 — 그림을 지우면 화면이 안 깨지고 이모지로 돌아갑니다.
  */
-const pachiStopButtonImage = require('./assets/pachislot/stopbutton.png');
+/** 조작대 사진. 버튼 넷과 레버가 그려져 있고, 그 위에 누름 자리만 겹칩니다. */
+const pachiDeckImage = require('./assets/pachislot/deck.jpg');
 /** 간판 옆 장식. 보내 주신 그림입니다. */
 const pachiDecoImage = require('./assets/pachislot/deco-slot.png');
 
@@ -2748,27 +2749,32 @@ function PachislotGameScreen({ coins, difficulty, selectedBet, motion, onBack, o
           {payout > 0 ? <Text style={styles.pachiGuideWin}>+{payout.toLocaleString()} WC</Text> : null}
         </View>
 
-        <View style={styles.pachiButtonRow}>
-          {[0, 1, 2].map((index) => (
-            <Pressable key={index} disabled={!spinning || stopped[index]} onPress={() => stopReel(index)} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, (!spinning || stopped[index]) && styles.pachiStopButtonOff]}>
-              <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
-              <Text style={styles.pachiStopText}>{index + 1}</Text>
-            </Pressable>
-          ))}
-          <Pressable disabled={!spinning} onPress={stopAll} style={({ pressed }) => [styles.pachiStopButton, pressed && styles.pachiPressed, !spinning && styles.pachiStopButtonOff]}>
-            <Image source={pachiStopButtonImage} style={styles.pachiStopImage} resizeMode="contain" />
-            <Text style={styles.pachiAllText}>ALL</Text>
-          </Pressable>
+        {/*
+          버튼 줄은 **사진 한 장**입니다(1024×198을 900×174로 줄였습니다).
+          제가 그린 버튼보다 훨씬 낫습니다 — 그 위에 **안 보이는 누름 자리**만 겹칩니다.
 
-          {/*
-            레버. **누르는 자리를 크게** 잡았습니다 — 그림은 작아도 손가락은 굵습니다.
-            안 눌린다고 하셔서 46×66으로 키웠습니다.
-          */}
-          <Pressable disabled={spinning || blocked} onPress={pullLever} style={({ pressed }) => [styles.pachiLeverBase, pressed && styles.pachiPressed, (spinning || blocked) && styles.disabledCard]}>
-            <View style={styles.pachiLeverMount} />
-            <View style={styles.pachiLeverStick} />
-            <View style={styles.pachiLeverBall}><View style={styles.pachiLeverGloss} /></View>
-          </Pressable>
+          사진에서 초록 버튼의 가로 위치를 재서 넣은 값입니다.
+            1번 가운데 12.5% · 2번 28.7% · 3번 44.9% · ALL 63.3% · 레버 83.5%
+            버튼 폭은 9.5%쯤이라 누름 자리를 14%로 넉넉히 잡았습니다.
+          ⚠️ **사진을 바꾸면 이 숫자도 다시 재야 합니다.**
+        */}
+        <View style={styles.pachiButtonRow}>
+          <Image source={pachiDeckImage} style={styles.pachiDeckImage} resizeMode="contain" />
+          {[
+            { at: 12.5, label: '1', on: () => stopReel(0), off: !spinning || stopped[0] },
+            { at: 28.7, label: '2', on: () => stopReel(1), off: !spinning || stopped[1] },
+            { at: 44.9, label: '3', on: () => stopReel(2), off: !spinning || stopped[2] },
+            { at: 63.3, label: 'ALL', on: stopAll, off: !spinning },
+            { at: 83.5, label: '레버', on: pullLever, off: spinning || blocked },
+          ].map((spot) => (
+            <Pressable
+              key={spot.label}
+              disabled={spot.off}
+              onPress={spot.on}
+              accessibilityLabel={spot.label}
+              style={({ pressed }) => [styles.pachiSpot, { left: `${spot.at - 7}%` }, pressed && styles.pachiSpotPressed]}
+            />
+          ))}
         </View>
       </View>
 
@@ -9329,11 +9335,15 @@ const styles = StyleSheet.create({
 
   // 릴 창 — 은색 테 안에 창이 하나 뚫려 있습니다
   // 크롬 테. 웹에서는 위 그러데이션이 얹히고, 앱에서는 이 단색이 그대로 보입니다.
-  pachiReelBezel: { paddingHorizontal: 15, paddingVertical: 5, backgroundColor: '#AEB6C3', borderTopWidth: 2, borderTopColor: '#F4F7FB', borderBottomWidth: 3, borderBottomColor: '#5A6270' },
+  /**
+   * 크롬 테. **가늘게** 둡니다 — 두꺼우면 은색 띠가 먼저 눈에 들어와 릴을 가립니다.
+   * (2026-09-02에 '신경 덜 쓰이게 가늘게' 하라고 하셨습니다.)
+   */
+  pachiReelBezel: { paddingHorizontal: 12, paddingVertical: 2, backgroundColor: '#9AA2B0', borderTopWidth: 1, borderTopColor: '#D8DEE7', borderBottomWidth: 2, borderBottomColor: '#565D6A' },
   // 테에 박힌 나사. 여섯 개씩 위아래로 박습니다.
-  pachiBezelRivetRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, paddingVertical: 3 },
+  pachiBezelRivetRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 1 },
   // 그림자를 주면 나사가 박혀 있는 것처럼 보입니다.
-  pachiRivet: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#8A92A1', borderTopWidth: 1, borderTopColor: '#E4E9F0', borderBottomWidth: 1, borderBottomColor: '#4A515D', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
+  pachiRivet: { width: 4, height: 4, borderRadius: 2, backgroundColor: '#8A92A1', borderTopWidth: 1, borderTopColor: '#E4E9F0', borderBottomWidth: 1, borderBottomColor: '#4A515D', shadowColor: '#000', shadowOpacity: 0.55, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } },
   // 기계 어깨
   pachiShoulder: { height: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#2A2F3A', borderBottomWidth: 1, borderBottomColor: '#0D1015' },
   pachiShoulderText: { color: '#C6CEDC', fontSize: 10, fontWeight: '900', letterSpacing: 4 },
@@ -9356,12 +9366,17 @@ const styles = StyleSheet.create({
   pachiReelGlass: { position: 'absolute', left: -40, top: -30, width: 70, height: 260, backgroundColor: 'rgba(255,255,255,0.16)', transform: [{ rotate: '16deg' }] },
 
   // 조작대 — 레버 · 정지 셋 · 작은 상태창
-  pachiDeck: { height: 96, paddingHorizontal: 8, paddingBottom: 4, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
+  pachiDeck: { paddingHorizontal: 8, paddingBottom: 6, backgroundColor: '#20242C', borderTopWidth: 2, borderTopColor: '#41474F' },
   // 안내 줄. 지금 뭘 해야 하는지 한 줄로 적습니다.
   pachiGuide: { height: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   pachiGuideText: { color: '#C7D2E4', fontSize: 12, fontWeight: '800' },
   pachiGuideWin: { color: '#FFE9A6', fontSize: 12, fontWeight: '900' },
-  pachiButtonRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  // 사진 한 장이 버튼 줄 전체입니다. 높이는 사진 비율(900:174)을 따릅니다.
+  pachiButtonRow: { width: '100%', aspectRatio: 900 / 174 },
+  pachiDeckImage: { position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' },
+  // 사진 속 버튼 위에 겹치는 누름 자리. 보이지 않고, 누를 때만 살짝 밝아집니다.
+  pachiSpot: { position: 'absolute', top: '14%', width: '14%', height: '72%', borderRadius: 999 },
+  pachiSpotPressed: { backgroundColor: 'rgba(255,255,255,0.25)' },
   // 그림은 작아도 **누르는 자리는 크게**. 안 눌린다고 하셔서 키웠습니다.
   pachiLeverBase: { width: 46, height: 66, alignItems: 'center', justifyContent: 'flex-end' },
   // 누르면 살짝 들어갑니다. 실물 버튼 느낌은 여기서 옵니다.
