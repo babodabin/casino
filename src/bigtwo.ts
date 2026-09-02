@@ -5,6 +5,7 @@
 // 나머지가 모두 넘기면 마지막에 낸 사람이 아무거나 새로 냅니다.
 
 import { createDeck, shuffleDeck, type Card, type Rank, type Suit } from './blackjack.ts';
+import { type OpponentLevel } from './opponent.ts';
 
 export type BigTwoComboType = '싱글' | '페어' | '트리플' | '스트레이트' | '플러시' | '풀하우스' | '포카드' | '스트레이트 플러시';
 export type BigTwoCombo = { type: BigTwoComboType; power: number; cards: Card[] };
@@ -91,11 +92,38 @@ export function legalBigTwoPlays(hand: Card[], current: BigTwoCombo | null, must
  * 컴퓨터의 선택. 낼 수 있는 것 중 가장 약한 것을 냅니다.
  * 이번에 내면 손이 비는 수가 있으면 그것을 먼저 잡습니다.
  */
-export function chooseBigTwoPlay(hand: Card[], current: BigTwoCombo | null, mustInclude?: string): BigTwoCombo | null {
+export function chooseBigTwoPlay(hand: Card[], current: BigTwoCombo | null, mustInclude?: string, level: OpponentLevel = '보통', random: () => number = Math.random): BigTwoCombo | null {
   const plays = legalBigTwoPlays(hand, current, mustInclude);
   if (plays.length === 0) return null;
   const finishing = plays.find((play) => play.cards.length === hand.length);
   if (finishing) return finishing;
+
+  /**
+   * 전문가는 **짝을 깨지 않고 센 패를 아낍니다.**
+   * 보통은 낼 수 있는 것 중 제일 약한 것을 그냥 냅니다. 그러면 페어의 한 장을 떼어
+   * 한 장짜리로 내버리는 일이 잦고, 2(제일 센 패)도 아무 때나 나갑니다.
+   */
+  if (level === '전문가') {
+    const rankCount = new Map<string, number>();
+    for (const card of hand) rankCount.set(card.rank, (rankCount.get(card.rank) ?? 0) + 1);
+    const cost = (play: BigTwoCombo) => {
+      let penalty = 0;
+      for (const card of play.cards) {
+        const held = rankCount.get(card.rank) ?? 0;
+        // 두 장 이상 쥔 숫자를 한 장만 떼어 내면 짝이 깨집니다.
+        if (held > 1 && play.cards.filter((item) => item.rank === card.rank).length < held) penalty += 6;
+        // 2는 판을 끊는 패입니다. 급하지 않으면 아낍니다.
+        if (card.rank === '2') penalty += 8;
+      }
+      // 같은 값이면 약한 것부터, 그리고 여러 장을 터는 쪽이 낫습니다.
+      return penalty + play.power * 0.02 - play.cards.length * 1.5;
+    };
+    return [...plays].sort((a, b) => cost(a) - cost(b))[0];
+  }
+
+  // 쉬움은 가끔 아무 수나 냅니다. 사람이 이길 구석이 있어야 합니다.
+  if (level === '쉬움' && plays.length > 1 && random() < 0.3) return plays[Math.floor(random() * plays.length)];
+
   // 새로 시작하는 차례면 여러 장을 한 번에 털어내는 쪽이 낫습니다.
   if (!current) {
     const longest = Math.max(...plays.map((play) => play.cards.length));
@@ -158,8 +186,8 @@ export function passBigTwo(state: BigTwoState): BigTwoState {
 }
 
 /** 컴퓨터 차례를 한 번 진행합니다. */
-export function stepBigTwo(state: BigTwoState): BigTwoState {
-  const play = chooseBigTwoPlay(state.hands[state.turn], state.current, bigTwoOpeningCard(state));
+export function stepBigTwo(state: BigTwoState, level: OpponentLevel = '보통', random: () => number = Math.random): BigTwoState {
+  const play = chooseBigTwoPlay(state.hands[state.turn], state.current, bigTwoOpeningCard(state), level, random);
   return play ? playBigTwo(state, play.cards) : passBigTwo(state);
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, goStopLevelOf, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
+import { calculateGoStopSettlement, chongtongPoints, chooseGoStopMatch, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, goStopLevelOf, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
 import { createHwatuDeck, type HwatuCard } from '../src/hwatu.ts';
 
 const deck = createHwatuDeck();
@@ -536,4 +536,22 @@ test('쉬움은 가끔 두 번째로 좋은 패를 낸다', () => {
   assert.equal(chooseComputerGoStopCard(round, 1, '전문가', () => 0).month, 9);
   // 쉬움은 난수가 낮으면 두 번째 수를 냅니다.
   assert.notEqual(chooseComputerGoStopCard(round, 1, '쉬움', () => 0).month, 9);
+});
+
+test('총통으로 이기면 먹은 패가 없어도 10점으로 친다', () => {
+  const empty: GoStopPlayer = { hand: [], captured: [], goCount: 0 };
+  // 모은 패가 없으니 보통이면 0점입니다.
+  assert.equal(calculateGoStopSettlement(empty, empty, 'gostop').finalPoints, 0);
+  // 총통이면 정해진 점수로 칩니다.
+  const bill = calculateGoStopSettlement(empty, empty, 'gostop', { chongtong: true });
+  assert.equal(bill.baseScore, chongtongPoints);
+  assert.equal(bill.finalPoints, chongtongPoints);
+  assert.equal(bill.reasons[0], `총통 ${chongtongPoints}점`);
+});
+
+test('바닥에 같은 월이 두 장이면 값이 큰 쪽을 가져온다', () => {
+  // 광과 피가 나란히 있으면 광을 가져와야 합니다. 전에는 늘 앞의 것이었습니다.
+  assert.equal(chooseGoStopMatch([card(1, '피'), card(1, '광')]).kind, '광');
+  assert.equal(chooseGoStopMatch([card(2, '피'), card(2, '열끗')]).kind, '열끗');
+  assert.equal(chooseGoStopMatch([card(1, '띠'), card(1, '피')]).kind, '띠');
 });

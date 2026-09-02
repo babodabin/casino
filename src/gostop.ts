@@ -342,6 +342,18 @@ export const goStopLevelOf = (mode: GoStopMode, seat: number): GoStopLevel =>
  * **쉬움**은 제일 좋은 수 대신 두 번째 수를 고를 때가 있고, 보통·전문가는 늘 제일 좋은 수입니다.
  * ⚠️ 난수를 안 주면 예전과 똑같이(늘 제일 좋은 수) 움직입니다. 기존 테스트가 그것을 봅니다.
  */
+/**
+ * 바닥에 같은 월이 **두 장** 있을 때 어느 것을 가져올지.
+ *
+ * ⚠️ 전에는 늘 첫 번째 장을 가져갔습니다. 그래서 광과 피가 나란히 놓여 있으면
+ * **컴퓨터가 피를 가져가는 일**이 있었습니다. 값이 큰 쪽을 가져옵니다.
+ * 값은 광 > 열끗 > 띠 > 쌍피 > 피 순입니다.
+ */
+export function chooseGoStopMatch(matches: HwatuCard[]): HwatuCard {
+  const worth = (card: HwatuCard) => card.kind === '광' ? 8 : card.kind === '열끗' ? 5 : card.kind === '띠' ? 4 : card.double ? 3 : 2;
+  return [...matches].sort((a, b) => worth(b) - worth(a) || a.month - b.month)[0];
+}
+
 export function chooseComputerGoStopCard(round: GoStopRound, playerIndex = round.turn, level: GoStopLevel = '보통', random?: () => number): HwatuCard {
   const player = round.players[playerIndex];
   if (!player?.hand.length) throw new Error('컴퓨터가 낼 손패가 없습니다.');
@@ -517,10 +529,21 @@ export function goStopPayoutPoints(baseScore: number, goCount: number) {
 }
 
 /** 승자와 한 패자의 패를 비교해 그 패자가 내야 할 최종 점수를 계산합니다. */
-export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPlayer, mode: GoStopMode): GoStopSettlement {
+/**
+ * 총통(손에 같은 월 넉 장)으로 이겼을 때 치는 점수.
+ *
+ * ⚠️ 총통은 **패를 한 장도 안 먹고** 그 자리에서 이깁니다. 그래서 모은 패로 세면 0점이고,
+ * 2026-09-02 전까지 화면이 '1점'으로 깎아 주고 있었습니다 — 제일 센 패를 잡고 본전만 받았습니다.
+ * 10점으로 칩니다(3점 나면 스톱하는 판에서 그만큼 드문 패입니다).
+ */
+export const chongtongPoints = 10;
+
+export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPlayer, mode: GoStopMode, options: { chongtong?: boolean } = {}): GoStopSettlement {
   const winnerScore = scoreGoStop(winner.captured);
   const loserScore = scoreGoStop(loser.captured);
-  const goScore = goStopPayoutPoints(winnerScore.total, winner.goCount);
+  // 총통은 먹은 패가 없으니 모은 패 대신 정해진 점수로 셉니다.
+  const baseScore = options.chongtong ? chongtongPoints : winnerScore.total;
+  const goScore = goStopPayoutPoints(baseScore, winner.goCount);
   let multiplier = 1;
   const reasons: string[] = [];
   const double = (reason: string) => { multiplier *= 2; reasons.push(`${reason} ×2`); };
@@ -533,7 +556,8 @@ export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPla
   // 3인 고스톱에서 먼저 고를 외친 사람이 다른 사람에게 지면 나머지 한 사람 몫도 냅니다.
   if (mode === 'gostop' && loser.goCount > 0) double('고박');
 
-  return { baseScore: winnerScore.total, goScore, multiplier, finalPoints: goScore * multiplier, reasons };
+  if (options.chongtong) reasons.unshift(`총통 ${chongtongPoints}점`);
+  return { baseScore, goScore, multiplier, finalPoints: goScore * multiplier, reasons };
 }
 
 /** 피를 빼앗는 상황에서 상대가 줄 일반 피를 고릅니다. */

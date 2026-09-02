@@ -171,3 +171,14 @@ test('네 명으로 돌리면 환급률이 100%를 넘지 않는다',()=>{
   const rate=total/rounds;
   assert.ok(rate>0.75&&rate<1,`환급률 ${(rate*100).toFixed(1)}%`);
 });
+
+test('전문가는 짝을 깨지 않고 2를 아낀다',()=>{
+  // 5가 두 장 있습니다. 한 장짜리를 내야 할 때 5를 떼면 페어가 깨집니다.
+  const myHand=hand('♦-5','♣-5','♠-7','♦-2');
+  const 바닥=classifyBigTwo(hand('♦-4'));
+  const 보통=chooseBigTwoPlay(myHand,바닥,undefined,'보통');
+  const 전문가=chooseBigTwoPlay(myHand,바닥,undefined,'전문가');
+  assert.equal(보통?.cards[0].rank,'5');
+  // 전문가는 짝이 안 깨지는 7을 냅니다. 2는 제일 센 패라 아낍니다.
+  assert.equal(전문가?.cards[0].rank,'7');
+});

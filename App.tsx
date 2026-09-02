@@ -14,12 +14,88 @@ import {
   Switch,
   Text,
   TextInput,
+  Vibration,
   View,
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
 
 const casinoEntranceAsset = require('./assets/casino-entrance-gold-v1.png');
+
+/**
+ * 소리와 진동을 켤지. **설정 스위치가 이 두 값만 바꿉니다** — 화면 마흔 개에 넘기지 않습니다.
+ * ⚠️ 2026-09-02 전까지 설정에 스위치는 있는데 **소리를 내는 코드가 한 줄도 없었습니다.**
+ * 켜도 꺼도 똑같았습니다.
+ */
+const feedback: { sound: boolean; vibration: boolean; ctx: unknown } = { sound: true, vibration: true, ctx: null };
+
+/**
+ * 브라우저가 소리를 만들 자리. 처음 소리를 낼 때 한 번만 만듭니다.
+ * ⚠️ 브라우저는 **사람이 화면을 한 번 누르기 전에는** 소리를 막습니다. 막혀 있으면 풀어 줍니다.
+ */
+function audioContext(): any {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  const Ctor = (window as any).AudioContext ?? (window as any).webkitAudioContext;
+  if (!Ctor) return null;
+  if (!feedback.ctx) { try { feedback.ctx = new Ctor(); } catch { return null; } }
+  const ctx = feedback.ctx as any;
+  if (ctx.state === 'suspended') ctx.resume?.().catch(() => {});
+  return ctx;
+}
+
+/** 잡음 한 조각. 카드 스치는 소리·칩 부딪는 소리의 바탕입니다. */
+function noiseBuffer(ctx: any, seconds: number) {
+  const frames = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+  const buffer = ctx.createBuffer(1, frames, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let index = 0; index < frames; index += 1) data[index] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+/**
+ * 소리 하나를 냅니다. **표는 `src/sound.ts`에 있습니다** — 여기서는 표대로 울리기만 합니다.
+ * 소리를 못 내는 자리(앱, 소리 막힌 브라우저)에서도 진동은 갑니다.
+ */
+function playCue(cue: SoundCue) {
+  if (feedback.vibration) {
+    const ms = vibrationFor[cue];
+    if (ms) {
+      if (Platform.OS === 'web') (globalThis.navigator as any)?.vibrate?.(ms);
+      else Vibration.vibrate(ms);
+    }
+  }
+  if (!feedback.sound) return;
+  const ctx = audioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  for (const tone of soundCues[cue]) {
+    const gain = ctx.createGain();
+    // 0에서 시작하면 exponential 곡선이 안 먹습니다. 아주 작은 값에서 올립니다.
+    gain.gain.setValueAtTime(0.0001, now + tone.at);
+    gain.gain.exponentialRampToValueAtTime(tone.gain, now + tone.at + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + tone.at + tone.dur);
+    gain.connect(ctx.destination);
+    if (tone.wave === 'noise') {
+      const source = ctx.createBufferSource();
+      source.buffer = noiseBuffer(ctx, tone.dur);
+      const band = ctx.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.value = tone.freq;
+      band.Q.value = 0.8;
+      source.connect(band);
+      band.connect(gain);
+      source.start(now + tone.at);
+      source.stop(now + tone.at + tone.dur);
+    } else {
+      const osc = ctx.createOscillator();
+      osc.type = tone.wave;
+      osc.frequency.value = tone.freq;
+      osc.connect(gain);
+      osc.start(now + tone.at);
+      osc.stop(now + tone.at + tone.dur);
+    }
+  }
+}
 const casinoEntranceSource = Platform.OS === 'web'
   ? { uri: './casino-entrance-gold-v1.png' }
   : casinoEntranceAsset;
@@ -70,7 +146,9 @@ import {
 import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
-import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, dealGoStop, declareGoStopShake, goStopLevelNotes, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopLevel, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
+import { soundCues, vibrationFor, type SoundCue } from './src/sound';
+import { opponentLevelNotes, opponentLevels, type OpponentLevel } from './src/opponent';
+import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, chooseGoStopMatch, dealGoStop, declareGoStopShake, goStopLevelNotes, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopLevel, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
 import { chooseComputerMinhwatuCard, dealMinhwatu, playMinhwatuTurn, scoreMinhwatu, settleMinhwatu, type MinhwaRound } from './src/minhwatu';
 import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, playYukbaekTurn, scoreYukbaek, settleYukbaekRound, type YukbaekMatch } from './src/yukbaek';
 import { DEFAULT_SEOTDA_RULES, dealSeotda, evaluateSeotda, resolveSeotda, seotdaRuleLabels, type SeotdaRules } from './src/seotda';
@@ -468,8 +546,11 @@ function CasinoApp() {
   const [tablePlayers, setTablePlayers] = useState(4);
   const [seotdaRules, setSeotdaRules] = useState<SeotdaRules>(DEFAULT_SEOTDA_RULES);
   const [goStopDeckStyle,setGoStopDeckStyle]=useState<GoStopDeckStyle>('classic');
-  /** 고스톱·맞고에서 상대할 컴퓨터 실력. 준비 화면에서 고릅니다. */
-  const [goStopLevel,setGoStopLevel]=useState<GoStopLevel>('보통');
+  /**
+   * 컴퓨터 상대의 실력. **고스톱만이 아니라 컴퓨터와 붙는 게임 전부**가 이 값을 씁니다.
+   * 고스톱·맞고는 준비 화면에서, 나머지는 설정에서 고릅니다. 값은 한 가지입니다.
+   */
+  const [goStopLevel,setGoStopLevel]=useState<OpponentLevel>('보통');
   // 홈의 '이어서 하기'는 마지막으로 '고른' 게임을 보여 줍니다(끝까지 안 해도 됩니다).
   const [lastGame, setLastGame] = useState<GameRecord['game'] | ''>('');
 
@@ -535,6 +616,9 @@ function CasinoApp() {
     if (!loaded) return;
     AsyncStorage.setItem(STORAGE_KEYS.preferences, JSON.stringify({ sound, vibration, gameSpeed, accessibility })).catch(() => {});
   }, [sound, vibration, gameSpeed, accessibility, loaded]);
+
+  // 설정 스위치를 실제 소리·진동에 잇습니다. 이 줄이 없으면 스위치가 아무 일도 안 합니다.
+  useEffect(() => { feedback.sound = sound; feedback.vibration = vibration; }, [sound, vibration]);
 
   useEffect(() => {
     if (!loaded) return;
@@ -712,6 +796,7 @@ function CasinoApp() {
     if (stake > coinsRef.current) return false;
     coinsRef.current -= stake;
     setCoins((current) => current - stake);
+    playCue('chip');
     return true;
   };
 
@@ -802,8 +887,14 @@ function CasinoApp() {
    * 두 가지를 같이 갱신합니다.
    */
   const addRecord = (make: (count: number) => GameRecord) => {
-    setRecords((current) => [make(current.length), ...current].slice(0, 100));
+    const record = make(records.length);
+    setRecords((current) => [record, ...current].slice(0, 100));
     setTotalPlays((current) => current + 1);
+    /**
+     * 이기고 지는 소리는 **여기 한 곳**에서 냅니다. 게임 서른두 개가 다 이 길로 지나갑니다.
+     * ⚠️ `setRecords` 안에서 내면 안 됩니다 — 리액트가 그 함수를 두 번 부를 때 소리도 두 번 납니다.
+     */
+    playCue(record.result === 'loss' ? 'lose' : record.result === 'win' || record.result === 'blackjack' ? 'win' : 'chip');
   };
 
   const settleCraps = (bet: CrapsBet, stake: number, result: CrapsRollResult) => {
@@ -1013,7 +1104,7 @@ function CasinoApp() {
           />
         )}
         {appScreen === 'doriGame' && (
-          <DoriGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('doriSetup')} onPlaceBet={placeBet} onSettle={settleDori} />
+          <DoriGameScreen level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('doriSetup')} onPlaceBet={placeBet} onSettle={settleDori} />
         )}
         {(appScreen === 'gostopSetup' || appScreen === 'matgoSetup') && (
           <GoStopSetupScreen mode={appScreen==='gostopSetup'?'gostop':'matgo'} coins={coins} difficulty={difficulty} selectedBet={selectedBet} deckStyle={goStopDeckStyle}
@@ -1071,7 +1162,7 @@ function CasinoApp() {
           />
         )}
         {appScreen === 'seotdaGame' && (
-          <SeotdaGameScreen coins={coins} selectedBet={selectedBet} rules={seotdaRules} onBack={() => setAppScreen('seotdaSetup')} onPlaceBet={placeBet} onSettle={settleSeotda} />
+          <SeotdaGameScreen level={goStopLevel} coins={coins} selectedBet={selectedBet} rules={seotdaRules} onBack={() => setAppScreen('seotdaSetup')} onPlaceBet={placeBet} onSettle={settleSeotda} />
         )}
         {appScreen === 'rouletteSetup' && (
           <SimpleSetupScreen
@@ -1179,19 +1270,19 @@ function CasinoApp() {
         {appScreen === 'bullGame' && <BullfightingGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bullSetup')} onPlaceBet={placeBet} onSettle={settleBullTournament}/>}
         {appScreen === 'videoPokerGame' && <VideoPokerGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('videoPokerSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleVideoPoker} />}
         {appScreen === 'holdemSetup' && <PokerSetupScreen mode="holdem" players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('holdemGame')} />}
-        {appScreen === 'holdemGame' && <PokerGameScreen mode="holdem" players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('텍사스 홀덤',mine,theirs,result,detail)} />}
+        {appScreen === 'holdemGame' && <PokerGameScreen level={goStopLevel} mode="holdem" players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('holdemSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('텍사스 홀덤',mine,theirs,result,detail)} />}
         {appScreen === 'omahaSetup' && <PokerSetupScreen mode="omaha" players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('omahaGame')} />}
-        {appScreen === 'omahaGame' && <PokerGameScreen mode="omaha" players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('omahaSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('오마하',mine,theirs,result,detail)} />}
+        {appScreen === 'omahaGame' && <PokerGameScreen level={goStopLevel} mode="omaha" players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('omahaSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('오마하',mine,theirs,result,detail)} />}
         {appScreen === 'sevenPokerSetup' && <SevenPokerSetupScreen players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sevenPokerGame')} />}
-        {appScreen === 'sevenPokerGame' && <SevenPokerGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sevenPokerSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('세븐 포커',mine,theirs,result,detail)} />}
+        {appScreen === 'sevenPokerGame' && <SevenPokerGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sevenPokerSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('세븐 포커',mine,theirs,result,detail)} />}
         {appScreen === 'fiveDrawSetup' && <FiveDrawSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('fiveDrawGame')} />}
-        {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('fiveDrawSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('파이브 카드 드로우',mine,theirs,result,detail)} />}
+        {appScreen === 'fiveDrawGame' && <FiveDrawGameScreen level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('fiveDrawSetup')} onPlaceBet={placeBet} onSettle={(mine,theirs,result,detail)=>settlePoker('파이브 카드 드로우',mine,theirs,result,detail)} />}
         {appScreen === 'chinesePokerSetup' && <SimpleSetupScreen title="차이니즈 포커 준비" hero="十三水 · 5 · 5 · 3" lead="열세 장을 세 줄로 나눠 줄마다 겨룹니다" rules={['1. 카드 열세 장을 받아 뒷줄 5장, 가운뎃줄 5장, 앞줄 3장으로 나눕니다.','2. 뒷줄이 가운뎃줄보다, 가운뎃줄이 앞줄보다 세야 합니다. 어기면 파울로 세 줄을 모두 내줍니다.','3. 앞줄 세 장은 스트레이트와 플러시를 세지 않아 트리플·원 페어·하이 카드만 있습니다.','4. 줄마다 이기면 값을 하나 받고, 세 줄을 모두 이기면 스쿱이라 보너스가 붙습니다.','5. 사람이 여럿이면 상대마다 따로 겨뤄 값을 다 더합니다. 모두에게 세 줄을 다 이기면 두 배입니다.']} startLabel="자리 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} players={tablePlayers} onPlayersChange={setTablePlayers} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('chinesePokerGame')}/>}
         {appScreen === 'chinesePokerGame' && <ChinesePokerGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('chinesePokerSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('차이니즈 포커',stake,multiplier,detail)}/>}
         {appScreen === 'tujeonSetup' && <SimpleSetupScreen title="투전 준비" hero="鬪箋 · 여든 장" lead="같은 숫자를 짝지어 상대와 겨룹니다" rules={['1. 여덟 무리(사람·물고기·새·꿩·별·말·노루·토끼)에 1부터 10까지, 모두 여든 장입니다.','2. 다섯 장을 받아 같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.','3. 짝이 하나도 없으면 다섯 장을 더한 끝자리가 끗이고, 9가 가보 0이 망통입니다.','4. 패를 보고 나쁘면 죽을 수 있습니다. 죽으면 베팅금의 0.35배만 돌려받습니다.','5. 승부해서 이기면 1.9배, 비기면 그대로 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('tujeonGame')}/>}
         {appScreen === 'tujeonGame' && <TujeonGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('tujeonSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('투전',stake,multiplier,detail)}/>}
         {appScreen === 'bigTwoSetup' && <SimpleSetupScreen title="빅투 준비" hero="♦3 · · · 2♠" lead="열세 장을 먼저 다 내려놓으면 이깁니다" rules={['1. '+tablePlayers+'명이 열세 장씩 나눠 갖습니다. ♦3을 가진 사람이 먼저 내고 첫 장에는 ♦3이 들어가야 합니다.','2. 숫자는 3이 가장 약하고 2가 가장 셉니다. 같은 숫자면 ♦ ♣ ♥ ♠ 순으로 세집니다.','3. 한 장·두 장(페어)·세 장(트리플)·다섯 장(스트레이트 이상)만 낼 수 있습니다.','4. 앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다. 낼 게 없으면 넘깁니다.','5. 먼저 다 내면 '+bigTwoWinPayout[tablePlayers]+'배입니다. 사람이 많을수록 배당이 큽니다. 져도 세 장 이하로 털었으면 절반을 돌려받습니다.']} startLabel="판에 앉기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} players={tablePlayers} onPlayersChange={setTablePlayers} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('bigTwoGame')}/>}
-        {appScreen === 'bigTwoGame' && <BigTwoGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
+        {appScreen === 'bigTwoGame' && <BigTwoGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('bigTwoSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('빅투',stake,multiplier,detail)}/>}
         {appScreen === 'pusherSetup' && <SimpleSetupScreen title="코인 푸셔 준비" hero="◉ ◉ ◉" lead="밀판이 밀어낸 동전이 내 몫입니다" rules={['1. 동전을 한 개 넣으면 밀판이 한 번 앞으로 밉니다.','2. 앞턱을 넘어간 동전이 내 몫입니다. 넣은 것이 바로 나오지 않고 쌓였다가 한꺼번에 쏟아집니다.','3. 금화는 '+pusherGoldPayout+'배로 쳐줍니다.','4. 앞쪽 양옆에는 빠지는 홈이 있어 그리로 밀린 동전은 사라집니다.','5. 판은 실제 기계처럼 그대로 남아 다음에 이어서 합니다.']} startLabel="기계 앞에 서기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('pusherGame')}/>}
         {appScreen === 'balatroChoice' && <BalatroChoiceScreen onBack={()=>setAppScreen('categoryCatalog')} onEasy={()=>setAppScreen('jokerSetup')} onHard={()=>setAppScreen('balatroHardSetup')}/>}
         {appScreen === 'balatroHardSetup' && <SimpleSetupScreen title="발라트로 하드 준비" hero="J ★ 세 단" lead="작은 · 큰 · 보스를 이어서 다 깨야 이깁니다" rules={['이 게임은 남과 겨루지 않습니다. 세 단을 차례로 깨면 이깁니다.','','― 한 판의 흐름 ―','1. 작은 블라인드 '+blindTargets['작은'].toLocaleString()+'점 → 큰 '+blindTargets['큰'].toLocaleString()+'점 → 보스 '+blindTargets['보스'].toLocaleString()+'점 순서입니다.','2. 단마다 낼 기회 '+balatroPlays+'번, 버릴 기회 '+balatroDiscards+'번입니다. 점수는 단마다 0에서 다시 셉니다.','3. 낼 기회를 다 쓰고도 목표를 못 넘기면 그 자리에서 판이 끝납니다.','','― 보스 조건 ―','4. 보스 블라인드에는 조건이 하나 붙습니다. 판을 시작할 때 미리 보여 줍니다.','5. 무늬 봉인(그 무늬는 칩을 안 줌) · 버리기 금지 · 한 장 덜(손패 6장) · 배수 반토막 · 첫 패 버림 중 하나입니다.','','― 족보 레벨 ―','6. 낸 족보는 한 단씩 오릅니다. 같은 족보를 쓸수록 그 족보의 칩과 배수가 커집니다.','7. 그래서 한 족보를 밀고 가는 것과 큰 족보를 노리는 것 사이에서 골라야 합니다.','','― 상점 ―','8. 단을 깰 때마다 상점이 열립니다. 조커 · 조커 칸 · 족보 레벨을 삽니다.','9. ⚠️ 상점은 진짜 WC를 씁니다. 이 판에 거는 돈이 그만큼 늘어납니다.','10. 한 판에 상점에 쓸 수 있는 돈은 처음 베팅의 '+balatroSpendCap+'배까지입니다.','','― 배당 ―','11. 세 단을 다 깨면 처음 베팅의 '+balatroPayout+'배를 받습니다. 상점에 쓴 돈에는 배당이 안 붙습니다.','12. 사는 사람과 안 사는 사람의 환급률이 같아지게 값을 맞췄습니다. 상점은 이득도 손해도 아닙니다.']} startLabel="첫 블라인드로" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('balatroChoice')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('balatroHardGame')}/>}
@@ -1209,7 +1300,7 @@ function CasinoApp() {
         {appScreen === 'predictSocialGame' && <PredictGameScreen group="사회문제" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSocialSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 사회문제',stake,multiplier,detail)}/>}
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
-        {appScreen === 'highLowGame' && <HighLowGameScreen players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
+        {appScreen === 'highLowGame' && <HighLowGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
         {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
         {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
@@ -1219,7 +1310,7 @@ function CasinoApp() {
         {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
         {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && <BottomInsetContext.Provider value={insets.bottom}>{renderTab({
-          tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, vibration, setVibration,
+          tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, opponentLevel: goStopLevel, setOpponentLevel: setGoStopLevel, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
           onRefillCoins: refillTestCoins, coins, records, totalPlays, lastGame,
           onExportBackup: exportBackup, onPickBackup: pickBackupFile,
@@ -1342,6 +1433,8 @@ type TabProps = {
   saveDifficulty: (value: string) => void;
   sound: boolean;
   setSound: (value: boolean) => void;
+  opponentLevel: OpponentLevel;
+  setOpponentLevel: (value: OpponentLevel) => void;
   vibration: boolean;
   setVibration: (value: boolean) => void;
   gameSpeed: GameSpeed;
@@ -1374,6 +1467,8 @@ function renderTab(props: TabProps) {
       saveDifficulty={props.saveDifficulty}
       sound={props.sound}
       setSound={props.setSound}
+      opponentLevel={props.opponentLevel}
+      setOpponentLevel={props.setOpponentLevel}
       vibration={props.vibration}
       setVibration={props.setVibration}
       gameSpeed={props.gameSpeed}
@@ -1562,7 +1657,7 @@ function useThrowGesture(onThrow: (power: number) => void, locked = false) {
     onPanResponderRelease: (_event, gesture) => {
       setPull(0);
       // 위로 40px 넘게 쓸었거나 빠르게 튕겼으면 던진 것으로 봅니다.
-      if (-gesture.dy > 40 || gesture.vy < -0.6) latest.current(-gesture.dy);
+      if (-gesture.dy > 40 || gesture.vy < -0.6) { playCue('roll'); latest.current(-gesture.dy); }
     },
     onPanResponderTerminate: () => setPull(0),
   })).current;
@@ -1599,7 +1694,7 @@ function useReveal() {
   return {
     opened,
     reset: () => setOpened(0),
-    open: (total: number) => setOpened((value) => Math.min(total, value + 1)),
+    open: (total: number) => { playCue('flip'); setOpened((value) => Math.min(total, value + 1)); },
     /** 마지막 승부처럼 한 번에 다 열 때. 한 장씩 누르게 하면 결과만 보고 싶은 사람이 답답합니다. */
     openAll: (total: number) => setOpened(total),
   };
@@ -1649,7 +1744,7 @@ function useTableDeal(deal: unknown, seats: number, target: number) {
     if (laid >= total) return;
     // 다음 장을 받을 자리. 0번이 나라서 내 카드만 천천히 놓입니다.
     const step = Math.max(16, Math.round((laid % seats === 0 ? DEAL_MINE_MS : DEAL_THEIRS_MS) * rush));
-    const timer = setTimeout(() => setLaid((value) => Math.min(total, value + 1)), step);
+    const timer = setTimeout(() => { playCue('card'); setLaid((value) => Math.min(total, value + 1)); }, step);
     return () => clearTimeout(timer);
   }, [laid, total, seats, rush]);
   return {
@@ -3059,7 +3154,7 @@ function CoinPusherGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
 
 const bigTwoSeatName=(index:number)=>index===0?'나':`컴퓨터 ${index}`;
 
-function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}:{players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
+function BigTwoGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:InstantSettle}){
   const [state,setState]=useState<BigTwoState|null>(null);
   const [picked,setPicked]=useState<string[]>([]);
   const settledRef=useRef(false);
@@ -3079,7 +3174,7 @@ function BigTwoGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}
   // 컴퓨터 차례는 한 박자 쉬고 저절로 넘어갑니다. 카드가 다 깔리기 전에는 기다립니다.
   useEffect(()=>{
     if(!state||state.winner!==null||state.turn===0||dealing)return;
-    const timer=setTimeout(()=>setState(current=>(current&&current.winner===null&&current.turn!==0)?stepBigTwo(current):current),750);
+    const timer=setTimeout(()=>setState(current=>(current&&current.winner===null&&current.turn!==0)?stepBigTwo(current,level):current),750);
     return()=>clearTimeout(timer);
   },[state,dealing]);
 
@@ -3753,7 +3848,7 @@ function FiveDrawSetupScreen(props: { coins:number; difficulty:string; selectedB
   return <View style={styles.detailScreen}><ScreenHeader title="파이브 카드 드로우(Five-card Draw) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('FiveDrawSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.holdemGuide}><Text style={styles.detailLead}>다섯 장을 한 번 교환해 완성하는 포커</Text><Text style={styles.slotRuleText}>나와 컴퓨터가 비공개 카드 5장씩을 받습니다.</Text><Text style={styles.slotRuleText}>남길 카드를 눌러 보관하고, 나머지 카드는 한 번만 교환합니다.</Text><Text style={styles.slotRuleText}>교환 뒤 체크·콜, 레이즈 또는 폴드를 선택하고 마지막에 족보를 비교합니다.</Text></View><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>드로우 포커 시작</Text></Pressable></ScrollView></View>;
 }
 
-function FiveDrawGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function FiveDrawGameScreen({level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   // 실제 드로우 포커처럼 베팅이 두 번입니다. 교환 전(preBet) 한 번, 교환 후(bet) 한 번.
   const [phase,setPhase]=useState<'ready'|'preBet'|'draw'|'bet'|'result'>('ready');
   const [player,setPlayer]=useState<Card[]>([]);
@@ -3798,7 +3893,7 @@ function FiveDrawGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coin
    */
   const computerPreDraw=(current:PokerBetting)=>{
     const equity=estimateDrawEquity({hole:opponent,trials:200});
-    const action=decidePokerAction({equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:0});
+    const action=decidePokerAction({level,equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:0});
     if(action.kind==='fold'){computerFolds(current);return;}
     if(action.kind==='raise'){computerRaises(current,action.amount);return;}
     const next={mine:current.mine,theirs:current.mine,raises:0};
@@ -3810,7 +3905,7 @@ function FiveDrawGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coin
   /** 교환 후 라운드. 내가 몇 장을 바꿨는지까지 넣어 승률을 다시 잽니다. */
   const computerPostDraw=(current:PokerBetting)=>{
     const equity=estimateDrawEquity({hole:opponent,opponentDrawCount:myExchanged,trials:200});
-    const action=decidePokerAction({equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:3});
+    const action=decidePokerAction({level,equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:3});
     if(action.kind==='fold'){computerFolds(current);return;}
     if(action.kind==='raise'){computerRaises(current,action.amount);return;}
     const next={mine:current.mine,theirs:current.mine,raises:0};
@@ -3836,7 +3931,7 @@ function SevenPokerSetupScreen(props: { coins:number; difficulty:string; selecte
   return <View style={styles.detailScreen}><ScreenHeader title="세븐 포커(Seven-card Poker) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('SevenPokerSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.holdemGuide}><Text style={styles.detailLead}>공개 카드와 비공개 카드로 심리전</Text><Text style={styles.slotRuleText}>처음 3장을 받은 뒤 한 장씩 추가되어 총 7장을 받습니다.</Text><Text style={styles.slotRuleText}>상대의 공개 카드는 볼 수 있지만 비공개 카드는 마지막 승부에서 공개됩니다.</Text><Text style={styles.slotRuleText}>7장 중 가장 강한 5장으로 승패를 정하며, 결과에는 실제 족보 카드만 강조됩니다.</Text></View><PlayerCountRow value={props.players} onChange={props.onPlayersChange}/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>세븐 포커 시작</Text></Pressable></ScrollView></View>;
 }
 
-function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}:{players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [hands,setHands]=useState<Card[][]|null>(null);
   const [round,setRound]=useState<TableRound|null>(null);
   // 0 대기 · 1~4 베팅 라운드 · 5 승부(또는 끝)
@@ -3897,7 +3992,7 @@ function SevenPokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSet
       const oneOnOne=estimateEquity({variant:'seven',hole:theirCards,holeToCome:7-theirCards.length,opponentKnown:myOpen,opponentHidden:7-myOpen.length,trials:160});
       const live=tableLive(round).length;
       const toCall=tableToCall(round,seat);
-      const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
+      const action=decidePokerAction({level,equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
       seatActions.show(seat,tableActionLabel(action.kind,toCall));
@@ -4017,7 +4112,7 @@ function HighLowSetupScreen(props: { coins:number; difficulty:string; selectedBe
   return <View style={styles.detailScreen}><ScreenHeader title="하이로우(High–Low) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('HighLowSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.holdemGuide}><Text style={styles.detailLead}>높은 패와 낮은 패가 팟을 절반씩</Text><Text style={styles.slotRuleText}>각자 카드 7장을 받고 가장 강한 하이 족보와 가장 낮은 로우 족보를 동시에 만듭니다.</Text><Text style={styles.slotRuleText}>로우는 A를 1로 쓰며, 8 이하의 서로 다른 카드 5장이 있어야 합니다. 스트레이트와 플러시는 로우에서 불리하지 않습니다.</Text><Text style={styles.slotRuleText}>하이 승자가 팟의 절반, 로우 승자가 나머지 절반을 가져갑니다. 두 쪽을 모두 이기면 팟 전체를 가져갑니다.</Text></View><PlayerCountRow value={props.players} onChange={props.onPlayersChange}/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>하이로우 시작</Text></Pressable></ScrollView></View>;
 }
 
-function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle}:{players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,share:number,detail:string)=>void}) {
+function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,share:number,detail:string)=>void}) {
   const [hands,setHands]=useState<Card[][]|null>(null);
   const [round,setRound]=useState<TableRound|null>(null);
   const [street,setStreet]=useState(0);
@@ -4071,7 +4166,7 @@ function HighLowGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onSettle
       const oneOnOne=estimateEquity({variant:'highlow',hole:theirCards,holeToCome:7-theirCards.length,opponentKnown:myOpen,opponentHidden:7-myOpen.length,trials:160});
       const live=tableLive(round).length;
       const toCall=tableToCall(round,seat);
-      const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
+      const action=decidePokerAction({level,equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
       seatActions.show(seat,tableActionLabel(action.kind,toCall));
@@ -4310,7 +4405,7 @@ const TABLE_THINK_MS = 700;
 /** 컴퓨터가 이번 판에 넣은 돈과 내가 넣은 돈을 따로 들고 다닙니다. */
 type PokerBetting = { mine: number; theirs: number; raises: number };
 
-function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:'holdem'|'omaha';players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;mode:'holdem'|'omaha';players:number;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const omaha=mode==='omaha';
   const [hands,setHands]=useState<Card[][]|null>(null);
   const [community,setCommunity]=useState<Card[]>([]);
@@ -4395,7 +4490,7 @@ function PokerGameScreen({mode,players,coins,selectedBet,onBack,onPlaceBet,onSet
       const oneOnOne=estimateEquity({variant:omaha?'omaha':'holdem',hole:hands[seat],community:board,opponentHidden:omaha?4:2,communityToCome:5-board.length,trials:200});
       const live=tableLive(round).length;
       const toCall=tableToCall(round,seat);
-      const action=decidePokerAction({equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:stage-1});
+      const action=decidePokerAction({level,equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:stage-1});
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
       seatActions.show(seat,tableActionLabel(action.kind,toCall));
@@ -5275,7 +5370,8 @@ function GoStopSetupScreen(props:{mode:GoStopMode;deckStyle:GoStopDeckStyle;coin
 /** 화면 자동 진행용 선택값. 같은 월 두 장이 있으면 첫 장을 골라 흐름을 멈추지 않습니다. */
 function automaticGoStopChoice(round: GoStopRound, played: HwatuCard, selectedPlayedMatchId?:string) {
   const matches = round.floor.filter((item) => item.month === played.month);
-  const playedMatchId = matches.length === 2 ? (selectedPlayedMatchId??matches[0].id) : undefined;
+  // ⚠️ 안 고르고 넘어오면(컴퓨터 차례) **값이 큰 쪽**을 가져옵니다. 전에는 늘 첫 장이었습니다.
+  const playedMatchId = matches.length === 2 ? (selectedPlayedMatchId??chooseGoStopMatch(matches).id) : undefined;
   let floor = [...round.floor];
   if (matches.length === 0) floor.push(played);
   else if (matches.length === 1) floor = floor.filter((item) => item.id !== matches[0].id);
@@ -5283,7 +5379,7 @@ function automaticGoStopChoice(round: GoStopRound, played: HwatuCard, selectedPl
   else floor = floor.filter((item) => item.month !== played.month);
   const drawn = round.deck.find((card)=>!card.bonus);
   const drawnMatches = drawn ? floor.filter((item) => item.month === drawn.month) : [];
-  return { playedMatchId, drawnMatchId: drawnMatches.length === 2 ? drawnMatches[0].id : undefined };
+  return { playedMatchId, drawnMatchId: drawnMatches.length === 2 ? chooseGoStopMatch(drawnMatches).id : undefined };
 }
 
 /**
@@ -5344,13 +5440,15 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
     // 이긴 사람이 다음 판을 먼저 냅니다.
     setFirstTurn(next.winner);
     if(next.winner===0){
-      const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode));
+      // 총통이면 먹은 패가 없어도 정해진 점수로 칩니다.
+      const chongtong=next.lastEvents?.includes('총통')===true;
+      const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode,{chongtong}));
       const wonPoints=bills.reduce((sum,bill)=>sum+Math.max(1,bill.finalPoints),0)*carryMultiplier;
       const reasons=Array.from(new Set(bills.flatMap((bill)=>bill.reasons)));
       setSettleNote(goStopBill(`내가 이겼습니다`,winner,bills[0],reasons,wonPoints,carryMultiplier,selectedBet,true));
       onSettle(selectedBet,selectedBet*wonPoints,'win',`${title} · ${scoreGoStop(winner.captured).total}점 · ${carryMultiplier>1?`나가리 ${carryMultiplier}배 · `:''}${reasons.length?reasons.join(' · '):'기본 정산'}`);
     }else{
-      const bill=calculateGoStopSettlement(winner,next.players[0],mode);
+      const bill=calculateGoStopSettlement(winner,next.players[0],mode,{chongtong:next.lastEvents?.includes('총통')===true});
       const wantedLoss=selectedBet*Math.max(1,bill.finalPoints)*carryMultiplier;
       const extra=Math.min(Math.max(0,wantedLoss-selectedBet),coins);
       setSettleNote(goStopBill(`컴퓨터 ${next.winner} 승리`,winner,bill,bill.reasons,Math.max(1,bill.finalPoints)*carryMultiplier,carryMultiplier,selectedBet,false,selectedBet+extra));
@@ -5738,7 +5836,7 @@ function DoriSetupScreen(props: { coins:number; difficulty:string; selectedBet:n
   );
 }
 
-function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function DoriGameScreen({level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealDori>|null>(null);
   const [phase,setPhase]=useState<'ready'|'bet'|'reveal'|'result'>('ready');
   const [betting,setBetting]=useState<PokerBetting>({mine:0,theirs:0,raises:0});
@@ -5780,7 +5878,7 @@ function DoriGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:nu
   const computerTurn=(current:PokerBetting)=>{
     if(!round)return;
     const equity=doriEquity(round.opponent);
-    const action=decidePokerAction({equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:2});
+    const action=decidePokerAction({level,equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:2});
     if(action.kind==='fold'){
       setBetting(current);setOpponentNote('컴퓨터 죽음 — 팟을 가져갑니다');setOutcome('컴퓨터가 죽었습니다');setShowdown(null);
       onSettle(current.mine,current.theirs,'win','컴퓨터 죽음 · 상대 패 비공개');setPhase('result');return;
@@ -5914,7 +6012,7 @@ function SeotdaSetupScreen(props: { coins:number; difficulty:string; selectedBet
   );
 }
 
-function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;rules:SeotdaRules;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function SeotdaGameScreen({level,coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{level:OpponentLevel;coins:number;selectedBet:number;rules:SeotdaRules;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(mine:number,theirs:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const [round,setRound]=useState<ReturnType<typeof dealSeotda>|null>(null);
   // 'reveal'은 승부가 정해진 뒤 상대 패를 한 장씩 여는 동안입니다. 다 열려야 정산합니다.
   const [phase,setPhase]=useState<'ready'|'bet'|'reveal'|'result'>('ready');
@@ -5954,7 +6052,7 @@ function SeotdaGameScreen({coins,selectedBet,rules,onBack,onPlaceBet,onSettle}:{
   const computerTurn=(current:PokerBetting)=>{
     if(!round)return;
     const equity=seotdaEquity(round.opponent,rules);
-    const action=decidePokerAction({equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:2});
+    const action=decidePokerAction({level,equity,toCall:current.mine-current.theirs,pot:current.mine+current.theirs,raiseSize:selectedBet,canRaise:current.raises<MAX_RAISES_PER_STREET,street:2});
     if(action.kind==='fold'){
       setBetting(current);setOpponentNote('컴퓨터 죽음 — 팟을 가져갑니다');setOutcome('컴퓨터가 죽었습니다');setShowdown(null);
       onSettle(current.mine,current.theirs,'win','컴퓨터 죽음 · 상대 패 비공개');setPhase('result');return;
@@ -7610,6 +7708,8 @@ function SettingsScreen(props: {
   saveDifficulty: (value: string) => void;
   sound: boolean;
   setSound: (value: boolean) => void;
+  opponentLevel: OpponentLevel;
+  setOpponentLevel: (value: OpponentLevel) => void;
   vibration: boolean;
   setVibration: (value: boolean) => void;
   gameSpeed: GameSpeed;
@@ -7702,6 +7802,19 @@ function SettingsScreen(props: {
         ))}
       </View>
       <Text style={styles.helperText}>베팅 등급은 걸 수 있는 WC 범위만 바꿉니다. 게임 실력 난이도와는 별개입니다.</Text>
+      {/*
+        상대 실력. **고스톱·맞고는 준비 화면에서도 고를 수 있고 값은 같습니다.**
+        여기서 고르면 섰다·도리짓고땡·홀덤·세븐 포커·하이로우·빅투까지 다 같이 바뀝니다.
+      */}
+      <Text style={styles.sectionTitle}>상대 실력</Text>
+      <View style={styles.difficultyRow}>
+        {opponentLevels.map((item) => (
+          <Pressable key={item} style={[styles.difficultyButton, props.opponentLevel === item && styles.difficultyActive]} onPress={() => props.setOpponentLevel(item)}>
+            <Text style={[styles.difficultyText, props.opponentLevel === item && styles.difficultyActiveText]}>{item}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={styles.helperText}>{opponentLevelNotes[props.opponentLevel]} · 고스톱·맞고는 준비 화면에서도 고를 수 있습니다.</Text>
       <Text style={styles.sectionTitle}>테스트 도구</Text>
       <Pressable style={styles.refillButton} onPress={props.onRefillCoins}>
         <Text style={styles.refillButtonTitle}>100,000 WC로 다시 채우기</Text>
@@ -8938,9 +9051,13 @@ const styles = StyleSheet.create({
   // 문어. 큰 놈이라 물고기보다 크게 그리고, 앉으면 두 칸 사이에 자리를 잡습니다.
   fishRouletteOctopus: { position: 'absolute', width: fishRouletteOctopusSize, height: fishRouletteOctopusSize, fontSize: 26, lineHeight: 34, textAlign: 'center' },
   fishRouletteOctopusSettled: { fontSize: 22, opacity: 0.95 },
-  fishRouletteBetArea: { width: '100%', gap: 7 },
+  /**
+   * 아래 칸. **베팅할 때(381)와 물고기가 헤엄칠 때(103)의 높이가 달라서** 그 차이만큼
+   * 바다판이 통째로 아래위로 움직였습니다(112 ↔ 236). 큰 쪽으로 자리를 잡아 둡니다.
+   */
+  fishRouletteBetArea: { width: '100%', gap: 4, minHeight: 357 },
   fishRouletteTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  fishRouletteType: { flexGrow: 1, flexBasis: '30%', paddingVertical: 7, borderRadius: 11, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center', gap: 1 },
+  fishRouletteType: { flexGrow: 1, flexBasis: '30%', paddingVertical: 5, borderRadius: 11, backgroundColor: '#0D2E3C', borderWidth: 1, borderColor: '#255E76', alignItems: 'center', gap: 1 },
   fishRouletteTypeActive: { backgroundColor: '#123F4F', borderColor: colors.gold, borderWidth: 2 },
   fishRouletteTypeName: { color: '#EAF4FA', fontSize: 13, fontWeight: '900' },
   fishRouletteTypeOdds: { color: '#8FE3F5', fontSize: 11, fontWeight: '800' },

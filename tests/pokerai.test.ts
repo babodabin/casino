@@ -175,3 +175,16 @@ test('도리짓고땡 승률이 족보 서열과 맞는다', async () => {
   assert.equal(none < mang, true, `못 지음 ${none} 이 망통 ${mang} 보다 낮아야 합니다`);
   assert.equal(none < 0.35, true, `못 지음 ${none}`);
 });
+
+test('실력마다 밀고 접는 자리가 다르다', () => {
+  // 승률 25%인데 팟 오즈는 33%입니다. 계산대로면 접어야 하는 자리입니다.
+  const 손해 = { equity: 0.25, toCall: 500, pot: 1000, raiseSize: 500, canRaise: true, street: 1 };
+  assert.equal(decidePokerAction({ ...손해, level: '전문가', random: seeded(4) }).kind, 'fold');
+  // 쉬움은 손해인 자리도 따라옵니다. 초보가 흔히 하는 꼴입니다.
+  assert.equal(decidePokerAction({ ...손해, level: '쉬움', random: seeded(4) }).kind, 'call');
+
+  // 승률 78%. 걸 것이 없는 자리에서 전문가는 올리고 쉬움은 그냥 지켜봅니다.
+  const 좋은손 = { equity: 0.78, toCall: 0, pot: 1000, raiseSize: 500, canRaise: true, street: 1 };
+  assert.equal(decidePokerAction({ ...좋은손, level: '전문가', random: seeded(9) }).kind, 'raise');
+  assert.equal(decidePokerAction({ ...좋은손, level: '쉬움', random: seeded(9) }).kind, 'check');
+});

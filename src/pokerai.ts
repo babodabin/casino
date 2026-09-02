@@ -5,6 +5,7 @@ import { opponentKeepCards } from './fivecarddraw.ts';
 import { type HwatuCard } from './hwatu.ts';
 import { compareSeotda, createSeotdaDeck, evaluateSeotda, type SeotdaRules } from './seotda.ts';
 import { compareDori, evaluateDori } from './dorijitgottaeng.ts';
+import { type OpponentLevel } from './opponent.ts';
 
 /**
  * 컴퓨터 상대의 베팅 판단.
@@ -140,7 +141,27 @@ export type PokerPolicyArgs = {
   canRaise: boolean;
   /** 0부터 시작하는 라운드 번호. 뒤로 갈수록 과감해집니다 */
   street: number;
+  /**
+   * 상대 실력. 안 주면 '보통'입니다.
+   * ⚠️ 이름만 다르고 속이 같으면 안 됩니다 — 아래 `levelStyle`에 무엇이 달라지는지 적어 뒀습니다.
+   */
+  level?: OpponentLevel;
   random?: () => number;
+};
+
+/**
+ * 실력마다 **판단 기준을 얼마나 지키는지**가 다릅니다.
+ *
+ *   - `raiseShift` — 레이즈를 거는 승률 문턱. 쉬움은 거의 안 올리고, 전문가는 낮은 문턱에서도 올립니다
+ *   - `callSlack` — 팟 오즈를 얼마나 어겨 주는지. 쉬움은 손해인 콜도 받고, 전문가는 안 받습니다
+ *   - `bluff` — 약한 손으로 걸어 보는 확률
+ */
+const levelStyle: Record<OpponentLevel, { raiseShift: number; callSlack: number; bluff: number }> = {
+  // 초보가 흔히 하는 꼴입니다 — 세게 못 밀고, 지는 자리에서도 따라옵니다.
+  쉬움: { raiseShift: 0.24, callSlack: 0.1, bluff: 0 },
+  보통: { raiseShift: 0, callSlack: 0, bluff: 0.08 },
+  // 팟 오즈를 한 푼도 안 어기고, 좋은 손은 더 자주 올립니다.
+  전문가: { raiseShift: -0.06, callSlack: -0.03, bluff: 0.14 },
 };
 
 /**
@@ -153,22 +174,23 @@ export type PokerPolicyArgs = {
 export function decidePokerAction(args: PokerPolicyArgs): PokerAction {
   const random = args.random ?? Math.random;
   const { equity, toCall, pot, raiseSize, canRaise } = args;
+  const style = levelStyle[args.level ?? '보통'];
   const odds = potOdds(toCall, pot);
   // 라운드가 뒤로 갈수록 정보가 많아져 강한 손을 더 밀어붙입니다.
-  const raiseLine = Math.max(0.58, 0.72 - args.street * 0.03);
+  const raiseLine = Math.max(0.58, 0.72 - args.street * 0.03) + style.raiseShift;
 
   if (toCall <= 0) {
     if (canRaise && equity >= raiseLine && random() < 0.55 + (equity - raiseLine)) return { kind: 'raise', amount: raiseSize };
-    // 약한 손으로도 가끔 걸어 봅니다(세미 블러프).
-    if (canRaise && equity < 0.35 && random() < 0.08) return { kind: 'raise', amount: raiseSize };
+    // 약한 손으로도 가끔 걸어 봅니다(세미 블러프). 쉬움은 안 합니다.
+    if (canRaise && equity < 0.35 && random() < style.bluff) return { kind: 'raise', amount: raiseSize };
     return { kind: 'check' };
   }
 
   // 콜 금액이 팟에 비해 아주 작으면 조금 더 관대하게 봅니다.
-  const tolerance = toCall <= pot * 0.12 ? 0.06 : 0.02;
+  const tolerance = (toCall <= pot * 0.12 ? 0.06 : 0.02) + style.callSlack;
   if (equity + tolerance < odds) {
-    // 아주 싼 콜은 가끔 받아 줍니다.
-    if (toCall <= pot * 0.1 && random() < 0.25) return { kind: 'call', amount: toCall };
+    // 아주 싼 콜은 가끔 받아 줍니다. 전문가는 손해면 안 받습니다.
+    if (toCall <= pot * 0.1 && random() < (args.level === '전문가' ? 0 : 0.25)) return { kind: 'call', amount: toCall };
     return { kind: 'fold' };
   }
   if (canRaise && equity >= raiseLine + 0.05 && random() < 0.5) return { kind: 'raise', amount: raiseSize };
