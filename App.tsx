@@ -5897,9 +5897,23 @@ function FaceDownHwatuDeck({count}:{count:number}){
 }
 
 function HwatuFloor({cards,deckCount,compact=false}:{cards:HwatuCard[];deckCount:number;compact?:boolean}){
-  const split=Math.ceil(cards.length/2);
   const size=compact?'small':'normal';
-  return <View style={[styles.hwatuFloorBoard,compact&&styles.hwatuFloorBoardCompact]}><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(0,split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View><FaceDownHwatuDeck count={deckCount}/><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{cards.slice(split).map(card=><HwatuCardView key={card.id} card={card} size={size}/>)}</View></View>;
+  /*
+   * ⚠️ 바닥은 **같은 월끼리 한 무더기**로 겹칩니다.
+   * 전에는 한 장씩 따로 놓아서, 쌈(같은 월 석 장)이 나도 석 장이 흩어져 보였습니다.
+   * 겹치되 끝을 남겨 두어 **몇 장인지는 세어집니다.**
+   */
+  const piles: HwatuCard[][] = [];
+  for (const card of cards) {
+    const found = piles.find((pile) => pile[0].month === card.month);
+    if (found) found.push(card); else piles.push([card]);
+  }
+  const overlap = compact ? styles.hwatuFloorStackSmall : styles.hwatuFloorStack;
+  const pile = (group: HwatuCard[]) => <View key={group[0].id} style={styles.hwatuFloorPile}>
+    {group.map((card, index) => <View key={card.id} style={index ? overlap : null}><HwatuCardView card={card} size={size}/></View>)}
+  </View>;
+  const half = Math.ceil(piles.length / 2);
+  return <View style={[styles.hwatuFloorBoard,compact&&styles.hwatuFloorBoardCompact]}><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{piles.slice(0,half).map(pile)}</View><FaceDownHwatuDeck count={deckCount}/><View style={[styles.hwatuFloorRow,compact&&styles.hwatuFloorRowCompact]}>{piles.slice(half).map(pile)}</View></View>;
 }
 
 /** 모은 패를 늘어놓는 순서. 왼쪽이 값이 큰 쪽입니다. */
@@ -6316,7 +6330,12 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
 
       {/* 내 손패. 열 장이 한 줄에 들어오도록 서로 겹칩니다. */}
       {/* 내 차례에는 바닥을 칠 수 있는 패를 들어 올려 표시합니다. */}
-      <View style={styles.goStopHand}>{round.players[0].hand.map((card,index)=>{
+      {/*
+        손패는 **1월부터 12월 차례로** 늘어놓습니다. 나눠 준 차례 그대로 두면 같은 월이
+        떨어져 있어 무엇을 낼 수 있는지 한눈에 안 보입니다. 화면에서만 정렬하고
+        판(엔진)의 차례는 건드리지 않습니다.
+      */}
+      <View style={styles.goStopHand}>{[...round.players[0].hand].sort((left,right)=>left.month-right.month||left.id.localeCompare(right.id)).map((card,index)=>{
         const myTurn=round.turn===0&&!round.finished&&round.pendingDecision!==0&&!slap;
         const canHit=myTurn&&round.floor.some((item)=>item.month===card.month);
         return <Pressable key={card.id} style={[index?{marginLeft:handStep-52}:null,canHit&&styles.goStopHandHit]} disabled={round.turn!==0||round.finished||round.pendingDecision===0||pendingPlay!==null} onPress={()=>play(card)}><HwatuCardView card={card}/></Pressable>;
@@ -7046,16 +7065,15 @@ function BlackjackGameScreen(props: {
    * ⚠️ 301은 **반원 테이블 안쪽 폭**입니다(판 347 − 테두리 9×2 − 안 여백 14×2).
    * 테두리나 여백을 바꾸면 이 값도 다시 재세요.
    */
-  const BLACKJACK_ROW_WIDTH = 301;
-  const handFanFor = (count: number) => {
-    const card = cardSizeBox[handFit.fit].width;
-    if (count <= 1) return null;
-    const room = Math.floor((BLACKJACK_ROW_WIDTH - card) / (count - 1));
-    const step = Math.max(16, Math.min(card + 6, room));
-    return { marginLeft: step - card };
-  };
+  /*
+   * 카드를 옆으로 얼마나 벌릴지. **예전 그대로** 둡니다 — 손이 좁을 때만 겹칩니다.
+   * ⚠️ 한때 장수에 맞춰 항상 겹치게 바꿨다가 되돌렸습니다. 좌우는 원래가 맞았고,
+   * 줄여야 했던 것은 **위아래**였습니다(줄 높이와 여백).
+   */
+  const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
+  const handFanFor = (_count: number) => handFan;
   // ⚠️ 카드 높이 + 2. 전에는 +10이라 줄마다 8이 그냥 비어 있었습니다.
-  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 2, gap: 0 }];
+  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 2, gap: handFit.crowded ? 0 : 6 }];
 
   /**
    * 딜러가 빛나야 하는지. **딜러가 그 판에서 모두를 이겼을 때만** 빛냅니다.
@@ -7986,19 +8004,22 @@ function RouletteGameScreen({
     /*
      * 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
      * ⚠️ 4.2초는 너무 빨라 "돌았다"는 느낌이 없었고, 8.2/9.4초는 **너무 길었습니다.**
-     * 그 사이인 4.4/5.2초로 뒀습니다.
+     * 그 사이인 5.2/6.2초로 뒀습니다.
+     *
+     * ⚠️ 느려지는 모양은 `cubic`에서 **5제곱(`Easing.poly(5)`)** 으로 바꿨습니다. 끝에서 반 바퀴쯤을
+     * 눈에 띄게 **기어가듯** 돕니다. 실제 룰렛이 마지막에 그렇게 섭니다.
      */
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(4400 * motion)),
-      easing: Easing.out(Easing.cubic),
+      duration: Math.max(260, Math.round(5200 * motion)),
+      easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(5200 * motion)),
-      easing: Easing.out(Easing.cubic),
+      duration: Math.max(300, Math.round(6200 * motion)),
+      easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
@@ -10413,6 +10434,11 @@ const styles = StyleSheet.create({
   hwatuCardTiny: { width: 32, height: 48, borderRadius: 3 },
   hwatuFloorBoardCompact: { minHeight: 150, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0, paddingVertical: 4, marginVertical: 0 },
   hwatuFloorRowCompact: { minHeight: 61, gap: 2 },
+  // 같은 월 무더기. 한 덩이로 움직입니다.
+  hwatuFloorPile: { flexDirection: 'row', alignItems: 'center' },
+  // 겹치는 폭. 끝을 남겨 두어 몇 장인지 세어집니다(작은 패 40 · 큰 패 50 기준).
+  hwatuFloorStackSmall: { marginLeft: -20 },
+  hwatuFloorStack: { marginLeft: -26 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
   hwatuCardImage: { position:'absolute', left:0, top:0, right:0, bottom:0, width:'100%', height:'100%' },
   hwatuCardCaption: { position:'absolute', left:2, right:2, bottom:1, height:15, borderRadius:4, backgroundColor:'rgba(18,24,20,0.88)', flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:4 },
