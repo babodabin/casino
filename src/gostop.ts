@@ -202,7 +202,15 @@ export function playGoStopTurn(round: GoStopRound, cardId: string, choice: Match
   let players = round.players.map((item, index) => index === round.turn
     ? { ...item, hand: removeCard(item.hand, played.id), captured: [...item.captured, ...drawnBonuses, ...captured] }
     : { ...item, hand: [...item.hand], captured: [...item.captured] });
-  players = stealPiFromOpponents(players, round.turn, events.filter((event) => ['쪽', '따닥', '싹쓸이', '폭탄'].includes(event)).length);
+  /*
+   * 상대 피를 한 장씩 가져오는 일들.
+   *
+   * ⚠️ **바닥의 같은 월 석 장을 넷째 패로 쓸어 가는 것**('네 장 다 먹음')이 빠져 있었습니다.
+   * 이름은 붙여 놓고 이 목록에는 안 넣어서, 넉 장을 다 먹어도 피를 못 가져왔습니다.
+   * 새 일을 만들 때는 **여기에 넣을지부터** 정하세요.
+   */
+  const 피뺏는일 = ['쪽', '따닥', '싹쓸이', '폭탄', '네 장 다 먹음', '깐 패로 네 장 다 먹음'];
+  players = stealPiFromOpponents(players, round.turn, events.filter((event) => 피뺏는일.includes(event)).length);
   const deck = drawn ? round.deck.slice(drawIndex + 1) : [];
   return finishGoStopTurn(round, players, floor, deck, events);
 }

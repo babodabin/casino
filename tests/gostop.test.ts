@@ -124,6 +124,21 @@ test('따닥이면 같은 월 네 장을 모두 먹고 상대 피를 가져온�
   assert.equal(next.players[0].captured.some((item) => item.id === opponentPi.id), true);
 });
 
+test('바닥의 같은 월 석 장을 넷째 패로 쓸어 가도 상대 피를 가져온다', () => {
+  // ⚠️ 이 일에 이름은 붙여 놓고 피를 뺏는 목록에는 안 넣어서, 넉 장을 다 먹어도
+  // 상대 피가 그대로였습니다.
+  const month = deck.filter((item) => item.month === 7);
+  const opponentPi = card(11, '피');
+  const next = playGoStopTurn(
+    roundFor([month[0]], [month[1], month[2], month[3], card(2, '띠')], [card(5)], [opponentPi]),
+    month[0].id,
+  );
+  assert.equal(next.lastEvents?.includes('네 장 다 먹음'), true);
+  assert.equal(next.players[0].captured.filter((item) => item.month === 7).length, 4);
+  assert.equal(next.players[0].captured.some((item) => item.id === opponentPi.id), true);
+  assert.equal(next.players[1].captured.some((item) => item.id === opponentPi.id), false);
+});
+
 test('마지막 바닥 패까지 먹으면 싹쓸이로 상대 피를 가져온다', () => {
   const month = deck.filter((item) => item.month === 4);
   const opponentPi = card(10, '피');
