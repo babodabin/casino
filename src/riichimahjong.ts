@@ -10,6 +10,21 @@ export type MahjongWaitShape = 'ryanmen'|'kanchan'|'penchan'|'tanki'|'shanpon';
 export type RiichiFuResult = { fu:number; wait:MahjongWaitShape; details:string[]; pinfu:boolean };
 export type RiichiScoreResult={basePoints:number;total:number;payments:number[];limitName:string};
 export type MahjongAiLevel='beginner'|'easy'|'normal'|'hard'|'expert';
+
+/**
+ * 마작 상대 셋의 실력. **베팅 등급을 따라갑니다.**
+ *
+ * ⚠️ 전에는 어느 자리에서나 `easy · normal · expert`로 못 박혀 있었습니다. 라이트에서도
+ * 전문가 한 명과 붙고, VIP에서도 초보 한 명이 앉아 있었습니다.
+ *
+ * 셋을 다 같은 실력으로 두지는 않습니다 — 실제 자리도 사람마다 다릅니다.
+ * 등급이 오르면 셋이 **통째로 한 단씩** 세집니다.
+ */
+export function mahjongLevelsFor(level: '쉬움' | '보통' | '전문가'): [MahjongAiLevel, MahjongAiLevel, MahjongAiLevel] {
+  if (level === '쉬움') return ['beginner', 'easy', 'normal'];
+  if (level === '전문가') return ['normal', 'expert', 'expert'];
+  return ['easy', 'normal', 'expert'];
+}
 export type RiichiMatchState={roundIndex:number;honba:number;riichiSticks:number;scores:[number,number,number,number];finished:boolean};
 export type RiichiRound = { player: MahjongTile[]; opponents: MahjongTile[][]; wall: MahjongTile[]; deadWall:MahjongTile[]; rivers: MahjongTile[][] };
 

@@ -12,6 +12,27 @@ export type OpponentLevel = '쉬움' | '보통' | '전문가';
 
 export const opponentLevels: OpponentLevel[] = ['쉬움', '보통', '전문가'];
 
+/**
+ * 베팅 등급으로 상대 실력을 정합니다. **따로 고르지 않습니다.**
+ *
+ * 실제 카지노에서 판돈이 큰 자리에 센 사람이 앉는 것과 같습니다.
+ * 크게 걸수록 센 상대와 붙고, 그만큼 배당도 큽니다.
+ *
+ * ⚠️ 등급 이름은 **속 이름**입니다. 화면에는 라이트·스탠더드·프리미엄·하이롤러·VIP로 보입니다.
+ * (`betTierNames` 참고. 여기 이름을 화면 이름으로 바꾸면 저장된 설정과 어긋납니다.)
+ *
+ *   입문 · 쉬움   (라이트 · 스탠더드) → 쉬움
+ *   보통          (프리미엄)          → 보통
+ *   어려움 · 전문가 (하이롤러 · VIP)   → 전문가
+ *
+ * 모르는 이름이 오면 보통으로 둡니다.
+ */
+export function opponentLevelForBetTier(tier: string): OpponentLevel {
+  if (tier === '입문' || tier === '쉬움') return '쉬움';
+  if (tier === '어려움' || tier === '전문가') return '전문가';
+  return '보통';
+}
+
 /** 실력마다 무엇이 다른지. 화면에도 이 글을 씁니다. */
 export const opponentLevelNotes: Record<OpponentLevel, string> = {
   쉬움: '실수도 하고 세게 못 밉니다',

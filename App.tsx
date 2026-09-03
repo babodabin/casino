@@ -146,7 +146,7 @@ import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type 
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
 import { soundCues, vibrationFor, type SoundCue } from './src/sound';
-import { opponentLevelNotes, opponentLevels, type OpponentLevel } from './src/opponent';
+import { opponentLevelForBetTier, opponentLevelNotes, type OpponentLevel } from './src/opponent';
 import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, chooseGoStopMatch, dealGoStop, declareGoStopShake, goStopLevelNotes, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopLevel, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
 import { chooseComputerMinhwatuCard, dealMinhwatu, playMinhwatuTurn, scoreMinhwatu, settleMinhwatu, type MinhwaRound } from './src/minhwatu';
 import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, playYukbaekTurn, scoreYukbaek, settleYukbaekRound, type YukbaekMatch } from './src/yukbaek';
@@ -199,7 +199,7 @@ import { drawSichuanReplacement, chooseVoidSuit, suitNames, nextVoidDiscard, swa
 import { createHongKongMatch, settleHongKongWin, settleHongKongMultipleRon, settleHongKongDraw, hongKongRoundLabel, rankHongKongScores, shuffleFlowers, createFlowerTiles, dealInitialHongKongFlowers, evaluateHongKongFaan, hongKongScore, drawHongKongTurn, HONG_KONG_MIN_FAAN, HONG_KONG_MIN_OPTIONS, type HongKongFlower, type HongKongMatchState } from './src/hongkongmahjong';
 import { createChineseMatch, settleChineseWin, settleChineseMultipleRon, settleChineseDraw, chineseRoundLabel, rankChineseScores, evaluateChineseYaku, chineseScore, type ChineseMatchState } from './src/chinesemahjong';
 import { canDeclareRiichiNow, chooseCallByPriority, drawModeSupplement, getModeCallOptions, isDoubleRiichiDeclaration, isMahjongSessionFinished, mahjongDealerSeat, reconcileSichuanKanEvent } from './src/mahjongflow';
-import { isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, settleMultipleRon, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
+import { mahjongLevelsFor, type MahjongAiLevel, isRedFive, DEFAULT_RIICHI_RULES, riichiRuleLabels, type RiichiRuleOptions, advanceRiichiMatch, applyMahjongCall, countYakumanMultiplier, seatWindFor, roundWindFor, getAnkanOptions, getKakanOptions, applyAnkan, applyKakan, ankanKeepsWait, canRobKan, deadWallDoraIndicators, deadWallUraIndicators, drawReplacementTile, MAX_KAN_PER_ROUND, canDeclareNineTerminals, countNineTerminals, isFourWindDiscardAbort, isFourRiichiAbort, isFourKanAbort, isNagashiMangan, nagashiManganPayments, type MahjongKanOption, calculateNotenPayments, calculateRiichiFu, calculateRiichiScore, canRonMahjong, chooseComputerCall, chooseComputerDiscard, countMahjongDora, dealRiichi, discardTile, doraFromIndicator, drawTile as drawMahjongTile, evaluateBasicRiichiYaku, getMahjongCallOptions, getMahjongWaits, getRiichiDiscardOptions, isMahjongFuriten, isWinningMahjongHand, playOneComputerTurn, rankRiichiScores, riichiRoundLabel, settleRiichiWin, settleMultipleRon, sortMahjongHand, suggestBeginnerRiichiYaku, suggestRiichiDiscards, tileDangerScore, type MahjongCallOption, type RiichiMatchState, type MahjongTile } from './src/riichimahjong';
 
 type Tab = '홈' | '게임' | '지갑' | '기록' | '설정';
 type MahjongMode = 'riichi'|'chinese'|'hongkong'|'sichuan';
@@ -690,7 +690,12 @@ function CasinoApp() {
    * 컴퓨터 상대의 실력. **고스톱만이 아니라 컴퓨터와 붙는 게임 전부**가 이 값을 씁니다.
    * 고스톱·맞고는 준비 화면에서, 나머지는 설정에서 고릅니다. 값은 한 가지입니다.
    */
-  const [goStopLevel,setGoStopLevel]=useState<OpponentLevel>('보통');
+  /**
+   * 상대 실력. **따로 고르지 않고 베팅 등급을 따라갑니다.**
+   * ⚠️ 전에는 설정과 고스톱 준비 화면 두 군데에서 골랐습니다. 크게 거는 자리에 약한 상대를
+   * 앉힐 수 있어서, 배당은 큰데 이기기는 쉬운 자리가 생겼습니다.
+   */
+  const goStopLevel=opponentLevelForBetTier(difficulty);
   // 홈의 '이어서 하기'는 마지막으로 '고른' 게임을 보여 줍니다(끝까지 안 해도 됩니다).
   const [lastGame, setLastGame] = useState<GameRecord['game'] | ''>('');
 
@@ -1257,7 +1262,7 @@ function CasinoApp() {
         )}
         {(appScreen === 'gostopSetup' || appScreen === 'matgoSetup') && (
           <GoStopSetupScreen mode={appScreen==='gostopSetup'?'gostop':'matgo'} coins={coins} difficulty={difficulty} selectedBet={selectedBet} deckStyle={goStopDeckStyle}
-            level={goStopLevel} onLevelChange={setGoStopLevel}
+            level={goStopLevel}
             onDeckStyleChange={setGoStopDeckStyle} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet}
             onStart={()=>setAppScreen(appScreen==='gostopSetup'?'gostopGame':'matgoGame')}/>
         )}
@@ -1451,15 +1456,15 @@ function CasinoApp() {
         {appScreen === 'highLowSetup' && <HighLowSetupScreen players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
         {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
-        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
+        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
         {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
-        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
+        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
         {appScreen === 'hongKongMahjongSetup' && <WorldMahjongSetupScreen mode="hongkong" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('hongKongMahjongGame')} />}
-        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
+        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
         {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
-        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
+        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && <BottomInsetContext.Provider value={insets.bottom}>{renderTab({
-          tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, opponentLevel: goStopLevel, setOpponentLevel: setGoStopLevel, vibration, setVibration,
+          tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, opponentLevel: goStopLevel, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
           onRefillCoins: refillTestCoins, coins, records, totalPlays, lastGame,
           onExportBackup: exportBackup, onPickBackup: pickBackupFile,
@@ -1583,7 +1588,6 @@ type TabProps = {
   sound: boolean;
   setSound: (value: boolean) => void;
   opponentLevel: OpponentLevel;
-  setOpponentLevel: (value: OpponentLevel) => void;
   vibration: boolean;
   setVibration: (value: boolean) => void;
   gameSpeed: GameSpeed;
@@ -1617,7 +1621,6 @@ function renderTab(props: TabProps) {
       sound={props.sound}
       setSound={props.setSound}
       opponentLevel={props.opponentLevel}
-      setOpponentLevel={props.setOpponentLevel}
       vibration={props.vibration}
       setVibration={props.setVibration}
       gameSpeed={props.gameSpeed}
@@ -1866,6 +1869,11 @@ function shakeDice(total: number, onTick: () => void, onDone: () => void, turns 
   timer = setTimeout(step, Math.max(16, at(1)));
   return () => { stopped = true; clearTimeout(timer); };
 }
+
+/** 마작 상대 실력을 화면에 적는 이름. `MahjongAiLevel`과 한 줄로 맞춰 둡니다. */
+const mahjongLevelNames: Record<MahjongAiLevel, string> = {
+  beginner: '초보', easy: '쉬움', normal: '보통', hard: '고수', expert: '전문가',
+};
 
 /**
  * 소리를 내지 않는 게임입니다.
@@ -5239,7 +5247,7 @@ function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins
   return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><MahjongGlossary/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
 }
 
-function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
+function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;level:OpponentLevel;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const profile=mahjongProfiles[mode];
   type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean;otherRonSeats?:number[];onPassRon?:()=>void;kanRefundTransfers?:SichuanKanTransfer[]};
   type MahjongRoundResult={winner:number|null;winners?:number[];method:'론'|'쯔모'|'유국'|'유국만관';concealed:MahjongTile[];melds:MahjongTile[][];yaku:string[];grade:string;scoreText:string};
@@ -5425,7 +5433,8 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
     const meldSets=computerMelds.map((melds)=>melds.map((meld)=>[...meld]));
     const flowerSets=flowers.map((list)=>[...list]);
     let remainingFlowerWall=[...flowerWall];
-    const levels=(['easy','normal','expert'] as const);
+    // 상대 셋의 실력. 베팅 등급이 정합니다.
+    const levels=mahjongLevelsFor(level);
     let remaining=[...nextWall];
 
     const persist=()=>{
@@ -5690,7 +5699,7 @@ function RiichiGameScreen({mode,coins,selectedBet,onBack,onPlaceBet,onSettle}:{m
       else setMatchState((current)=>advanceRiichiMatch(current,{winner:seat}));
       const ronNames=computerRons.map((index)=>`컴퓨터 ${index+1}`).join('·');
       finish('loss',`${ronNames} 론${computerRons.length>1?' · 일포다향':''} · 내가 버린 ${mine.discarded.glyph}으로 완성 · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);
-      return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=(['easy','normal','expert'] as const);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors,allowedCalls:getModeCallOptions(mode,hand,mine.discarded,index===0,voidSuits[index+1])}));const callReaction=chooseCallByPriority(calls.flatMap((call,index)=>call?[{seat:index+1,candidate:index,call}]:[]),0);const caller=callReaction?.candidate??-1;if(caller>=0){const call=callReaction!.call;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);setAnyCallMade(true);setMyDiscardClaimed(true);if(call.kind==='kan')setKanOwners((current)=>[...current,caller+1]);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=mode==='riichi'?drawReplacementTile(callHand,remaining,deadWall,revealedKans):{...drawSichuanReplacement(callHand,remaining),deadWall};callHand=supplement.hand;remaining=supplement.wall;setDeadWall(supplement.deadWall);setRevealedKans((value)=>value+1);}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(riichiDeclared||declaration?[nextRivers[0]]:[]),...opponentRiichi.flatMap((declared,seat)=>declared&&seat!==caller?[nextRivers[seat+1]]:[])],visibleTiles:[...callHand,...nextRivers.flat(),...computerMeldSets.flat(2)]});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${['쉬움','보통','전문가'][caller]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
+      return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=mahjongLevelsFor(level);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors,allowedCalls:getModeCallOptions(mode,hand,mine.discarded,index===0,voidSuits[index+1])}));const callReaction=chooseCallByPriority(calls.flatMap((call,index)=>call?[{seat:index+1,candidate:index,call}]:[]),0);const caller=callReaction?.candidate??-1;if(caller>=0){const call=callReaction!.call;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);setAnyCallMade(true);setMyDiscardClaimed(true);if(call.kind==='kan')setKanOwners((current)=>[...current,caller+1]);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=mode==='riichi'?drawReplacementTile(callHand,remaining,deadWall,revealedKans):{...drawSichuanReplacement(callHand,remaining),deadWall};callHand=supplement.hand;remaining=supplement.wall;setDeadWall(supplement.deadWall);setRevealedKans((value)=>value+1);}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(riichiDeclared||declaration?[nextRivers[0]]:[]),...opponentRiichi.flatMap((declared,seat)=>declared&&seat!==caller?[nextRivers[seat+1]]:[])],visibleTiles:[...callHand,...nextRivers.flat(),...computerMeldSets.flat(2)]});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${mahjongLevelNames[levels[caller]]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
   const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;const onPassRon=pendingCall.onPassRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);if(onPassRon){onPassRon();return;}runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
   const claim=(option:MahjongCallOption)=>{if(!pendingCall)return;setAnyCallMade(true);if(option.kind==='kan')setKanOwners((current)=>[...current,0]);setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){if(mode==='sichuan'){const settled=settleSichuanKan(bloodState,{kanner:0,kind:'minkan',discarder:pendingCall.discarder,basePoints:1});setBloodState(settled.state);setSichuanKanTransfers((current)=>[...current,...settled.transfers]);setSichuanLastKanTransfers(settled.transfers);setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);}const draw=drawModeSupplement(mode,called.hand,wall,deadWall,revealedKans);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDeadWall(draw.deadWall);setRevealedKans((value)=>value+1);setDrawnId(draw.drawn.id);setAfterKanDraw(true);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};
   const opponentMeldView=(index:number)=><>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{sichuanSeatStatus(index+1)}</Text>}{opponentMelds[index]?.length?<View style={styles.mahjongOpponentMeldRow}>{opponentMelds[index].map((meld,meldIndex)=><View key={meldIndex} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>:null}</>;
@@ -5904,19 +5913,17 @@ function HwatuCapturedGroups({cards}:{cards:HwatuCard[]}){
   return <View style={styles.hwatuCapturedGroups}>{order.map(label=>{const group=cards.filter(card=>hwatuScoreGroup(card)===label);if(!group.length)return null;return <View key={label} style={styles.hwatuCapturedGroup}><Text style={styles.hwatuCapturedLabel}>{label} · {group.length}</Text><View style={styles.hwatuCapturedCards}>{group.map(card=><HwatuCardView key={card.id} card={card}/>)}</View></View>;})}</View>;
 }
 
-function GoStopSetupScreen(props:{mode:GoStopMode;deckStyle:GoStopDeckStyle;coins:number;difficulty:string;selectedBet:number;level:GoStopLevel;onLevelChange:(value:GoStopLevel)=>void;onDeckStyleChange:(value:GoStopDeckStyle)=>void;onBack:()=>void;onDifficultyChange:(value:string)=>void;onBetChange:(value:number)=>void;onStart:()=>void}){
+function GoStopSetupScreen(props:{mode:GoStopMode;deckStyle:GoStopDeckStyle;coins:number;difficulty:string;selectedBet:number;level:GoStopLevel;onDeckStyleChange:(value:GoStopDeckStyle)=>void;onBack:()=>void;onDifficultyChange:(value:string)=>void;onBetChange:(value:number)=>void;onStart:()=>void}){
   const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];const title=props.mode==='gostop'?'고스톱':'맞고';
   return <View style={styles.detailScreen}><ScreenHeader title={`${title} 준비`} onBack={props.onBack}/><ScrollView contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
     <View style={styles.sicboHero}><Text style={styles.sicboHeroDice}>{props.mode==='gostop'?'花 · GO / STOP':'二 · 맞고'}</Text><Text style={styles.detailLead}>{props.mode==='gostop'?'세 명이 3점부터 결정':'두 명이 7점부터 결정'}</Text></View>
-    {/* 상대 실력을 **들어가기 전에** 고릅니다. 전에는 자리마다 정해져 있어 고를 수가 없었습니다. */}
-    <Text style={styles.sectionTitle}>상대 실력</Text>
-    <View style={styles.setupOptions}>{(['쉬움','보통','전문가'] as GoStopLevel[]).map((item)=>
-      <Pressable key={item} style={[styles.setupOption,props.level===item&&styles.setupOptionActive]} onPress={()=>props.onLevelChange(item)}>
-        <Text style={[styles.setupOptionTitle,props.level===item&&styles.setupOptionTitleActive]}>{item}</Text>
-        {/* 설명은 엔진에서 가져옵니다. 화면에만 적어 두면 코드와 어긋납니다. */}
-        <Text style={styles.setupOptionRange}>{goStopLevelNotes[item]}</Text>
-      </Pressable>)}
-    </View>
+    {/*
+      상대 실력은 **베팅 등급을 따라갑니다.** 고르는 자리가 아니라 알려 주는 자리입니다.
+      ⚠️ 따로 고르게 두면 크게 거는 자리에 약한 상대를 앉힐 수 있습니다. 설명은 엔진에서
+      가져옵니다 — 화면에만 적어 두면 코드와 어긋납니다.
+    */}
+    <Text style={styles.sectionTitle}>상대 실력 · {props.level}</Text>
+    <Text style={styles.helperText}>{goStopLevelNotes[props.level]} · 베팅 등급을 올리면 상대도 세집니다.</Text>
     <Text style={styles.sectionTitle}>게임 종류</Text><View style={styles.slotModeRow}>
       <Pressable onPress={()=>props.onDeckStyleChange('classic')} style={[styles.slotModeCard,props.deckStyle==='classic'&&styles.slotModeActive]}><Text style={props.deckStyle==='classic'?styles.slotModeTitleActive:styles.slotModeTitle}>기본판 · 48장</Text><Text style={styles.slotModeText}>정규 화투패만 사용</Text></Pressable>
       <Pressable onPress={()=>props.onDeckStyleChange('bonus')} style={[styles.slotModeCard,props.deckStyle==='bonus'&&styles.slotModeActive]}><Text style={props.deckStyle==='bonus'?styles.slotModeTitleActive:styles.slotModeTitle}>보너스판 · 50장</Text><Text style={styles.slotModeText}>2피·3피 보너스 추가</Text></Pressable>
@@ -8344,7 +8351,6 @@ function SettingsScreen(props: {
   sound: boolean;
   setSound: (value: boolean) => void;
   opponentLevel: OpponentLevel;
-  setOpponentLevel: (value: OpponentLevel) => void;
   vibration: boolean;
   setVibration: (value: boolean) => void;
   gameSpeed: GameSpeed;
@@ -8417,18 +8423,11 @@ function SettingsScreen(props: {
       </View>
       <Text style={styles.helperText}>베팅 등급은 걸 수 있는 WC 범위만 바꿉니다. 게임 실력 난이도와는 별개입니다.</Text>
       {/*
-        상대 실력. **고스톱·맞고는 준비 화면에서도 고를 수 있고 값은 같습니다.**
-        여기서 고르면 섰다·도리짓고땡·홀덤·세븐 포커·하이로우·빅투까지 다 같이 바뀝니다.
+        상대 실력. **베팅 등급을 따라갑니다** — 여기서 따로 고르지 않습니다.
+        고스톱·맞고·섰다·도리짓고땡·홀덤·세븐 포커·하이로우·빅투가 다 이 값을 씁니다.
       */}
-      <Text style={styles.sectionTitle}>상대 실력</Text>
-      <View style={styles.difficultyRow}>
-        {opponentLevels.map((item) => (
-          <Pressable key={item} style={[styles.difficultyButton, props.opponentLevel === item && styles.difficultyActive]} onPress={() => props.setOpponentLevel(item)}>
-            <Text style={[styles.difficultyText, props.opponentLevel === item && styles.difficultyActiveText]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
-      <Text style={styles.helperText}>{opponentLevelNotes[props.opponentLevel]} · 고스톱·맞고는 준비 화면에서도 고를 수 있습니다.</Text>
+      <Text style={styles.sectionTitle}>상대 실력 · {props.opponentLevel}</Text>
+      <Text style={styles.helperText}>{opponentLevelNotes[props.opponentLevel]} · 위 베팅 등급을 올리면 상대도 세집니다(라이트·스탠더드 → 쉬움 · 프리미엄 → 보통 · 하이롤러·VIP → 전문가).</Text>
       <Text style={styles.sectionTitle}>테스트 도구</Text>
       <Pressable style={styles.refillButton} onPress={props.onRefillCoins}>
         <Text style={styles.refillButtonTitle}>100,000 WC로 다시 채우기</Text>
