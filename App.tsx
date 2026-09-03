@@ -685,6 +685,11 @@ function CasinoApp() {
   // 카드 분류(개인 카드) 게임에서 몇 명이 앉을지. 나를 포함한 인원이고 게임끼리 같이 씁니다.
   const [tablePlayers, setTablePlayers] = useState(4);
   const [seotdaRules, setSeotdaRules] = useState<SeotdaRules>(DEFAULT_SEOTDA_RULES);
+  /**
+   * 블랙잭 손님 수. **같은 슈에서 카드를 나눠 받으니 손님이 늘면 내 카드도 달라집니다.**
+   * 0명이면 딜러와 1대1입니다.
+   */
+  const [blackjackGuests,setBlackjackGuests]=useState(2);
   const [goStopDeckStyle,setGoStopDeckStyle]=useState<GoStopDeckStyle>('classic');
   /**
    * 컴퓨터 상대의 실력. **고스톱만이 아니라 컴퓨터와 붙는 게임 전부**가 이 값을 씁니다.
@@ -1235,12 +1240,15 @@ function CasinoApp() {
             onBack={() => setAppScreen('categoryCatalog')}
             onDifficultyChange={saveDifficulty}
             onBetChange={setSelectedBet}
+            guests={blackjackGuests}
+            onGuestsChange={setBlackjackGuests}
             onStart={startBlackjack}
           />
         )}
         {appScreen === 'blackjackGame' && (
           <BlackjackGameScreen
-            key={gameRoundId}
+            key={`${gameRoundId}-${blackjackGuests}`}
+            guests={blackjackGuests}
             bet={selectedBet}
             coins={coins}
             difficulty={difficulty}
@@ -2516,6 +2524,8 @@ function BlackjackSetupScreen(props: {
   coins: number;
   difficulty: string;
   selectedBet: number;
+  guests: number;
+  onGuestsChange: (value: number) => void;
   onBack: () => void;
   onDifficultyChange: (value: string) => void;
   onBetChange: (value: number) => void;
@@ -2534,6 +2544,20 @@ function BlackjackSetupScreen(props: {
             <Text style={styles.detailLead}>21에 가장 가까이</Text>
             <Text style={styles.gameListDescription}>딜러보다 21에 가까운 카드 합계를 만드세요.</Text>
           </View>
+        </View>
+
+        {/*
+          같은 자리에 앉는 손님 수. ⚠️ **한 슈에서 같이 나눠 받으므로 손님이 늘면
+          내 카드도 달라집니다.** 그래서 이건 그림이 아니라 게임이 바뀌는 값입니다.
+        */}
+        <Text style={styles.sectionTitle}>같이 앉는 손님</Text>
+        <View style={styles.horseBetTypeRow}>
+          {[0, 1, 2, 3].map((count) => (
+            <Pressable key={count} style={[styles.horseBetType, props.guests === count && styles.horseBetTypeActive]} onPress={() => props.onGuestsChange(count)}>
+              <Text style={styles.horseBetTypeTitle}>{count === 0 ? '없음' : `${count}명`}</Text>
+              <Text style={styles.horseBetTypeDetail}>{count === 0 ? '딜러와 1대1' : `나까지 ${count + 1}명`}</Text>
+            </Pressable>
+          ))}
         </View>
 
         <Text style={styles.sectionTitle}>베팅 등급</Text>
@@ -6290,6 +6314,11 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
           const 튐={
             transform:[{scale:slapLift.interpolate({inputRange:[0,0.12,0.26,1],outputRange:[1,1.28,1,1]})}],
           };
+          /**
+           * 낸 패와 깐 패가 **같은 월**이면 한 무더기로 그립니다.
+           * 바닥 패 · 낸 패 · 깐 패 석 장이 한자리에 쌓이는 자리입니다.
+           */
+          const 한무더기=!!drawn&&drawn.month===slap.card.month;
           const 내려침={
             transform:[
               {translateY:slapLift.interpolate({inputRange:[0,0.1,0.18,1],outputRange:[-22,3,0,0]})},
@@ -6301,18 +6330,23 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
             {/* 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일은 **크게** 알려 줍니다.
                 이게 없어서 먹고도 못 먹은 줄 아셨습니다. */}
             {slap.next.lastEvents?.length?<Text style={styles.goStopSlapEvent}>{slap.next.lastEvents.join(' · ')}!</Text>:null}
+            {/*
+              ⚠️ **낸 패와 깐 패가 같은 월이면 한 무더기입니다**(뻑이 되는 자리).
+              전에는 왼쪽에 `바닥 1 + 낸 패 1`, 오른쪽에 `바닥 1 + 깐 패 1`로 그려서
+              **같은 바닥 패를 두 번** 그렸습니다. 석 장인데 화면에는 넉 장으로 보였습니다.
+              이제 바닥 패는 한 번만 그리고 낸 패와 깐 패를 그 위에 차례로 얹습니다.
+            */}
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
-                <Animated.View style={[styles.goStopSlapRow,slapTook?튐:내려침]}>
-                  {/* ⚠️ 맞은 패가 둘일 때는 서로도 **붙여** 한 무더기로 보이게 합니다.
-                      떨어뜨려 놓으면 석 장이 따로 놀아 무엇을 친 것인지 안 보였습니다. */}
+                <Animated.View style={[styles.goStopSlapRow,(slapTook||(한무더기&&drawnTook))?튐:내려침]}>
+                  {/* 맞은 패가 둘일 때는 서로도 붙여 한 무더기로 보이게 합니다. */}
                   {hit.map((card,index)=><View key={card.id} style={[index?styles.goStopSlapStack:null,took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
-                  {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
                   <View style={[hit.length?(slapTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(slap.card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={slap.card} size={sizeFor(took.has(slap.card.id))}/></View>
+                  {한무더기&&drawn?<View style={[styles.goStopSlapOver,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>:null}
                 </Animated.View>
-                <Text style={styles.goStopSlapTag}>낸 패 · {slap.card.month}월{slapTook?'':' · 못 가져옴'}</Text>
+                <Text style={styles.goStopSlapTag}>{한무더기?'낸 패 · 깐 패':'낸 패'} · {slap.card.month}월{(slapTook||(한무더기&&drawnTook))?'':' · 못 가져옴'}</Text>
               </View>
-              {drawn?<View style={styles.goStopSlapSide}>
+              {drawn&&!한무더기?<View style={styles.goStopSlapSide}>
                 <Animated.View style={[styles.goStopSlapRow,drawnTook?튐:내려침]}>
                   {drawnHit.map((card,index)=><View key={card.id} style={[index?styles.goStopSlapStack:null,took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   <View style={[drawnHit.length?(drawnTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>
@@ -6798,6 +6832,7 @@ function PlayingCard({ card, hidden = false, compact = false, tiny = false, stac
 }
 
 function BlackjackGameScreen(props: {
+  guests: number;
   bet: number;
   coins: number;
   difficulty: string;
@@ -6812,7 +6847,7 @@ function BlackjackGameScreen(props: {
    * 자리에 앉는 손님 수. **딜러 한 사람이 모두를 상대합니다.**
    * ⚠️ 손님이 이기든 지든 내 정산에는 영향이 없습니다. 같은 슈에서 카드만 나눠 받습니다.
    */
-  const guestCount = 2;
+  const guestCount = props.guests;
   const initial = useRef((() => {
     const dealt = dealTableRound(shuffleDeck(createDeck()), guestCount);
     /**
@@ -7070,10 +7105,17 @@ function BlackjackGameScreen(props: {
    * ⚠️ 한때 장수에 맞춰 항상 겹치게 바꿨다가 되돌렸습니다. 좌우는 원래가 맞았고,
    * 줄여야 했던 것은 **위아래**였습니다(줄 높이와 여백).
    */
+  /**
+   * 내 카드는 **한 단 크게** 봅니다. 딜러와 손님 패는 세기만 하면 되지만 내 패는 계속 봅니다.
+   * ⚠️ 판에 자리가 남을 때만 키웁니다 — 자리가 빠듯하면 딜러와 같은 크기로 둡니다.
+   */
+  const myCardSize: CardSize = handFit.fit === 'mini' ? 'small' : handFit.fit === 'small' ? 'mid' : handFit.fit;
   const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
   const handFanFor = (_count: number) => handFan;
   // ⚠️ 카드 높이 + 2. 전에는 +10이라 줄마다 8이 그냥 비어 있었습니다.
   const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 2, gap: handFit.crowded ? 0 : 6 }];
+  // 내 카드 줄. 카드가 한 단 커서 높이도 그만큼 잡고, **조금 아래로** 내립니다.
+  const myHandRow = [styles.dealerCardRow, { minHeight: cardSizeBox[myCardSize].height + 2, gap: handFit.crowded ? 0 : 6, marginTop: 10 }];
 
   /**
    * 딜러가 빛나야 하는지. **딜러가 그 판에서 모두를 이겼을 때만** 빛냅니다.
@@ -7128,11 +7170,13 @@ function BlackjackGameScreen(props: {
       {/* 스크롤 없이 한 화면에 고정합니다. 위쪽은 테이블, 아래쪽은 버튼 자리로 나눕니다. */}
       <View style={styles.fixedTableArea} onLayout={handFit.onLayout}>
         {/*
-          ⚠️ 470 → 515로 키웠습니다(2026-09-03). 아래에 66이 남아 있었고 그중 45를 판에 줬습니다.
+          ⚠️ 470 → 478로 키웠습니다(2026-09-03).
+          ⚠️ 515까지 올렸다가 **결과 칸에서 38이 넘쳤습니다.** 결과 칸은 버튼 칸(180)보다
+          크고(190) 아래에 안내 한 줄이 더 붙습니다. 판을 더 키우려면 그 칸부터 재세요.
           ⚠️ 판 높이를 못 박습니다. 전에는 끝나면 결과 칸이 생기면서 판이 90쯤 **눌려**
           아래(내 자리 칩)가 잘렸습니다. 판은 언제나 같은 자리·같은 크기여야 합니다.
         */}
-        <DealerTable height={515}>
+        <DealerTable height={478}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
             {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} hidden={index === 1 && holeHidden} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
@@ -7161,14 +7205,15 @@ function BlackjackGameScreen(props: {
               <View style={styles.tableGuestCards}>{shown.map((card, index) => (
                 <View key={card.id} style={index ? { marginLeft: -14 } : null}><PlayingCard card={card} size="mini" /></View>
               ))}</View>
-              <Text style={styles.tableGuestName}>{guest.name} · {handValue(shown)}</Text>
-              {mark ? <Text style={styles.tableGuestMark}>{mark}</Text> : null}
+              {/* ⚠️ 승·패 글자를 카드 위에 얹었더니 **카드에 가려 안 보였습니다.**
+                  이름 옆에 나란히 적습니다. */}
+              <Text style={styles.tableGuestName}>{guest.name} · {handValue(shown)}{mark ? ` · ${mark}` : ''}</Text>
             </View>;
           })}</View>
 
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${myTurn && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${myTurn ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
-          <View style={handRow}>
-            {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
+          <View style={myHandRow}>
+            {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={myCardSize} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           {splitHand && (
@@ -8004,21 +8049,21 @@ function RouletteGameScreen({
     /*
      * 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
      * ⚠️ 4.2초는 너무 빨라 "돌았다"는 느낌이 없었고, 8.2/9.4초는 **너무 길었습니다.**
-     * 그 사이인 5.2/6.2초로 뒀습니다.
+     * 그 사이인 6.8/8.0초로 뒀습니다 — 느린 끝을 **한 바퀴만큼 더** 늘린 값입니다.
      *
      * ⚠️ 느려지는 모양은 `cubic`에서 **5제곱(`Easing.poly(5)`)** 으로 바꿨습니다. 끝에서 반 바퀴쯤을
      * 눈에 띄게 **기어가듯** 돕니다. 실제 룰렛이 마지막에 그렇게 섭니다.
      */
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(5200 * motion)),
+      duration: Math.max(260, Math.round(6800 * motion)),
       easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(6200 * motion)),
+      duration: Math.max(300, Math.round(8000 * motion)),
       easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -8917,7 +8962,8 @@ const styles = StyleSheet.create({
   // 일곱 장처럼 많을 때 부채처럼 겹쳐 한 줄에 담습니다.
   dealerCardFan: { marginLeft: -30 },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
-  dealerBetSpot: { marginTop: 6, width: 98, height: 46, borderRadius: 23, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  // ⚠️ 위 여백 6 → 14. 코인을 카드에서 조금 더 떼어 **아래로** 내렸습니다.
+  dealerBetSpot: { marginTop: 14, width: 98, height: 46, borderRadius: 23, borderWidth: 2, borderColor: '#3E9A75', alignItems: 'center', justifyContent: 'center', gap: 2 },
   dealerBetSpotText: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   gameTopBar: { height: 64, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 17, borderBottomWidth: 1, borderBottomColor: '#2E594C', backgroundColor: '#081B17' },
   gameTopTitle: { color: colors.goldLight, fontSize: 18, fontWeight: '900', letterSpacing: 1.5 },
@@ -8932,7 +8978,13 @@ const styles = StyleSheet.create({
   teenPattiActionSlot: { width: '100%', height: 104, justifyContent: 'center' },
   fixedTableArea: { flex: 1, paddingHorizontal: 14, paddingTop: 8, paddingBottom: 10, justifyContent: 'space-between' },
   // 판이 눌리지 않게 아래 칸 높이도 못 박습니다(히트/스탠드 → 결과로 바뀌어도 그대로).
-  fixedActionArea: { width: '100%', height: 180, justifyContent: 'flex-start' },
+  /*
+   * 버튼 자리. **결과 칸이 제일 큽니다.**
+   * ⚠️ 180으로 두었더니 결과 칸(190)과 그 아래 안내 한 줄(16)이 **자리 밖으로 밀려나** 화면이
+   * 39만큼 넘쳤습니다. 상자는 안 잘리므로 눈에는 안 보이고 스크롤만 생깁니다.
+   * 제일 큰 것에 맞춰 220으로 잡습니다. 노는 동안에는 아래가 조금 빕니다.
+   */
+  fixedActionArea: { width: '100%', height: 220, justifyContent: 'flex-start' },
   gameActionsTight: { marginTop: 10 },
   gameActionButtonTight: { minHeight: 56 },
   stakeButtonTight: { minHeight: 42, marginTop: 8 },
