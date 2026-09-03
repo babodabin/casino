@@ -7177,7 +7177,7 @@ function BlackjackGameScreen(props: {
           아래(내 자리 칩)가 잘렸습니다. 판은 언제나 같은 자리·같은 크기여야 합니다.
         */}
         <DealerTable height={478}>
-          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
+          <View style={styles.blackjackSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
             {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} hidden={index === 1 && holeHidden} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
@@ -7211,14 +7211,14 @@ function BlackjackGameScreen(props: {
             </View>;
           })}</View>
 
-          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${myTurn && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${myTurn ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
+          <View style={styles.blackjackSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${myTurn && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${myTurn ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
           <View style={myHandRow}>
             {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={myCardSize} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           {splitHand && (
             <>
-              <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{myTurn && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
+              <View style={styles.blackjackSeatRow}><Text style={styles.dealerSeatLabel}>손 2{myTurn && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
               <View style={handRow}>
                 {splitHand.map((card, index, row) => <View key={`split-${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} /></View>)}
               </View>
@@ -8049,21 +8049,23 @@ function RouletteGameScreen({
     /*
      * 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
      * ⚠️ 4.2초는 너무 빨라 "돌았다"는 느낌이 없었고, 8.2/9.4초는 **너무 길었습니다.**
-     * 그 사이인 6.8/8.0초로 뒀습니다 — 느린 끝을 **한 바퀴만큼 더** 늘린 값입니다.
+     * 그 사이인 8.4/9.8초로 뒀습니다 — 느린 끝을 **두 바퀴만큼 더** 늘린 값입니다.
+     * ⚠️ 예전 9.4초와 비슷한 길이지만 느낌이 다릅니다. 그때는 `cubic`이라 **줄곧** 느렸고,
+     * 지금은 5제곱이라 앞은 빠르고 **끝에서만** 기어갑니다.
      *
      * ⚠️ 느려지는 모양은 `cubic`에서 **5제곱(`Easing.poly(5)`)** 으로 바꿨습니다. 끝에서 반 바퀴쯤을
      * 눈에 띄게 **기어가듯** 돕니다. 실제 룰렛이 마지막에 그렇게 섭니다.
      */
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(6800 * motion)),
+      duration: Math.max(260, Math.round(8400 * motion)),
       easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(8000 * motion)),
+      duration: Math.max(300, Math.round(9800 * motion)),
       easing: Easing.out(Easing.poly(5)),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -8947,6 +8949,12 @@ const styles = StyleSheet.create({
   dealerEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
   // ⚠️ 이름 줄의 위아래 여백. 4 → 2로 줄였습니다(줄이 넷이라 판에서 16이 빕니다).
   dealerSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 2 },
+  /*
+   * 블랙잭 이름 줄. **이름은 왼쪽, 점수는 오른쪽 끝**입니다.
+   * ⚠️ 가운데에 붙여 놓으면 딜러 점수가 카드와 겹쳐 가려집니다. 그렇다고 한 줄만 오른쪽에
+   * 두면 딜러와 내 줄이 어긋나 보여서, **딜러·나·스플릿 세 줄을 다** 같은 자리로 맞춥니다.
+   */
+  blackjackSeatRow: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2, marginBottom: 2, paddingHorizontal: 4 },
   dealerSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
   dealerSeatNote: { color: '#8FBFA8', fontSize: 11, fontWeight: '700' },
   dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
