@@ -4242,6 +4242,7 @@ const velodromeRiderSize = 20;
  * 다 붙어 보여서 누가 앞선지 잘 안 보였습니다.
  */
 function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps,onPick,oddsFor}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished';laps:number;onPick:(id:number)=>void;oddsFor:(rider:Cyclist)=>number}){
+  // 1을 넘지 않습니다 — 먼저 들어온 선수는 결승선에 서서 나머지를 기다립니다.
   const lap=(rider:Cyclist)=>race?Math.min(1,progress*winnerTime/race.times[rider.id]):0;
   // 지금 앞선 순서. 경주 전에는 등번호 순으로 둡니다.
   const standing=[...riders].sort((a,b)=>lap(b)-lap(a));
@@ -4312,9 +4313,15 @@ function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
   const choose=(id:number)=>{if(phase!=='betting')return;setShown(id);setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
   const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateCycleRace(riders);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
   const reset=()=>{setRiders(createCycleField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
-  // 1등이 결승선을 끊는 순간 경주가 끝납니다. 그래야 뒤 선수들이 뒤처진 자리에 그대로 멈춰
-  // 원 위의 위치가 곧 순위가 됩니다. 가장 느린 선수를 기준으로 하면 전부 결승선에 겹칩니다.
-  const winnerTime=race?Math.min(...Object.values(race.times)):1;
+  /**
+   * 경주가 끝나는 때. **꼴찌까지 다 들어와야** 끝납니다.
+   *
+   * ⚠️ 전에는 1등이 결승선을 끊는 순간 끝냈습니다. 뒤 선수들이 뒤처진 자리에 그대로 멈춰
+   * 원 위의 위치가 곧 순위가 되어 보기 좋았지만, **다 들어오지도 않았는데 경주가 끝났습니다.**
+   * 이제 제일 느린 선수를 기준으로 삼습니다 — 먼저 들어온 선수는 결승선에서 기다립니다.
+   * 순위는 아래 순위 줄이 알려 줍니다.
+   */
+  const winnerTime=race?Math.max(...Object.values(race.times)):1;
   return <View style={styles.cycleScreen}><ScreenHeader title="월드 벨로드롬" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>GWANGMYEONG · 7 RIDERS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'경주권 판매 중':phase==='racing'?(progress>.68?'🔔 마지막 바퀴':'대열 주행 중'):'순위 확정'}</Text></View></View>
     <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase} laps={laps} onPick={choose} oddsFor={(rider)=>betType==='place'?rider.placeOdds:rider.winOdds}/>
@@ -6326,7 +6333,8 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
             ],
           };
           return <View style={styles.goStopSlapOverlay}>
-            <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
+            {/* ⚠️ '내가 냈습니다 / 컴퓨터 N 냈습니다' 줄을 뺐습니다. 지금 누구 차례인지는
+                자리 테두리가 이미 알려 주는데, 글까지 있으니 복잡했습니다. */}
             {/* 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일은 **크게** 알려 줍니다.
                 이게 없어서 먹고도 못 먹은 줄 아셨습니다. */}
             {slap.next.lastEvents?.length?<Text style={styles.goStopSlapEvent}>{slap.next.lastEvents.join(' · ')}!</Text>:null}
@@ -6344,14 +6352,16 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
                   <View style={[hit.length?(slapTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(slap.card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={slap.card} size={sizeFor(took.has(slap.card.id))}/></View>
                   {한무더기&&drawn?<View style={[styles.goStopSlapOver,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>:null}
                 </Animated.View>
-                <Text style={styles.goStopSlapTag}>{한무더기?'낸 패 · 깐 패':'낸 패'} · {slap.card.month}월{(slapTook||(한무더기&&drawnTook))?'':' · 못 가져옴'}</Text>
+                {/* ⚠️ '낸 패 · N월' 같은 이름표를 뺐습니다. 화투는 그림으로 아는 것이라
+                    몇 월인지 글로 적을 일이 아닙니다. 가져갔는지 아닌지는 **금테와 크기**가
+                    알려 줍니다(가져가는 패는 크고 금테, 못 가져온 패는 작고 흐림). */}
               </View>
               {drawn&&!한무더기?<View style={styles.goStopSlapSide}>
                 <Animated.View style={[styles.goStopSlapRow,drawnTook?튐:내려침]}>
                   {drawnHit.map((card,index)=><View key={card.id} style={[index?styles.goStopSlapStack:null,took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   <View style={[drawnHit.length?(drawnTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>
                 </Animated.View>
-                <Text style={styles.goStopSlapTag}>깐 패 · {drawn.month}월{drawnTook?'':' · 그냥 깜'}</Text>
+
               </View>:null}
             </View>
           </View>;
@@ -10463,13 +10473,11 @@ const styles = StyleSheet.create({
   goStopTurnBox: { alignItems: 'center', gap: 6 },
   // 판 위에 떠 있는 상자입니다. 자리를 차지하지 않으므로 나타나도 화면이 안 밀립니다.
   goStopSlapOverlay: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center', gap: 4 },
-  goStopSlapWho: { color: '#FFE9A8', fontSize: 13, fontWeight: '900' },
   // 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일. 놓치면 규칙이 안 도는 줄 압니다.
   goStopSlapEvent: { color: '#FFD35F', fontSize: 17, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.85)', textShadowRadius: 6 },
   goStopSlapRow: { flexDirection: 'row', alignItems: 'center' },
   goStopSlapPair: { flexDirection: 'row', alignItems: 'flex-start', gap: 14 },
   goStopSlapSide: { alignItems: 'center', gap: 3 },
-  goStopSlapTag: { color: '#9FC4B4', fontSize: 10, fontWeight: '800' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
   // 맞은 패끼리 붙이는 폭. 낸 패를 얹는 것(-30)보다 조금만 겹쳐 장수는 세어지게 둡니다.
   goStopSlapStack: { marginLeft: -18 },
