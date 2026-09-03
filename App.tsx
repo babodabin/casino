@@ -418,11 +418,12 @@ const gameCategories: GameCategory[] = [
     { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
   ]},
   { name: '자동 배팅', icon: '◎', detail: '경마 · 경륜 · 예측 마켓 · 슬롯 · 비디오 포커', eyebrow: 'AUTO BETTING', games: [
-    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
+    // ⚠️ **이 순서가 화면에 나오는 순서입니다.** 정해 주신 차례대로 둡니다.
     { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
     { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
     { name: '예측 마켓 · 스포츠', icon: '球', description: '실제로 끝난 경기의 승패를 예·아니오로 맞히는 게임', status: 'playable' },
     { name: '예측 마켓 · 사회문제', icon: '社', description: '경제·선거·연예에서 실제로 일어난 일을 예·아니오로 맞히기', status: 'playable' },
+    { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
     { name: '비디오 포커', icon: 'VP', description: '다섯 장 중 필요한 카드를 보관하고 교환', status: 'playable' },
   ]},
 ];
@@ -4158,7 +4159,7 @@ function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
     })()}
     {phase==='betting'?<><RacingPickBanner label={`${horseBetLabels[betType]} · ${selections.length?selections.join(' → '):'선택 대기'} · ${selectedBet.toLocaleString()} WC`} disabled={selections.length!==needed||selectedBet>coins} onStart={startRace} startLabel="경주 시작"/><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as HorseBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{horseBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'3위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>고른 말 {selections.length}/{needed} · 트랙의 말을 눌러 고르세요</Text>
-    <View style={styles.horseTicket}><Text style={styles.horseTicketTitle}>마권</Text><Text style={styles.slotRuleText}>{horseBetLabels[betType]} · {selections.length?selections.join(' → '):'말을 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View></>:
+    <View style={styles.horseTicket}><Text style={styles.horseTicketTitleDark}>마권</Text><Text style={styles.horseTicketLine}>{horseBetLabels[betType]} · {selections.length?selections.join(' → '):'말을 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpectedDark}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View></>:
     <View style={styles.horseResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'결승선을 향해 달리고 있습니다':'경주 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번 　🥈 {race.order[1]}번 　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleHorseTicket(ticket,race)>0?`${settleHorseTicket(ticket,race).toLocaleString()} WC 적중!`:`${horseBetLabels[ticket.type]} 마권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={newRace}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
   </ScrollView></View>;
 }
@@ -9232,7 +9233,15 @@ const styles = StyleSheet.create({
   horseStats: { color: '#AAC0B5', fontSize: 9, lineHeight: 14 },
   horseOdds: { color: '#FFD96B', fontSize: 14, fontWeight: '900', textAlign: 'right' },
   horsePickOrder: { color: '#F2C85B', fontSize: 9, fontWeight: '800', textAlign: 'right', marginTop: 3 },
+  /*
+   * 마권은 **종이**입니다(크림색 바탕).
+   * ⚠️ 그 위에 밝은 글씨를 쓰면 안 됩니다. 제목 #FFE080 · 본문 #D8D3DF · 배당 #E6C765를
+   * 그대로 쓰고 있어서 **아무것도 안 보였습니다.** 이 상자 안에서는 아래 어두운 글씨만 쓰세요.
+   */
   horseTicket: { padding: 14, borderRadius: 16, backgroundColor: '#F1E3BC', borderWidth: 2, borderColor: '#B98A2D' },
+  horseTicketTitleDark: { color: '#4A3410', fontSize: 18, fontWeight: '900', marginBottom: 7 },
+  horseTicketLine: { color: '#33270C', fontSize: 12, lineHeight: 19, fontWeight: '700' },
+  horseExpectedDark: { color: '#8A5A12', fontSize: 13, fontWeight: '900', marginTop: 7 },
   horseTicketTitle: { color: '#FFE080', fontSize: 18, fontWeight: '900', marginBottom: 7 },
   horseExpected: { color: '#E6C765', fontSize: 13, fontWeight: '800', marginTop: 7 },
   horseResultPanel: { padding: 16, borderRadius: 18, backgroundColor: '#132C23', borderWidth: 1, borderColor: '#527665' },
