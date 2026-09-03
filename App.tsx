@@ -937,11 +937,12 @@ function CasinoApp() {
   const coinsRef = useRef(coins);
   coinsRef.current = coins;
 
-  const placeBet = (stake: number) => {
+  /** `quiet`을 주면 칩 소리를 내지 않습니다. 예측 마켓처럼 **읽고 고르는 게임**에 씁니다. */
+  const placeBet = (stake: number, quiet = false) => {
     if (stake > coinsRef.current) return false;
     coinsRef.current -= stake;
     setCoins((current) => current - stake);
-    playCue('chip');
+    if (!quiet) playCue('chip');
     return true;
   };
 
@@ -1039,7 +1040,9 @@ function CasinoApp() {
      * 이기고 지는 소리는 **여기 한 곳**에서 냅니다. 게임 서른두 개가 다 이 길로 지나갑니다.
      * ⚠️ `setRecords` 안에서 내면 안 됩니다 — 리액트가 그 함수를 두 번 부를 때 소리도 두 번 납니다.
      */
-    playCue(record.result === 'loss' ? 'lose' : record.result === 'win' || record.result === 'blackjack' ? 'win' : 'chip');
+    if (!quietGames.has(record.game)) {
+      playCue(record.result === 'loss' ? 'lose' : record.result === 'win' || record.result === 'blackjack' ? 'win' : 'chip');
+    }
   };
 
   const settleCraps = (bet: CrapsBet, stake: number, result: CrapsRollResult) => {
@@ -1440,9 +1443,9 @@ function CasinoApp() {
         {/* ⚠️ 여기 화면들은 `ScreenSlide` 안에 있습니다. 새 화면을 넣을 때도 이 안에 넣으세요. */}
         {appScreen === 'fishRouletteGame' && <FishRouletteGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('fishRouletteSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('물고기 룰렛',stake,multiplier,detail)}/>}
         {appScreen === 'predictSportsSetup' && <SimpleSetupScreen title="예측 마켓 · 스포츠 준비" hero="YES · NO" lead="이미 끝난 실제 경기의 승패를 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 경기입니다.','2. 축구·테니스·야구처럼 승패가 이미 갈린 경기가 나옵니다. 예인지 아니오인지 고르세요.','3. 배당은 그 경기가 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictSportsGame')}/>}
-        {appScreen === 'predictSportsGame' && <PredictGameScreen group="스포츠" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSportsSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 스포츠',stake,multiplier,detail)}/>}
+        {appScreen === 'predictSportsGame' && <PredictGameScreen group="스포츠" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSportsSetup')} onPlaceBet={(stake)=>placeBet(stake,true)} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 스포츠',stake,multiplier,detail)}/>}
         {appScreen === 'predictSocialSetup' && <SimpleSetupScreen title="예측 마켓 · 사회문제 준비" hero="YES · NO" lead="이미 결과가 나온 실제 사건을 맞힙니다" rules={['1. kalshi.com에서 받아온, 실제로 결과가 나온 사건입니다.','2. 경제·선거·연예·과학기술에서 일어난 일이 나옵니다. 예인지 아니오인지 고르세요.','3. 배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.','4. 어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.','5. 문제는 하루 한 번 새로 받아옵니다.']} startLabel="문제 받기" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={()=>setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={()=>setAppScreen('predictSocialGame')}/>}
-        {appScreen === 'predictSocialGame' && <PredictGameScreen group="사회문제" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSocialSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 사회문제',stake,multiplier,detail)}/>}
+        {appScreen === 'predictSocialGame' && <PredictGameScreen group="사회문제" coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('predictSocialSetup')} onPlaceBet={(stake)=>placeBet(stake,true)} onSettle={(stake,multiplier,detail)=>settleNewGame('예측 마켓 · 사회문제',stake,multiplier,detail)}/>}
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
@@ -1861,6 +1864,43 @@ function shakeDice(total: number, onTick: () => void, onDone: () => void, turns 
   };
   timer = setTimeout(step, Math.max(16, at(1)));
   return () => { stopped = true; clearTimeout(timer); };
+}
+
+/**
+ * 소리를 내지 않는 게임입니다.
+ * 예측 마켓은 **글을 읽고 고르는** 게임이라, 이기고 지는 소리가 오히려 방해가 됩니다.
+ * 여기에 이름을 넣으면 `addRecord`가 그 게임에서는 소리를 안 냅니다.
+ */
+const quietGames = new Set(['예측 마켓 · 스포츠', '예측 마켓 · 사회문제']);
+
+/**
+ * 맞혔을 때 터지는 별. 열 개가 밖으로 퍼지며 사라집니다.
+ *
+ * `fire`를 1씩 올리면 그때마다 다시 터집니다(같은 값이면 안 터집니다).
+ * ⚠️ 웹에서는 `useNativeDriver`가 안 되어 JS로 돕니다. 0.9초짜리라 그래도 괜찮습니다.
+ */
+function StarBurst({ fire }: { fire: number }) {
+  const spread = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!fire) return;
+    spread.setValue(0);
+    Animated.timing(spread, { toValue: 1, duration: 900, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+  }, [fire]);
+  if (!fire) return null;
+  return <View pointerEvents="none" style={styles.burstWrap}>
+    {Array.from({ length: 10 }, (_, index) => {
+      const angle = (index / 10) * Math.PI * 2;
+      const far = 44 + (index % 3) * 18;
+      return <Animated.Text key={index} style={[styles.burstStar, {
+        opacity: spread.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.85, 0] }),
+        transform: [
+          { translateX: spread.interpolate({ inputRange: [0, 1], outputRange: [0, Math.cos(angle) * far] }) },
+          { translateY: spread.interpolate({ inputRange: [0, 1], outputRange: [0, Math.sin(angle) * far] }) },
+          { scale: spread.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.4, 1.25, 0.6] }) },
+        ],
+      }]}>★</Animated.Text>;
+    })}
+  </View>;
 }
 
 function useAutoStart(start: () => void) {
@@ -3399,6 +3439,8 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
   const [side,setSide]=useState<PredictSide|null>(null);
   const [outcome,setOutcome]=useState<ReturnType<typeof settlePredict>|null>(null);
   const [solved,setSolved]=useState<string[]>([]);
+  /** 맞힐 때마다 1씩 올려 별을 터뜨립니다. */
+  const [burst,setBurst]=useState(0);
 
   const nextQuestion=()=>{
     setSide(null);setOutcome(null);
@@ -3410,6 +3452,7 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
     if(!onPlaceBet(selectedBet))return;
     const settled=settlePredict(question,pick);
     setSide(pick);setOutcome(settled);
+    if(settled.won)setBurst((value)=>value+1);
     // ⚠️ 전에는 '다음 문제'를 눌러야 세어서, 답을 맞히고도 '푼 문제'가 한 판씩 늦게 올랐습니다.
     setSolved((done)=>done.includes(question.id)?done:[...done,question.id]);
     onSettle(selectedBet,settled.multiplier,`${group} · ${question.title} · ${pick==='yes'?'예':'아니오'} 선택 · 정답 ${question.result==='yes'?'예':'아니오'}`);
@@ -3442,6 +3485,9 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
         <Text style={styles.predictChoiceChance}>{predictPercent(question,pick)}%</Text>
       </Pressable>)}</View>:<>
         <View style={[styles.predictAnswer,outcome.won?styles.predictAnswerWon:styles.predictAnswerLost]}>
+          {/* 맞히면 별이 터집니다. 틀리면 ✕만 남습니다 — 소리는 이 게임에서 안 냅니다. */}
+          <StarBurst fire={outcome.won?burst:0}/>
+          <Text style={[styles.predictBigMark,outcome.won?styles.predictBigMarkWon:styles.predictBigMarkLost]}>{outcome.won?'★':'✕'}</Text>
           <Text style={styles.predictAnswerMark}>{outcome.won?'맞혔습니다':'틀렸습니다'}</Text>
           <Text style={styles.predictAnswerText}>실제 결과는 <Text style={styles.predictMarketStrong}>{question.result==='yes'?'예':'아니오'}</Text> · {label(question,question.result)}</Text>
           <Text style={styles.predictAnswerText}>{side==='yes'?'예':'아니오'}에 걸어 {outcome.won?`${Math.round(selectedBet*outcome.multiplier).toLocaleString()} WC`:'0 WC'}</Text>
@@ -3450,7 +3496,12 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
       </>}
     </>}
 
-    <View style={styles.setupSummary}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>이미 결과가 나온 실제 사건입니다. 예인지 아니오인지 고르세요.</Text><Text style={styles.slotRuleText}>배당은 그 일이 끝나기 전에 시장이 매기던 값에서 나옵니다. 시장이 어렵게 본 쪽일수록 배당이 큽니다.</Text><Text style={styles.slotRuleText}>어느 쪽에 걸어도 환급률은 같습니다. 시장보다 잘 아는 만큼만 이깁니다.</Text><Text style={styles.slotRuleText}>문제는 하루 한 번 새로 받아옵니다. 푼 문제 {solved.length}개</Text></View>
+    {/*
+      ⚠️ 규칙은 **준비 화면(앞)에만** 둡니다. 여기에도 똑같이 적어 두었더니 화면 절반을
+      규칙이 차지했습니다. 문제를 푸는 자리에는 문제와 예·아니오만 있으면 됩니다.
+      대신 몇 개 풀었는지는 여기서 보여 줍니다.
+    */}
+    <Text style={styles.predictSolved}>푼 문제 {solved.length}개</Text>
   </ScrollView></View>;
 }
 
@@ -4064,15 +4115,49 @@ function HorseRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
   useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.025)),80);return()=>clearInterval(timer);},[phase]);
   useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
   const chooseType=(type:HorseBetType)=>{if(phase!=='betting')return;setBetType(type);setSelections([]);};
-  const chooseHorse=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  /** 마지막으로 누른 말. 그 말의 상태를 트랙 아래에 보여 줍니다. */
+  const [shown,setShown]=useState<number|null>(null);
+  const chooseHorse=(id:number)=>{if(phase!=='betting')return;setShown(id);setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
   const startRace=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateHorseRace(horses);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
   const newRace=()=>{setHorses(createHorseField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
   const maxTime=race?Math.max(...Object.values(race.times)):1;
   return <View style={styles.horseScreen}><ScreenHeader title="월드 경마장" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>SEOUL NIGHT RACE · 1,600M</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'마권 판매 중':phase==='racing'?'경주 진행 중':'경주 확정'}</Text></View></View>
-    <View style={styles.horseTrack}>{horses.map(horse=>{const laneProgress=race?Math.min(1,progress*maxTime/race.times[horse.id]):0;const place=race?.order.indexOf(horse.id)??-1,isMine=(ticket?.selections??selections).includes(horse.id);return <View key={horse.id} style={[styles.horseLane,isMine&&styles.racingChosenLane]}><View style={styles.horseLaneNumber}><Text style={styles.horseLaneNumberText}>{horse.id}</Text></View><View style={styles.horseLaneCourse}><View style={[styles.horseDistance,{width:`${Math.max(5,laneProgress*88)}%`}]}><Text style={styles.horseRunner}>🏇</Text>{isMine&&<Text style={styles.racingTrackPick}>내 선택</Text>}</View><View style={styles.horseFinishLine}/></View>{phase==='finished'&&<Text style={styles.horsePlace}>{place+1}위</Text>}</View>;})}</View>
+    {/*
+      트랙의 **말을 눌러 고릅니다.** 누른 차례가 곧 1착·2착 순서입니다.
+      ⚠️ 아래에 있던 '출전마 선택' 목록은 없앴습니다 — 같은 말을 두 군데에서 고르게 하면
+      어느 쪽이 진짜인지 헷갈리고, 목록이 화면의 절반을 먹었습니다.
+      배당은 레인 오른쪽에 붙여 **경마장에서 바로** 보이게 했습니다.
+    */}
+    <View style={styles.horseTrack}>{horses.map(horse=>{
+      const laneProgress=race?Math.min(1,progress*maxTime/race.times[horse.id]):0;
+      const place=race?.order.indexOf(horse.id)??-1;
+      const picked=(ticket?.selections??selections);
+      const isMine=picked.includes(horse.id);
+      const order=picked.indexOf(horse.id);
+      return <Pressable key={horse.id} disabled={phase!=='betting'} onPress={()=>chooseHorse(horse.id)} style={({pressed})=>[styles.horseLane,isMine&&styles.racingChosenLane,pressed&&styles.pressed]}>
+        <View style={[styles.horseLaneNumber,{borderColor:horse.color}]}><Text style={styles.horseLaneNumberText}>{horse.id}</Text></View>
+        <View style={styles.horseLaneCourse}>
+          <View style={[styles.horseDistance,{width:`${Math.max(5,laneProgress*88)}%`}]}><Text style={styles.horseRunner}>🏇</Text></View>
+          {isMine&&<Text numberOfLines={1} style={styles.racingTrackPick}>{needed>1?`${order+1}착`:'내 선택'}</Text>}
+          <View style={styles.horseFinishLine}/>
+          {phase==='betting'&&<Text style={styles.horseLaneName} numberOfLines={1}>{horse.name}</Text>}
+        </View>
+        {phase==='betting'
+          ?<Text style={[styles.horseLaneOdds,isMine&&styles.horseLaneOddsMine]}>{(betType==='place'?horse.placeOdds:horse.winOdds).toFixed(1)}배</Text>
+          :<Text style={styles.horsePlace}>{phase==='finished'?`${place+1}위`:''}</Text>}
+      </Pressable>;
+    })}</View>
+    {/* 누른 말의 상태. 목록을 없앤 대신 여기서 한 줄로 봅니다. */}
+    {phase==='betting'&&shown!==null&&(()=>{const horse=horses.find(item=>item.id===shown);if(!horse)return null;
+      return <View style={styles.horseFormCard}>
+        <View style={[styles.horseNumberBadge,{backgroundColor:horse.color}]}><Text style={styles.horseNumberText}>{horse.id}</Text></View>
+        <View style={styles.horseInfo}><Text style={styles.horseName}>{horse.name}</Text><Text style={styles.horseStats}>속도 {horse.speed} · 지구력 {horse.stamina} · 컨디션 {horse.form}</Text></View>
+        <View><Text style={styles.horseOdds}>단승 {horse.winOdds.toFixed(1)}배</Text><Text style={styles.horseStats}>연승 {horse.placeOdds.toFixed(1)}배</Text></View>
+      </View>;
+    })()}
     {phase==='betting'?<><RacingPickBanner label={`${horseBetLabels[betType]} · ${selections.length?selections.join(' → '):'선택 대기'} · ${selectedBet.toLocaleString()} WC`} disabled={selections.length!==needed||selectedBet>coins} onStart={startRace} startLabel="경주 시작"/><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as HorseBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{horseBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'3위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
-    <Text style={styles.sectionTitle}>출전마 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{horses.map(horse=><Pressable key={horse.id} onPress={()=>chooseHorse(horse.id)} style={[styles.horseCard,selections.includes(horse.id)&&styles.horseCardActive]}><View style={[styles.horseNumberBadge,{backgroundColor:horse.color}]}><Text style={styles.horseNumberText}>{horse.id}</Text></View><View style={styles.horseInfo}><Text style={styles.horseName}>{horse.name}</Text><Text style={styles.horseStats}>속도 {horse.speed} · 지구력 {horse.stamina} · 컨디션 {horse.form}</Text></View><View><Text style={styles.horseOdds}>{betType==='place'?horse.placeOdds.toFixed(1):horse.winOdds.toFixed(1)}배</Text>{selections.includes(horse.id)&&<Text style={styles.horsePickOrder}>{selections.indexOf(horse.id)+1}번째</Text>}</View></Pressable>)}</View>
+    <Text style={styles.sectionTitle}>고른 말 {selections.length}/{needed} · 트랙의 말을 눌러 고르세요</Text>
     <View style={styles.horseTicket}><Text style={styles.horseTicketTitle}>마권</Text><Text style={styles.slotRuleText}>{horseBetLabels[betType]} · {selections.length?selections.join(' → '):'말을 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View></>:
     <View style={styles.horseResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'결승선을 향해 달리고 있습니다':'경주 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번 　🥈 {race.order[1]}번 　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleHorseTicket(ticket,race)>0?`${settleHorseTicket(ticket,race).toLocaleString()} WC 적중!`:`${horseBetLabels[ticket.type]} 마권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={newRace}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
   </ScrollView></View>;
@@ -4092,7 +4177,14 @@ const velodromeLaneOuterY = 190, velodromeLaneInnerY = 158;
 /** 선수 표시 크기. 트랙이 아니라 선수를 작게 해야 누가 앞선지 잘 보입니다. */
 const velodromeRiderSize = 20;
 
-function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished'}){
+/**
+ * 벨로드롬. `laps`만큼 돕니다.
+ *
+ * ⚠️ **두 바퀴면 벌어지는 것이 두 배로 보입니다.** 선수마다 기록 차이는 그대로인데
+ * 도는 각도가 두 배(720도)라, 1번과 7번 사이가 그만큼 더 멀어집니다. 한 바퀴에서는
+ * 다 붙어 보여서 누가 앞선지 잘 안 보였습니다.
+ */
+function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished';laps:number}){
   const lap=(rider:Cyclist)=>race?Math.min(1,progress*winnerTime/race.times[rider.id]):0;
   // 지금 앞선 순서. 경주 전에는 등번호 순으로 둡니다.
   const standing=[...riders].sort((a,b)=>lap(b)-lap(a));
@@ -4100,11 +4192,12 @@ function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclis
     <View style={styles.velodrome}>
       <View style={styles.velodromeInfield}>
         <Text style={styles.velodromeInfieldTitle}>{phase==='betting'?'출발 대기':phase==='racing'?`${Math.round(progress*100)}%`:'결승'}</Text>
-        <Text style={styles.velodromeInfieldSub}>한 바퀴</Text>
+        <Text style={styles.velodromeInfieldSub}>{laps === 1 ? '한 바퀴' : '두 바퀴'}</Text>
       </View>
       <View style={styles.velodromeFinish}/>
       {riders.map((rider,index)=>{
-        const angle=(-90+lap(rider)*360)*Math.PI/180;
+        // 도는 각도는 바퀴 수만큼 커집니다. 그래서 앞뒤 간격도 그만큼 벌어집니다.
+        const angle=(-90+lap(rider)*360*laps)*Math.PI/180;
         // 트랙 폭 안에 선수 수만큼 레인을 나눠 넣습니다. 안쪽 인필드를 넘지 않게 합니다.
         const inward=riders.length>1?index/(riders.length-1):0;
         const radiusX=velodromeLaneOuterX-inward*(velodromeLaneOuterX-velodromeLaneInnerX);
@@ -4126,12 +4219,17 @@ function Velodrome({riders,race,progress,winnerTime,chosen,phase}:{riders:Cyclis
 }
 
 function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(ticket:CycleTicket,result:CycleRaceResult)=>void}){
+  /** 몇 바퀴를 도는 경주인지. 판마다 고릅니다. 배당과 결과는 바퀴 수와 상관없습니다. */
+  const [laps,setLaps]=useState(1);
+  /** 마지막으로 누른 선수. 그 선수의 상태를 트랙 아래에 보여 줍니다. */
+  const [shown,setShown]=useState<number|null>(null);
   const [riders,setRiders]=useState<Cyclist[]>(()=>createCycleField()),[betType,setBetType]=useState<CycleBetType>('win'),[selections,setSelections]=useState<number[]>([]),[phase,setPhase]=useState<'betting'|'racing'|'finished'>('betting'),[race,setRace]=useState<CycleRaceResult|null>(null),[ticket,setTicket]=useState<CycleTicket|null>(null),[progress,setProgress]=useState(0);
   const needed=requiredCycleSelections(betType),odds=cycleTicketOdds(betType,selections,riders);
-  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.022)),80);return()=>clearInterval(timer);},[phase]);
+  // ⚠️ 두 바퀴는 두 배로 돕니다. 걸음을 절반으로 줄여야 실제로 두 배 오래 걸립니다.
+  useEffect(()=>{if(phase!=='racing')return;const timer=setInterval(()=>setProgress(current=>Math.min(1,current+.022/laps)),80);return()=>clearInterval(timer);},[phase,laps]);
   useEffect(()=>{if(phase==='racing'&&progress>=1&&ticket&&race){setPhase('finished');onSettle(ticket,race);}},[phase,progress,ticket,race]);
   const chooseType=(type:CycleBetType)=>{if(phase==='betting'){setBetType(type);setSelections([]);}};
-  const choose=(id:number)=>{if(phase!=='betting')return;setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
+  const choose=(id:number)=>{if(phase!=='betting')return;setShown(id);setSelections(current=>current.includes(id)?current.filter(item=>item!==id):current.length<needed?[...current,id]:[id]);};
   const start=()=>{if(selections.length!==needed||!odds||!onPlaceBet(selectedBet))return;const nextTicket={type:betType,selections:[...selections],stake:selectedBet,odds},nextRace=simulateCycleRace(riders);setTicket(nextTicket);setRace(nextRace);setProgress(0);setPhase('racing');};
   const reset=()=>{setRiders(createCycleField());setSelections([]);setRace(null);setTicket(null);setProgress(0);setPhase('betting');};
   // 1등이 결승선을 끊는 순간 경주가 끝납니다. 그래야 뒤 선수들이 뒤처진 자리에 그대로 멈춰
@@ -4139,10 +4237,37 @@ function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
   const winnerTime=race?Math.min(...Object.values(race.times)):1;
   return <View style={styles.cycleScreen}><ScreenHeader title="월드 벨로드롬" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>GWANGMYEONG · 7 RIDERS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'경주권 판매 중':phase==='racing'?(progress>.68?'🔔 마지막 바퀴':'대열 주행 중'):'순위 확정'}</Text></View></View>
-    <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase}/>
+    <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase} laps={laps}/>
+    {/* 누른 선수의 상태. 아래 큰 목록을 없앤 대신 여기서 한 줄로 봅니다. */}
+    {phase==='betting'&&shown!==null&&(()=>{const rider=riders.find(item=>item.id===shown);if(!rider)return null;
+      return <View style={styles.horseFormCard}>
+        <View style={[styles.cycleJerseyLarge,{backgroundColor:rider.color}]}><Text style={[styles.horseNumberText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View>
+        <View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.horseName}>{rider.name}</Text><Text style={styles.cycleStyle}>{rider.style}</Text></View><Text style={styles.horseStats}>스프린트 {rider.sprint} · 지구력 {rider.endurance} · 전술 {rider.tactics}</Text></View>
+        <View><Text style={styles.horseOdds}>단승 {rider.winOdds.toFixed(1)}배</Text><Text style={styles.horseStats}>연승 {rider.placeOdds.toFixed(1)}배</Text></View>
+      </View>;
+    })()}
     {phase==='racing'&&race&&progress>.68&&<View style={styles.cycleBell}><Text style={styles.cycleBellTitle}>🔔 마지막 바퀴 진입</Text><Text style={styles.slotRuleText}>현재 대열 {race.lastLapOrder.slice(0,4).join(' → ')} · 막판 추입이 시작됩니다</Text></View>}
     {phase==='betting'?<><RacingPickBanner label={`${cycleBetLabels[betType]} · ${selections.length?selections.join(' → '):'선택 대기'} · ${selectedBet.toLocaleString()} WC`} disabled={selections.length!==needed||selectedBet>coins} onStart={start} startLabel="출발"/><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as CycleBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{cycleBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
-    <Text style={styles.sectionTitle}>선수 선택 · {selections.length}/{needed}</Text><View style={styles.horseCards}>{riders.map(rider=><Pressable key={rider.id} onPress={()=>choose(rider.id)} style={[styles.horseCard,selections.includes(rider.id)&&styles.horseCardActive]}><View style={[styles.cycleJerseyLarge,{backgroundColor:rider.color}]}><Text style={[styles.horseNumberText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View><View style={styles.horseInfo}><View style={styles.cycleNameRow}><Text style={styles.horseName}>{rider.name}</Text><Text style={styles.cycleStyle}>{rider.style}</Text></View><Text style={styles.horseStats}>스프린트 {rider.sprint} · 지구력 {rider.endurance} · 전술 {rider.tactics}</Text></View><View><Text style={styles.horseOdds}>{betType==='place'?rider.placeOdds.toFixed(1):rider.winOdds.toFixed(1)}배</Text>{selections.includes(rider.id)&&<Text style={styles.horsePickOrder}>{selections.indexOf(rider.id)+1}번째</Text>}</View></Pressable>)}</View>
+    {/*
+      ⚠️ 선수를 고르는 자리는 **번호 줄 하나**입니다. 전에는 카드 일곱 장이 화면의 절반을
+      먹었습니다. 번호 옆에 배당을 같이 적어, 누르기 전에 배당을 보고 고를 수 있게 했습니다.
+      선수의 힘·전술은 누르면 트랙 바로 아래에 나옵니다.
+    */}
+    <Text style={styles.sectionTitle}>고른 선수 {selections.length}/{needed} · 번호를 눌러 고르세요</Text>
+    <View style={styles.cycleNumberRow}>{riders.map(rider=>{
+      const order=selections.indexOf(rider.id);
+      return <Pressable key={rider.id} onPress={()=>choose(rider.id)} style={({pressed})=>[styles.cycleNumberPick,order>=0&&styles.cycleNumberPickOn,pressed&&styles.pressed]}>
+        <View style={[styles.cycleJerseySmall,{backgroundColor:rider.color}]}><Text style={[styles.cycleJerseyText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View>
+        <Text style={styles.cycleNumberOdds}>{(betType==='place'?rider.placeOdds:rider.winOdds).toFixed(1)}배</Text>
+        {order>=0&&needed>1&&<Text style={styles.cycleNumberOrder}>{order+1}착</Text>}
+      </Pressable>;
+    })}</View>
+    <Text style={styles.sectionTitle}>바퀴 수</Text>
+    <View style={styles.horseBetTypeRow}>{[1,2].map(count=>
+      <Pressable key={count} disabled={phase!=='betting'} onPress={()=>setLaps(count)} style={[styles.horseBetType,laps===count&&styles.horseBetTypeActive]}>
+        <Text style={styles.horseBetTypeTitle}>{count===1?'한 바퀴':'두 바퀴'}</Text>
+        <Text style={styles.horseBetTypeDetail}>{count===1?'짧게 한 판':'오래 · 간격이 벌어집니다'}</Text>
+      </Pressable>)}</View>
     <View style={styles.cycleTicket}><Text style={styles.horseTicketTitle}>경주권</Text><Text style={styles.cycleTicketText}>{cycleBetLabels[betType]} · {selections.length?selections.join(' → '):'선수를 선택하세요'} · {selectedBet.toLocaleString()} WC</Text><Text style={styles.horseExpected}>{odds?`예상 배당 ${odds.toFixed(1)}배 · 적중 시 ${Math.round(selectedBet*odds).toLocaleString()} WC`:'선택을 완료하면 배당이 표시됩니다'}</Text></View></>:
     <View style={styles.horseResultPanel}><Text style={styles.horseTicketTitle}>{phase==='racing'?'경주가 진행 중입니다':'경륜 결과'}</Text>{phase==='finished'&&race&&ticket&&<><Text style={styles.horsePodium}>🥇 {race.order[0]}번　🥈 {race.order[1]}번　🥉 {race.order[2]}번</Text><Text style={styles.horseExpected}>{settleCycleTicket(ticket,race)>0?`${settleCycleTicket(ticket,race).toLocaleString()} WC 적중!`:`${cycleBetLabels[ticket.type]} 경주권 미적중`}</Text><Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={reset}><Text style={styles.primaryButtonText}>다음 경주</Text></Pressable></>}</View>}
   </ScrollView></View>;
@@ -8904,6 +9029,15 @@ const styles = StyleSheet.create({
   predictAnswer: { width: '100%', gap: 6, padding: 15, borderRadius: 14, borderWidth: 1 },
   predictAnswerWon: { backgroundColor: 'rgba(24,58,38,0.7)', borderColor: '#3FA96A' },
   predictAnswerLost: { backgroundColor: 'rgba(58,24,26,0.7)', borderColor: '#B4413F' },
+  // 별이 터지는 자리. 답 상자 한가운데에서 퍼집니다.
+  burstWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  burstStar: { position: 'absolute', color: '#FFE9A6', fontSize: 20, fontWeight: '900' },
+  // 맞혔는지 틀렸는지 한 글자로. 글씨보다 이게 먼저 보입니다.
+  predictBigMark: { fontSize: 40, fontWeight: '900', textAlign: 'center' },
+  predictBigMarkWon: { color: '#FFE9A6' },
+  predictBigMarkLost: { color: '#E68A8A' },
+  // 규칙을 준비 화면으로 옮기고 남긴 한 줄.
+  predictSolved: { color: colors.muted, fontSize: 12, textAlign: 'center', marginTop: 14 },
   predictAnswerMark: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
   predictAnswerText: { color: '#C3CBD8', fontSize: 13, fontWeight: '700', lineHeight: 20 },
   pusherScreen: { flex: 1, backgroundColor: colors.bg },
@@ -8967,7 +9101,12 @@ const styles = StyleSheet.create({
   racingStartButtonText: { color: '#201604', fontSize: 13, fontWeight: '900' },
   racingSelectedTag: { color: '#231700', fontSize: 9, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFD75C' },
   racingChosenLane: { backgroundColor: 'rgba(255,215,92,.18)', borderTopWidth: 1, borderTopColor: '#FFD75C', borderBottomColor: '#FFD75C' },
-  racingTrackPick: { position: 'absolute', right: -3, top: -2, color: '#211600', fontSize: 7, fontWeight: '900', paddingHorizontal: 4, paddingVertical: 2, borderRadius: 6, overflow: 'hidden', backgroundColor: '#FFD75C' },
+  /*
+   * 내가 고른 자리 딱지.
+   * ⚠️ **레인 전체**를 기준으로 붙입니다. 말이 달린 만큼만 넓은 상자 안에 넣었더니
+   * 출발선에서 상자가 5%밖에 안 되어 '내 선 / 택'으로 접히고 말을 가렸습니다.
+   */
+  racingTrackPick: { position: 'absolute', right: 2, top: 0, color: '#211600', fontSize: 9, fontWeight: '900', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 6, overflow: 'hidden', backgroundColor: '#FFD75C' },
   bullScreen: { flex: 1, backgroundColor: colors.bg },
   bullStatus: { paddingHorizontal: 11, paddingVertical: 7, borderRadius: 12, backgroundColor: '#332313', borderWidth: 1, borderColor: '#C58A42' },
   bullStatusText: { color: '#FFD99A', fontSize: 11, fontWeight: '900' },
@@ -9045,7 +9184,8 @@ const styles = StyleSheet.create({
   horsePage: { padding: 14, paddingBottom: 42, gap: 13 },
   horseTrack: { paddingVertical: 8, borderRadius: 20, overflow: 'hidden', backgroundColor: '#8B5A32', borderWidth: 5, borderColor: '#D3B477' },
   horseLane: { height: 54, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.25)' },
-  horseLaneNumber: { width: 32, height: 32, marginHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: '#F7F1E3' },
+  // ⚠️ 색은 **테두리에만** 씁니다. 배경에 깔면 파랑·보라 위의 검은 번호가 안 읽힙니다.
+  horseLaneNumber: { width: 32, height: 32, marginHorizontal: 5, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: '#F7F1E3', borderWidth: 3, borderColor: '#F7F1E3' },
   horseLaneNumberText: { color: '#161616', fontSize: 15, fontWeight: '900' },
   horseLaneCourse: { flex: 1, height: 48, justifyContent: 'center', position: 'relative' },
   horseDistance: { height: 42, justifyContent: 'center', alignItems: 'flex-end' },
@@ -9059,6 +9199,13 @@ const styles = StyleSheet.create({
   horseBetTypeActive: { backgroundColor: '#473713', borderColor: '#F0C75B', borderWidth: 2 },
   horseBetTypeTitle: { color: '#FFF3C8', fontSize: 14, fontWeight: '900' },
   horseBetTypeDetail: { color: '#AFC4BA', fontSize: 8, marginTop: 4, textAlign: 'center' },
+  // 레인에 적는 말 이름. 트랙 안이라 옅게 두고, 길면 잘라 냅니다.
+  horseLaneName: { position: 'absolute', left: 8, bottom: 1, color: 'rgba(255,255,255,0.72)', fontSize: 10, fontWeight: '800' },
+  // 배당은 레인 오른쪽 끝. **경마장에서 바로** 보여야 해서 목록이 아니라 여기 둡니다.
+  horseLaneOdds: { width: 46, textAlign: 'right', paddingRight: 6, color: '#FFE9A6', fontSize: 13, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  horseLaneOddsMine: { color: '#FFFFFF' },
+  // 누른 말의 상태 한 줄. 없앤 목록을 대신합니다.
+  horseFormCard: { marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#14251F', borderWidth: 1, borderColor: colors.gold },
   horseCards: { gap: 7 },
   horseCard: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 9, borderRadius: 14, backgroundColor: '#14251F', borderWidth: 1, borderColor: '#385247' },
   horseCardActive: { backgroundColor: '#352D17', borderColor: '#F0C75B', borderWidth: 2 },
@@ -9087,6 +9234,14 @@ const styles = StyleSheet.create({
   velodromeRider: { position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D7E2E9' },
   velodromeRiderMine: { borderColor: colors.gold, borderWidth: 3 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
+  // 번호 줄. 일곱 명이 두 줄로 접힙니다.
+  cycleNumberRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  cycleNumberPick: { alignItems: 'center', gap: 3, paddingVertical: 7, paddingHorizontal: 9, borderRadius: 12, backgroundColor: '#14251F', borderWidth: 1, borderColor: '#385247' },
+  cycleNumberPickOn: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
+  cycleJerseySmall: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 2, borderColor: '#FFF' },
+  cycleJerseyText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  cycleNumberOdds: { color: '#FFE9A6', fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  cycleNumberOrder: { color: colors.goldLight, fontSize: 10, fontWeight: '800' },
   velodromeStanding: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   velodromeStandingItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   velodromeStandingMine: { borderColor: colors.gold },
