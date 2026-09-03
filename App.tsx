@@ -8049,7 +8049,17 @@ function RouletteGameScreen({
     /*
      * 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
      * ⚠️ 4.2초는 너무 빨라 "돌았다"는 느낌이 없었고, 8.2/9.4초는 **너무 길었습니다.**
-     * 그 사이인 8.4/9.8초로 뒀습니다 — 느린 끝을 **두 바퀴만큼 더** 늘린 값입니다.
+     * 지금은 **7.0/8.2초**입니다.
+     *
+     * ⚠️ 시간만 보지 마세요. `Easing.out(Easing.poly(n))`은 n이 클수록 **앞이 빠르고 끝이 깁니다.**
+     * 남은 거리가 (1−t)^n이므로 속도는 n(1−t)^(n−1)이고, 평균 속도의 절반이 되는 때가
+     * (0.5/n)^(1/(n−1))입니다. 그 앞이 '빠른 구간', 뒤가 '느린 구간'입니다.
+     *
+     *   5제곱 9.8초 → 빠름 4.3 · 느림 5.5   (앞이 길다고 하셨습니다)
+     *   7제곱 8.2초 → 빠름 **2.9** · 느림 5.3  ← 지금
+     *
+     * 느린 끝은 그대로 두고 앞만 줄이려면 **n을 올리고 전체 시간을 줄이세요.** 시간만 줄이면
+     * 느린 끝도 같이 짧아집니다.
      * ⚠️ 예전 9.4초와 비슷한 길이지만 느낌이 다릅니다. 그때는 `cubic`이라 **줄곧** 느렸고,
      * 지금은 5제곱이라 앞은 빠르고 **끝에서만** 기어갑니다.
      *
@@ -8058,15 +8068,15 @@ function RouletteGameScreen({
      */
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(8400 * motion)),
-      easing: Easing.out(Easing.poly(5)),
+      duration: Math.max(260, Math.round(7000 * motion)),
+      easing: Easing.out(Easing.poly(7)),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(9800 * motion)),
-      easing: Easing.out(Easing.poly(5)),
+      duration: Math.max(300, Math.round(8200 * motion)),
+      easing: Easing.out(Easing.poly(7)),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (!finished) return;
