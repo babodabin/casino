@@ -5919,8 +5919,22 @@ const GOSTOP_LANES: { kind: (typeof goStopTakenOrder)[number]; width: number }[]
   { kind: '띠', width: 82 },
   { kind: '피', width: 117 },
 ];
-const GOSTOP_TAKEN_CARD=28;
+/**
+ * 모은 패 한 장의 폭. `hwatuCardTiny`와 **같은 값이어야** 겹치는 걸음이 맞습니다.
+ * ⚠️ 28에서 32로 키웠습니다(2026-09-03). 판에 세로 자리가 216 남아 있었습니다.
+ * ⚠️ 더 키우려면 3인 상대 자리를 먼저 재세요 — 폭 162 안에 무리 넷(4×32 + 틈 3×8 = 152)이
+ * 들어갑니다. 36으로 올리면 168이 되어 **줄이 접힙니다.**
+ */
+const GOSTOP_TAKEN_CARD=32;
 const GOSTOP_TAKEN_GAP=8;
+/**
+ * 상대 자리에서 무리 사이 틈. 자리가 좁아 내 자리(8)보다 줄여 씁니다.
+ * ⚠️ `goStopSeatTakenRow`의 `gap`과 같은 값이어야 합니다. 여기서 남는 폭을 세어 걸음을 정합니다.
+ *
+ * 폭 161에 실제로 들어가는지 셈해 본 값입니다(카드 32).
+ *   4장 146 · 8장 156 · 12장 152 · 20장 156 · 24장 160  — 스물넷까지 들어갑니다.
+ */
+const GOSTOP_TAKEN_SEAT_GAP=4;
 const GOSTOP_TAKEN_STEP=10;
 function goStopTakenKind(card:HwatuCard){
   if(card.kind==='광')return '광';
@@ -6167,9 +6181,15 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
     const groups=goStopTakenOrder.map((kind)=>({kind,cards:cards.filter((card)=>goStopTakenKind(card)===kind)})).filter((group)=>group.cards.length);
     // 겹쳐 놓는 장수(무리마다 첫 장은 안 겹칩니다)와 남는 폭으로 한 걸음을 정합니다.
     const overlapped=cards.length-groups.length;
-    const spare=width-groups.length*GOSTOP_TAKEN_CARD-Math.max(0,groups.length-1)*GOSTOP_TAKEN_GAP;
-    const step=overlapped>0?Math.max(2,Math.min(GOSTOP_TAKEN_STEP,Math.floor(spare/overlapped))):GOSTOP_TAKEN_STEP;
-    return <View style={styles.goStopTakenRow}>{groups.map(({kind,cards:group})=>{
+    const spare=width-groups.length*GOSTOP_TAKEN_CARD-Math.max(0,groups.length-1)*GOSTOP_TAKEN_SEAT_GAP;
+    /*
+     * ⚠️ 걸음의 바닥은 **1**입니다. 2로 두면 패가 많을 때 줄이 자리 밖으로 밀려납니다.
+     * 3인 상대 자리는 폭이 161뿐인데, 무리 넷(4×32)에 틈 셋(3×6)이면 벌써 146입니다.
+     * 스무 장을 먹으면 남는 15로 열여섯 번을 겹쳐야 하므로 한 걸음이 1이 됩니다.
+     * 겹쳐서 잘 안 보이는 대신, 무엇을 몇 장 먹었는지는 **자리 위 숫자 줄**이 알려 줍니다.
+     */
+    const step=overlapped>0?Math.max(1,Math.min(GOSTOP_TAKEN_STEP,Math.floor(spare/overlapped))):GOSTOP_TAKEN_STEP;
+    return <View style={styles.goStopSeatTakenRow}>{groups.map(({kind,cards:group})=>{
       // 띠는 홍단 · 청단 · 초단끼리 붙여 둡니다.
       const sorted=kind==='띠'?[...group].sort((left,right)=>(left.ribbon??'힣').localeCompare(right.ribbon??'힣')):group;
       return <View key={kind} style={styles.goStopTakenGroup}>{sorted.map((card,index)=><View key={card.id} style={index?{marginLeft:step-GOSTOP_TAKEN_CARD}:null}><HwatuCardView card={card} size="tiny"/></View>)}</View>;
@@ -6218,6 +6238,8 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
         const score=scores[index+1];
         return <View key={index} style={[styles.goStopSeat,round.turn===index+1&&!round.finished&&styles.goStopSeatActive]}>
           <View style={styles.goStopSeatHead}><Text style={styles.goStopSeatName}>컴퓨터 {index+1} · {level}</Text><Text style={styles.goStopSeatScore}>{score.total}점{player.goCount?` · ${player.goCount}고`:''}</Text></View>
+          {/* 내 자리와 **같은 줄**을 상대에게도 둡니다. 몇 점인지만 보고는 무엇으로 난 점수인지 알 수 없습니다. */}
+          <Text style={styles.goStopSeatCounts}>광 {score.counts.광} · 열끗 {score.counts.열끗} · 띠 {score.counts.띠} · 피 {score.counts.피}</Text>
           <View style={styles.goStopBackRow}>{player.hand.map((card)=><View key={card.id} style={styles.goStopBack}/>)}</View>
           {takenRow(player.captured,seatTakenWidth)}
         </View>;
@@ -6242,15 +6264,12 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
           const drawnTook=!!drawn&&(took.has(drawn.id)||drawnHit.some((card)=>took.has(card.id)));
           const sizeFor=(taken:boolean)=>taken?'normal':'small' as const;
           /*
-           * 가져가는 쪽은 **같이 떠오르며 옅어집니다**(바닥에 안 남습니다).
-           * 못 가져오는 쪽은 위에서 **착 내려쳐** 바닥에 붙습니다.
+           * 가져가는 쪽은 **제자리에서 한 번 크게** 튑니다(예전 그대로).
+           * ⚠️ 떠오르며 사라지게 해 봤는데, 가져간 패가 눈앞에서 없어져 무엇을 먹었는지
+           * 볼 시간이 없었습니다. 자리를 지키고 크기로만 알립니다.
            */
-          const 떠오름={
-            transform:[
-              {translateY:slapLift.interpolate({inputRange:[0,0.18,1],outputRange:[0,-8,-38]})},
-              {scale:slapLift.interpolate({inputRange:[0,0.18,0.7,1],outputRange:[1,1.32,1.14,0.86]})},
-            ],
-            opacity:slapLift.interpolate({inputRange:[0,0.7,1],outputRange:[1,1,0.15]}),
+          const 튐={
+            transform:[{scale:slapLift.interpolate({inputRange:[0,0.12,0.26,1],outputRange:[1,1.28,1,1]})}],
           };
           const 내려침={
             transform:[
@@ -6265,7 +6284,7 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
             {slap.next.lastEvents?.length?<Text style={styles.goStopSlapEvent}>{slap.next.lastEvents.join(' · ')}!</Text>:null}
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
-                <Animated.View style={[styles.goStopSlapRow,slapTook?떠오름:내려침]}>
+                <Animated.View style={[styles.goStopSlapRow,slapTook?튐:내려침]}>
                   {hit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
                   <View style={[hit.length?(slapTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(slap.card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={slap.card} size={sizeFor(took.has(slap.card.id))}/></View>
@@ -6273,7 +6292,7 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
                 <Text style={styles.goStopSlapTag}>낸 패 · {slap.card.month}월{slapTook?'':' · 못 가져옴'}</Text>
               </View>
               {drawn?<View style={styles.goStopSlapSide}>
-                <Animated.View style={[styles.goStopSlapRow,drawnTook?떠오름:내려침]}>
+                <Animated.View style={[styles.goStopSlapRow,drawnTook?튐:내려침]}>
                   {drawnHit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   <View style={[drawnHit.length?(drawnTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>
                 </Animated.View>
@@ -10282,19 +10301,27 @@ const styles = StyleSheet.create({
   goStopBoard: { flex: 1, paddingHorizontal: 8, paddingTop: 6, paddingBottom: 8, gap: 4, backgroundColor: '#0C4A2E', justifyContent: 'space-between' },
   goStopOpponentRow: { flexDirection: 'row', gap: 6 },
   // 높이를 위아래로 묶어 둡니다. 상대가 패를 모을수록 자리가 커지면 그만큼 내 손패가 밀립니다.
-  goStopSeat: { flex: 1, minHeight: 130, maxHeight: 140, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
+  // ⚠️ 모은 패를 키우고 점수 줄을 한 줄 더 넣어서 152~168로 올렸습니다.
+  goStopSeat: { flex: 1, minHeight: 152, maxHeight: 168, padding: 7, borderRadius: 10, backgroundColor: 'rgba(4,26,17,0.55)', borderWidth: 1, borderColor: '#2C5644', gap: 4, overflow: 'hidden' },
   goStopSeatActive: { borderColor: colors.gold },
   goStopSeatHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   goStopSeatName: { color: '#F2D580', fontSize: 12, fontWeight: '900' },
   goStopSeatScore: { color: '#9FBBAE', fontSize: 10, fontWeight: '700' },
+  // 상대가 무엇을 몇 장 먹었는지. 내 자리에 있는 줄과 같은 값입니다.
+  goStopSeatCounts: { color: '#9FBBAE', fontSize: 10, fontWeight: '700', marginTop: 1 },
   // 상대 손패는 뒷면 장수만 보여 줍니다. 무슨 패인지는 알 수 없으니까요.
   goStopBackRow: { flexDirection: 'row', gap: 2, minHeight: 22 },
   goStopBack: { width: 13, height: 21, borderRadius: 2, backgroundColor: '#1A2233', borderWidth: 1, borderColor: '#D12B32' },
   // ⚠️ 줄을 접지 않습니다(`flexWrap` 없음). 접히면 자리가 아래로 늘어 손패를 화면 밖으로 밀어냅니다.
-  goStopTakenRow: { flexDirection: 'row', height: 46, alignItems: 'center', gap: 8 },
+  goStopTakenRow: { flexDirection: 'row', height: 52, alignItems: 'center', gap: 8 },
+  /*
+   * 상대 자리 줄. 내 자리(틈 8)보다 **좁게** 씁니다 — 자리 폭이 161뿐입니다.
+   * ⚠️ 이 값은 `GOSTOP_TAKEN_SEAT_GAP`과 **같아야** 합니다. 걸음을 그 값으로 세기 때문입니다.
+   */
+  goStopSeatTakenRow: { flexDirection: 'row', height: 52, alignItems: 'center', gap: 4 },
   goStopTakenGroup: { flexDirection: 'row' },
   // 모은 패 네 자리. 폭을 고정해 두어 무리가 비어도 자리가 안 당겨집니다.
-  goStopLane: { height: 44, flexDirection: 'row', alignItems: 'center', borderRadius: 5, paddingHorizontal: 1, backgroundColor: 'rgba(4,26,17,0.35)' },
+  goStopLane: { height: 50, flexDirection: 'row', alignItems: 'center', borderRadius: 5, paddingHorizontal: 1, backgroundColor: 'rgba(4,26,17,0.35)' },
   goStopLaneEmpty: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.14)', backgroundColor: 'transparent' },
   goStopLaneWaiting: { color: 'rgba(207,224,214,0.45)', fontSize: 10, fontWeight: '800' },
   // 장수는 얹기만 합니다. 자리를 한 칸도 더 안 먹습니다.
@@ -10337,7 +10364,8 @@ const styles = StyleSheet.create({
   goStopMessage: { color: '#CFE0D6', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   // 바닥에 깔 작은 패와, 모은 패를 겹쳐 쌓을 때 쓰는 아주 작은 패입니다.
   hwatuCardSmall: { width: 40, height: 60, borderRadius: 3 },
-  hwatuCardTiny: { width: 28, height: 42, borderRadius: 3 },
+  // ⚠️ 폭은 `GOSTOP_TAKEN_CARD`와 같아야 합니다. 한쪽만 바꾸면 겹치는 걸음이 어긋납니다.
+  hwatuCardTiny: { width: 32, height: 48, borderRadius: 3 },
   hwatuFloorBoardCompact: { minHeight: 150, backgroundColor: 'transparent', borderWidth: 0, borderRadius: 0, paddingVertical: 4, marginVertical: 0 },
   hwatuFloorRowCompact: { minHeight: 61, gap: 2 },
   hwatuCard: { width: 52, height: 78, borderRadius: 4, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'flex-end', borderWidth: 0, paddingBottom: 0, overflow: 'hidden' },
