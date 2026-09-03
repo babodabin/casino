@@ -417,7 +417,7 @@ const gameCategories: GameCategory[] = [
     { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
     { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
   ]},
-  { name: '자동 배팅', icon: '◎', detail: '슬롯 · 경마 · 비디오 포커', eyebrow: 'AUTO BETTING', games: [
+  { name: '자동 배팅', icon: '◎', detail: '경마 · 경륜 · 예측 마켓 · 슬롯 · 비디오 포커', eyebrow: 'AUTO BETTING', games: [
     { name: '슬롯', icon: '7', description: '같은 그림과 연속 보너스를 노리는 머신 게임', status: 'playable' },
     { name: '경마', icon: '馬', description: '출전마를 분석하고 결승 순위를 예측', status: 'playable' },
     { name: '경륜', icon: '輪', description: '일곱 선수의 전법과 막판 스퍼트를 예측', status: 'playable' },
@@ -1890,7 +1890,7 @@ function StarBurst({ fire }: { fire: number }) {
   return <View pointerEvents="none" style={styles.burstWrap}>
     {Array.from({ length: 10 }, (_, index) => {
       const angle = (index / 10) * Math.PI * 2;
-      const far = 44 + (index % 3) * 18;
+      const far = 68 + (index % 3) * 26;
       return <Animated.Text key={index} style={[styles.burstStar, {
         opacity: spread.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 0.85, 0] }),
         transform: [
@@ -4205,7 +4205,15 @@ function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps}:{riders:C
         const left=velodromeCenterX+Math.cos(angle)*radiusX-velodromeRiderSize/2;
         const top=velodromeCenterY+Math.sin(angle)*radiusY-velodromeRiderSize/2;
         // 경기 중에는 번호를 적지 않습니다. 색만으로 알아보고, 번호는 아래 순위줄에서 봅니다.
-        return <View key={rider.id} style={[styles.velodromeRider,{left,top,backgroundColor:rider.color},chosen.includes(rider.id)&&styles.velodromeRiderMine]}/>;
+        /*
+         * 내가 고른 선수는 **더 크게** 그립니다.
+         * ⚠️ 금색 테두리만으로는 20px짜리 점이라 트랙 위에서 못 찾습니다. 크기를 28로 키우고
+         * 그만큼 자리도 다시 잡아야 가운데가 안 틀어집니다.
+         */
+        const mine=chosen.includes(rider.id);
+        const size=mine?28:velodromeRiderSize;
+        const shift=(size-velodromeRiderSize)/2;
+        return <View key={rider.id} style={[styles.velodromeRider,{left:left-shift,top:top-shift,width:size,height:size,borderRadius:size/2,backgroundColor:rider.color},mine&&styles.velodromeRiderMine]}/>;
       })}
     </View>
     <View style={styles.velodromeStanding}>
@@ -7893,7 +7901,8 @@ function RouletteGameScreen({
   // 아홉 바퀴를 반대로 돕니다. 3240 = 360 × 9. 끝나는 자리는 다시 0도(맨 위)입니다.
   const ballRotation = ballProgress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-6120deg'] });
   // 처음에는 바깥 테두리를 돌다가 마지막에 안쪽 칸으로 떨어집니다.
-  const ballRadius = ballProgress.interpolate({ inputRange: [0, 0.78, 1], outputRange: [-140, -137, -124] });
+  // 공이 도는 반지름. 휠(350)을 키우면서 같이 키웠습니다 — 안 그러면 공이 숫자 위를 지납니다.
+  const ballRadius = ballProgress.interpolate({ inputRange: [0, 0.78, 1], outputRange: [-157, -153, -138] });
   const shownNumber = phase === 'spinning' ? tickingNumber : resultNumber;
   const shownColor = shownNumber === null ? null : rouletteColor(shownNumber);
 
@@ -7917,10 +7926,12 @@ function RouletteGameScreen({
               {europeanWheelOrder.map((number, index) => {
                 const angle = index * (360 / europeanWheelOrder.length);
                 const radians = angle * Math.PI / 180;
-                const center = 150;
-                const radius = 124;
-                const left = center + Math.sin(radians) * radius - 17;
-                const top = center - Math.cos(radians) * radius - 14;
+                // ⚠️ 이 세 값은 `rouletteWheelRing`(334)과 `roulettePocket`(38×30)에 맞춘 것입니다.
+                // 휠 크기를 바꾸면 여기도 같이 바꿔야 숫자가 테두리 밖으로 나갑니다.
+                const center = 167;
+                const radius = 138;
+                const left = center + Math.sin(radians) * radius - 19;
+                const top = center - Math.cos(radians) * radius - 15;
                 const color = rouletteColor(number);
                 return (
                   <View key={number} style={[styles.roulettePocket, { left, top, transform: [{ rotate: `${angle}deg` }] }, color === 'red' ? styles.roulettePocketRed : color === 'black' ? styles.roulettePocketBlack : styles.roulettePocketGreen]}>
@@ -9031,9 +9042,9 @@ const styles = StyleSheet.create({
   predictAnswerLost: { backgroundColor: 'rgba(58,24,26,0.7)', borderColor: '#B4413F' },
   // 별이 터지는 자리. 답 상자 한가운데에서 퍼집니다.
   burstWrap: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  burstStar: { position: 'absolute', color: '#FFE9A6', fontSize: 20, fontWeight: '900' },
+  burstStar: { position: 'absolute', color: '#FFE9A6', fontSize: 34, fontWeight: '900' },
   // 맞혔는지 틀렸는지 한 글자로. 글씨보다 이게 먼저 보입니다.
-  predictBigMark: { fontSize: 40, fontWeight: '900', textAlign: 'center' },
+  predictBigMark: { fontSize: 64, fontWeight: '900', textAlign: 'center' },
   predictBigMarkWon: { color: '#FFE9A6' },
   predictBigMarkLost: { color: '#E68A8A' },
   // 규칙을 준비 화면으로 옮기고 남긴 한 줄.
@@ -9100,7 +9111,12 @@ const styles = StyleSheet.create({
   racingStartButton: { minWidth: 104, minHeight: 46, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#D5A92D' },
   racingStartButtonText: { color: '#201604', fontSize: 13, fontWeight: '900' },
   racingSelectedTag: { color: '#231700', fontSize: 9, fontWeight: '900', paddingHorizontal: 7, paddingVertical: 4, borderRadius: 9, overflow: 'hidden', backgroundColor: '#FFD75C' },
-  racingChosenLane: { backgroundColor: 'rgba(255,215,92,.18)', borderTopWidth: 1, borderTopColor: '#FFD75C', borderBottomColor: '#FFD75C' },
+  /*
+   * 내가 고른 레인.
+   * ⚠️ 전에는 옅은 금빛 배경(0.18)에 실선 하나였습니다. 트랙이 원래 갈색이라 **거의 안 보였습니다.**
+   * 이제 배경을 두 배 넘게 진하게 하고, 위아래 테두리를 굵게, 왼쪽에 금색 막대를 세웁니다.
+   */
+  racingChosenLane: { backgroundColor: 'rgba(255,215,92,.42)', borderTopWidth: 2, borderTopColor: '#FFD75C', borderBottomWidth: 2, borderBottomColor: '#FFD75C', borderLeftWidth: 5, borderLeftColor: '#FFD75C' },
   /*
    * 내가 고른 자리 딱지.
    * ⚠️ **레인 전체**를 기준으로 붙입니다. 말이 달린 만큼만 넓은 상자 안에 넣었더니
@@ -9232,7 +9248,7 @@ const styles = StyleSheet.create({
   // 결승선은 12시 방향입니다. 선수도 여기서 출발해 한 바퀴 돌아 여기로 돌아옵니다.
   velodromeFinish: { position: 'absolute', top: 2, left: 168, width: 8, height: 44, borderRadius: 2, backgroundColor: '#F3F6F8' },
   velodromeRider: { position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D7E2E9' },
-  velodromeRiderMine: { borderColor: colors.gold, borderWidth: 3 },
+  velodromeRiderMine: { borderColor: '#FFD75C', borderWidth: 4, zIndex: 3, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 9, elevation: 9 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
   // 번호 줄. 일곱 명이 두 줄로 접힙니다.
   cycleNumberRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
@@ -9244,7 +9260,7 @@ const styles = StyleSheet.create({
   cycleNumberOrder: { color: colors.goldLight, fontSize: 10, fontWeight: '800' },
   velodromeStanding: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   velodromeStandingItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
-  velodromeStandingMine: { borderColor: colors.gold },
+  velodromeStandingMine: { borderColor: '#FFD75C', borderWidth: 2, backgroundColor: 'rgba(255,215,92,.20)' },
   velodromeStandingPlace: { color: colors.gold, fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeStandingDot: { width: 10, height: 10, borderRadius: 5 },
   velodromeStandingName: { color: '#C3CBD8', fontSize: 12, fontWeight: '800' },
@@ -10108,25 +10124,26 @@ const styles = StyleSheet.create({
   refillButton: { padding: 18, borderRadius: 17, backgroundColor: '#19382E', borderWidth: 1, borderColor: colors.gold },
   refillButtonTitle: { color: colors.goldLight, fontSize: 16, fontWeight: '900' },
   refillButtonText: { color: colors.muted, fontSize: 11, marginTop: 5 },
-  roulettePage: { padding: 18, paddingBottom: 44 },
+  // ⚠️ 좌우 여백을 10으로 줄여 **휠에 그만큼을 줍니다.** 375 화면에서 350짜리 휠이 들어갑니다.
+  roulettePage: { paddingHorizontal: 10, paddingTop: 18, paddingBottom: 44 },
   rouletteStatusRow: { width: '100%', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   rouletteBalance: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 3 },
   difficultyBadge: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 12, backgroundColor: '#2E2512', borderWidth: 1, borderColor: colors.gold },
   difficultyBadgeText: { color: colors.goldLight, fontSize: 12, fontWeight: '800' },
-  rouletteStage: { height: 330, alignItems: 'center', justifyContent: 'center' },
+  rouletteStage: { height: 364, alignItems: 'center', justifyContent: 'center' },
   rouletteMarker: { position: 'absolute', zIndex: 6, top: 2, width: 0, height: 0, borderLeftWidth: 12, borderRightWidth: 12, borderTopWidth: 24, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#FFE39A' },
   // 공이 도는 궤도. 크기가 없는 점이라 자리를 안 먹고, 이걸 돌리면 공이 원을 그립니다.
   rouletteBallOrbit: { position: 'absolute', zIndex: 6, width: 0, height: 0, alignItems: 'center', justifyContent: 'center' },
   rouletteBall: { position: 'absolute', width: 13, height: 13, borderRadius: 7, backgroundColor: '#FFFDF5', borderWidth: 1, borderColor: '#B99B4E', shadowColor: '#000000', shadowOpacity: 0.5, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
-  rouletteWheel: { width: 316, height: 316, alignItems: 'center', justifyContent: 'center', borderRadius: 158, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
+  rouletteWheel: { width: 350, height: 350, alignItems: 'center', justifyContent: 'center', borderRadius: 175, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
   rouletteWheelSpinning: { borderColor: '#FFE39A' },
-  rouletteWheelRing: { position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: '#141C1A', borderWidth: 2, borderColor: '#E0C276' },
+  rouletteWheelRing: { position: 'absolute', width: 334, height: 334, borderRadius: 167, backgroundColor: '#141C1A', borderWidth: 2, borderColor: '#E0C276' },
   rouletteSpokes: { position: 'absolute', top: 60, left: 60, width: 180, height: 180, borderRadius: 90, borderWidth: 1, borderColor: 'rgba(224,194,118,0.22)' },
-  roulettePocket: { position: 'absolute', width: 34, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 1, borderColor: 'rgba(232,217,170,0.85)' },
+  roulettePocket: { position: 'absolute', width: 38, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 1, borderColor: 'rgba(232,217,170,0.85)' },
   roulettePocketRed: { backgroundColor: '#B4323D' },
   roulettePocketBlack: { backgroundColor: '#121519' },
   roulettePocketGreen: { backgroundColor: '#14754F' },
-  roulettePocketText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900', lineHeight: 15 },
+  roulettePocketText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900', lineHeight: 16 },
   rouletteBowl: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', borderRadius: 75, backgroundColor: '#0A392B', borderWidth: 8, borderColor: '#B68D33' },
   rouletteHub: { position: 'absolute', top: 18, width: 22, height: 22, borderRadius: 11, backgroundColor: '#E9CD7A', borderWidth: 4, borderColor: '#725619' },
   rouletteResultNumber: { color: colors.text, fontSize: 44, fontWeight: '900', marginTop: 12, fontVariant: ['tabular-nums'] },
