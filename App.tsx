@@ -146,7 +146,7 @@ import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type 
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
 import { soundCues, vibrationFor, type SoundCue } from './src/sound';
-import { opponentLevelForBetTier, opponentLevelNotes, type OpponentLevel } from './src/opponent';
+import { opponentLevelForBetTier, opponentLevelNotes, opponentLevels, type OpponentLevel } from './src/opponent';
 import { calculateGoStopSettlement, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, chooseGoStopMatch, dealGoStop, declareGoStopShake, goStopLevelNotes, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopDeckStyle, type GoStopLevel, type GoStopMode, type GoStopPlayer, type GoStopRound, type GoStopSettlement } from './src/gostop';
 import { chooseComputerMinhwatuCard, dealMinhwatu, playMinhwatuTurn, scoreMinhwatu, settleMinhwatu, type MinhwaRound } from './src/minhwatu';
 import { chooseComputerYukbaekCard, createYukbaekMatch, createYukbaekRound, playYukbaekTurn, scoreYukbaek, settleYukbaekRound, type YukbaekMatch } from './src/yukbaek';
@@ -696,6 +696,12 @@ function CasinoApp() {
    * 앉힐 수 있어서, 배당은 큰데 이기기는 쉬운 자리가 생겼습니다.
    */
   const goStopLevel=opponentLevelForBetTier(difficulty);
+  /**
+   * 마작 상대 실력. **여기만 손으로 고릅니다.**
+   * 마작은 상대가 셋이라 한 자리에 실력이 하나가 아닙니다 — 등급으로 뭉뚱그리지 않고
+   * 준비 화면에서 직접 고르게 둡니다.
+   */
+  const [mahjongLevel,setMahjongLevel]=useState<OpponentLevel>('보통');
   // 홈의 '이어서 하기'는 마지막으로 '고른' 게임을 보여 줍니다(끝까지 안 해도 됩니다).
   const [lastGame, setLastGame] = useState<GameRecord['game'] | ''>('');
 
@@ -1455,14 +1461,14 @@ function CasinoApp() {
         {appScreen === 'pusherGame' && <CoinPusherGameScreen coins={coins} selectedBet={selectedBet} onBack={()=>setAppScreen('pusherSetup')} onPlaceBet={placeBet} onSettle={(stake,multiplier,detail)=>settleNewGame('코인 푸셔',stake,multiplier,detail)}/>}
         {appScreen === 'highLowSetup' && <HighLowSetupScreen players={tablePlayers} onPlayersChange={setTablePlayers} coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('highLowGame')} />}
         {appScreen === 'highLowGame' && <HighLowGameScreen level={goStopLevel} players={tablePlayers} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('highLowSetup')} onPlaceBet={placeBet} onSettle={settleHighLow} />}
-        {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
-        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
-        {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
-        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
-        {appScreen === 'hongKongMahjongSetup' && <WorldMahjongSetupScreen mode="hongkong" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('hongKongMahjongGame')} />}
-        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
-        {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
-        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" level={goStopLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
+        {appScreen === 'riichiSetup' && <RiichiSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} level={mahjongLevel} onLevelChange={setMahjongLevel} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('riichiGame')} />}
+        {appScreen === 'riichiGame' && <RiichiGameScreen mode="riichi" level={mahjongLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('riichiSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('리치 마작',stake,result,detail)} />}
+        {appScreen === 'chineseMahjongSetup' && <WorldMahjongSetupScreen mode="chinese" coins={coins} difficulty={difficulty} selectedBet={selectedBet} level={mahjongLevel} onLevelChange={setMahjongLevel} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('chineseMahjongGame')} />}
+        {appScreen === 'chineseMahjongGame' && <RiichiGameScreen mode="chinese" level={mahjongLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('chineseMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('중국식 마작',stake,result,detail)} />}
+        {appScreen === 'hongKongMahjongSetup' && <WorldMahjongSetupScreen mode="hongkong" coins={coins} difficulty={difficulty} selectedBet={selectedBet} level={mahjongLevel} onLevelChange={setMahjongLevel} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('hongKongMahjongGame')} />}
+        {appScreen === 'hongKongMahjongGame' && <RiichiGameScreen mode="hongkong" level={mahjongLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('hongKongMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('홍콩 마작',stake,result,detail)} />}
+        {appScreen === 'sichuanMahjongSetup' && <WorldMahjongSetupScreen mode="sichuan" coins={coins} difficulty={difficulty} selectedBet={selectedBet} level={mahjongLevel} onLevelChange={setMahjongLevel} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('sichuanMahjongGame')} />}
+        {appScreen === 'sichuanMahjongGame' && <RiichiGameScreen mode="sichuan" level={mahjongLevel} coins={coins} selectedBet={selectedBet} onBack={() => setAppScreen('sichuanMahjongSetup')} onPlaceBet={placeBet} onSettle={(stake,result,detail)=>settleMahjong('사천 마작',stake,result,detail)} />}
         {appScreen === 'tabs' && <BottomInsetContext.Provider value={insets.bottom}>{renderTab({
           tab, onGoTab: setTab, difficulty, saveDifficulty, sound, setSound, opponentLevel: goStopLevel, vibration, setVibration,
           gameSpeed, setGameSpeed, accessibility, setAccessibility,
@@ -1868,6 +1874,24 @@ function shakeDice(total: number, onTick: () => void, onDone: () => void, turns 
   };
   timer = setTimeout(step, Math.max(16, at(1)));
   return () => { stopped = true; clearTimeout(timer); };
+}
+
+/**
+ * 마작 상대 실력을 고르는 칸. 리치·중국·홍콩·사천 네 준비 화면이 같이 씁니다.
+ * ⚠️ 무엇이 달라지는지(상대 셋의 실력)를 **글로 같이 적습니다.** 이름만 바뀌고 속이 같으면
+ * 고를 이유가 없습니다 — 고스톱에서 한 번 그런 적이 있습니다.
+ */
+function MahjongLevelPicker({level,onChange}:{level:OpponentLevel;onChange:(value:OpponentLevel)=>void}){
+  return <>
+    <Text style={styles.sectionTitle}>상대 실력</Text>
+    <View style={styles.setupOptions}>{opponentLevels.map((item)=>
+      <Pressable key={item} style={[styles.setupOption,level===item&&styles.setupOptionActive]} onPress={()=>onChange(item)}>
+        <Text style={[styles.setupOptionTitle,level===item&&styles.setupOptionTitleActive]}>{item}</Text>
+        <Text style={styles.setupOptionRange}>{mahjongLevelsFor(item).map((seat)=>mahjongLevelNames[seat]).join(' · ')}</Text>
+      </Pressable>)}
+    </View>
+    <Text style={styles.helperText}>상대 셋의 실력입니다. 마작은 상대가 셋이라 자리마다 다릅니다.</Text>
+  </>;
 }
 
 /** 마작 상대 실력을 화면에 적는 이름. `MahjongAiLevel`과 한 줄로 맞춰 둡니다. */
@@ -5142,9 +5166,9 @@ function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet
   </View></View>;
 }
 
-function RiichiSetupScreen(props:{coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}) {
+function RiichiSetupScreen(props:{coins:number;difficulty:string;selectedBet:number;level:OpponentLevel;onLevelChange:(v:OpponentLevel)=>void;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}) {
   const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('RiichiSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text></View><RiichiBeginnerGuide/><MahjongGlossary/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>설명을 읽었어요 · 동1국 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title="리치 마작(Riichi Mahjong) 준비" onBack={props.onBack}/><ScrollView {...useScrollMemory('RiichiSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>🀇 🀈 🀉　🀀 🀀</Text><Text style={styles.detailLead}>한 장을 뽑고 한 장을 버려 완성</Text><Text style={styles.slotRuleText}>기본 완성 모양은 같은 패 2장인 머리 하나와, 세 장으로 된 몸통 네 개입니다.</Text><Text style={styles.slotRuleText}>몸통은 같은 패 3장 또는 같은 종류의 연속 숫자 3장으로 만듭니다.</Text></View><RiichiBeginnerGuide/><MahjongGlossary/><MahjongLevelPicker level={props.level} onChange={props.onLevelChange}/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>설명을 읽었어요 · 동1국 시작</Text></Pressable></ScrollView></View>;
 }
 
 function RiichiBeginnerGuide(){
@@ -5242,9 +5266,9 @@ const mahjongProfiles:Record<MahjongMode,{title:string;round:string;lead:string;
   sichuan:{title:'사천 마작(Sichuan Mahjong)',round:'川 1局',lead:'자패 없이 숫자패로만 즐기는 기본판',rules:['동·남·서·북·백·발·중을 빼고 만수·통수·삭수 108장만 사용합니다.','몸통 4개와 머리 1개를 만드는 기본 목표는 같습니다.','정결(定缺): 한 종류를 정해 전부 버려야 화료할 수 있습니다.','치(吃)가 없습니다. 퐁과 깡만 부를 수 있습니다.','같은 패 네 장이 든 용칠대자를 인정하고, 점수는 번이 배수로 곱해집니다.'],honors:false,note:'정결·용칠대자·번 배수 점수(상한 64배) 적용'},
 };
 
-function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins:number;difficulty:string;selectedBet:number;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}){
+function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins:number;difficulty:string;selectedBet:number;level:OpponentLevel;onLevelChange:(v:OpponentLevel)=>void;onBack:()=>void;onDifficultyChange:(v:string)=>void;onBetChange:(v:number)=>void;onStart:()=>void}){
   const profile=mahjongProfiles[props.mode];const option=difficultyOptions.find((item)=>item.name===props.difficulty)??difficultyOptions[2];
-  return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><MahjongGlossary/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><MahjongGlossary/><MahjongLevelPicker level={props.level} onChange={props.onLevelChange}/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
 }
 
 function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;level:OpponentLevel;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
