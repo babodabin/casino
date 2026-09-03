@@ -1816,29 +1816,50 @@ function useThrowGesture(onThrow: (power: number) => void, locked = false) {
 }
 
 /**
- * 주사위를 굴리다 **마지막에 천천히 멈춥니다.**
+ * 주사위를 굴리다 **마지막에 천천히 멈춥니다.** 눈이 바뀌는 시각을 실제로 계산합니다.
  *
- * ⚠️ 전에는 `setInterval`로 같은 간격(80ms)을 두고 끝나는 시각에 그냥 껐습니다.
- * 그래서 끝까지 같은 속도로 팽팽 돌다 **뚝 끊겼습니다.** 실제 주사위는 마지막 몇 번이
- * 눈에 띄게 느려지다 섭니다.
+ * ⚠️ 처음에는 `setInterval`로 같은 간격을 두고 끝나는 시각에 껐습니다 — 끝까지 팽팽 돌다
+ * 뚝 끊겼습니다. 다음에는 간격을 t³로 늘려 봤는데 마지막이 195ms라 **여전히 툭 끝났습니다.**
  *
- * 간격을 `fast`에서 `slow`까지 늘려 가며 굴립니다. 늘어나는 정도는 t³이라
- * **앞은 그대로 빠르고 마지막 서너 번만** 느려집니다. 전체 시간은 `total` 그대로입니다.
+ * 이제는 어림이 아니라 **굴러가는 주사위의 식 그대로** 씁니다.
+ *
+ *   마찰이 일정하면 각속도가 일정하게 줄어듭니다 — 던진 물체가 서는 것과 같습니다.
+ *     각도  θ(t) = ω₀·t − ½·α·t²        (ω₀ 처음 각속도 · α 줄어드는 정도)
+ *     서는 때  T = ω₀/α
+ *     총 각도  Θ = ½·ω₀·T
+ *
+ *   주사위는 **90도 돌 때마다 눈이 하나 바뀝니다.** 다 서기까지 n번 바뀐다면
+ *   k번째로 바뀌는 때는 각도가 k·Θ/n일 때이므로, 위 식을 풀면
+ *
+ *     t_k = T · (1 − √(1 − k/n))
+ *
+ *   마지막 간격은 T/√n, 첫 간격은 약 T/2n입니다. 그래서 **마지막이 처음보다 2√n배** 느립니다.
+ *   T 1300 · n 14로 실제로 나오는 간격입니다(ms).
+ *
+ *     47 → 49 → 51 → 54 → 56 → 60 → 63 → 68 → 74 → 82 → 93 → 110 → 144 → 347
+ *
+ *   마지막 한 번이 347ms라 눈에 띄게 느려지다 섭니다. 처음 47ms는 그대로 빠릅니다.
+ *
+ * ⚠️ `turns`를 키우면 더 자주 바뀌지만 **마지막 간격은 T/√n이라 오히려 짧아집니다.**
+ * 더 천천히 세우고 싶으면 `turns`가 아니라 `total`을 늘리세요.
  *
  * 돌려주는 것은 멈추는 함수입니다. 화면을 떠날 때 불러 주세요.
  */
-function shakeDice(total: number, onTick: () => void, onDone: () => void, fast = 70, slow = 260) {
+function shakeDice(total: number, onTick: () => void, onDone: () => void, turns = 14) {
   let stopped = false;
   let timer: ReturnType<typeof setTimeout>;
-  const started = Date.now();
+  const n = Math.max(3, Math.round(turns));
+  const at = (k: number) => total * (1 - Math.sqrt(Math.max(0, 1 - k / n)));
+  let done = 0;
   const step = () => {
     if (stopped) return;
-    const t = Math.min(1, (Date.now() - started) / Math.max(1, total));
-    if (t >= 1) { onDone(); return; }
+    done += 1;
+    // 마지막 한 번은 결과입니다. 그 앞의 가장 긴 간격을 지나 여기에 옵니다.
+    if (done >= n) { onDone(); return; }
     onTick();
-    timer = setTimeout(step, fast + (slow - fast) * t * t * t);
+    timer = setTimeout(step, Math.max(16, at(done + 1) - at(done)));
   };
-  timer = setTimeout(step, fast);
+  timer = setTimeout(step, Math.max(16, at(1)));
   return () => { stopped = true; clearTimeout(timer); };
 }
 
@@ -2905,14 +2926,14 @@ function SicBoGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBet
   const roll = (power = 0) => {
     if (rolling || !onPlaceBet(selectedBet)) return;
     setRolling(true); setNet(null);
-    shakeDice(spinFor(power, Math.max(80, Math.round(720 * motion))),
+    shakeDice(spinFor(power, Math.max(120, Math.round(1050 * motion))),
       () => setDice(rollSicBo()),
       () => {
         const next = rollSicBo(); setDice(next);
         setNet(sicBoNet(bet, selectedBet, next)); setRolling(false);
         onSettle(bet, selectedBet, next);
       },
-      Math.max(30, Math.round(70 * motion)), Math.max(40, Math.round(260 * motion)));
+      Math.max(6, Math.round(14 * motion)));
   };
   // 그릇을 위로 쓸면 주사위를 던집니다. 버튼도 그대로 있습니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling || selectedBet > coins);
@@ -2936,7 +2957,7 @@ function YahtzeeGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
   const roll=(power=0)=>{
     if(!started||finished||rollCount>=3||rolling)return;
     setRolling(true);
-    shakeDice(spinFor(power,850),
+    shakeDice(spinFor(power,1250),
       ()=>setDice((current)=>rollYahtzeeDice(current,held)),
       ()=>{setDice((current)=>rollYahtzeeDice(current,held));setRollCount((value)=>value+1);setRolling(false);});
   };
@@ -7402,7 +7423,7 @@ function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, on
     if(rolling)return;
     if (!active && !onPlaceBet(selectedBet)) return;
     setRolling(true);setLast(null);
-    shakeDice(spinFor(power,900),
+    shakeDice(spinFor(power,1300),
       ()=>setRollingDice(rollDice()),
       ()=>{
         const dice=rollDice();setRollingDice(dice);
@@ -8796,8 +8817,14 @@ const styles = StyleSheet.create({
   feltLabel: { color: 'rgba(232,240,234,0.82)', fontSize: 13, fontWeight: '800' },
   jokerScreen: { flex: 1, backgroundColor: colors.bg },
   // 발라트로 고르기
-  balatroPick: { padding: 16, borderRadius: 18, marginBottom: 12, gap: 6, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.border, borderTopColor: 'rgba(245,222,138,0.22)' },
-  balatroPickHard: { borderColor: colors.gold },
+  /*
+   * 이지·하드 고르는 칸. **테두리는 네 면이 다 금색**입니다.
+   * ⚠️ 전에는 `borderColor`를 자주 회색으로 두고 윗줄만 옅은 금색을 얹어서,
+   * 금테가 위에만 있고 나머지 세 면은 회색이었습니다. 나눠 쓰지 마세요.
+   */
+  balatroPick: { padding: 16, borderRadius: 18, marginBottom: 12, gap: 6, backgroundColor: colors.panel, borderWidth: 2, borderColor: colors.gold },
+  // 하드는 같은 금색을 한 단 밝게 해서 둘을 가릅니다.
+  balatroPickHard: { borderColor: colors.goldLight },
   balatroPickName: { color: colors.goldLight, fontSize: 18, fontWeight: '900' },
   balatroPickText: { color: colors.muted, fontSize: 12, lineHeight: 19 },
   // 블라인드 세 단
