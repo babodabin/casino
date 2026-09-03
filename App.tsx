@@ -4185,7 +4185,7 @@ const velodromeRiderSize = 20;
  * 도는 각도가 두 배(720도)라, 1번과 7번 사이가 그만큼 더 멀어집니다. 한 바퀴에서는
  * 다 붙어 보여서 누가 앞선지 잘 안 보였습니다.
  */
-function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished';laps:number}){
+function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps,onPick,oddsFor}:{riders:Cyclist[];race:CycleRaceResult|null;progress:number;winnerTime:number;chosen:number[];phase:'betting'|'racing'|'finished';laps:number;onPick:(id:number)=>void;oddsFor:(rider:Cyclist)=>number}){
   const lap=(rider:Cyclist)=>race?Math.min(1,progress*winnerTime/race.times[rider.id]):0;
   // 지금 앞선 순서. 경주 전에는 등번호 순으로 둡니다.
   const standing=[...riders].sort((a,b)=>lap(b)-lap(a));
@@ -4217,12 +4217,27 @@ function Velodrome({riders,race,progress,winnerTime,chosen,phase,laps}:{riders:C
         return <View key={rider.id} style={[styles.velodromeRider,{left:left-shift,top:top-shift,width:size,height:size,borderRadius:size/2,backgroundColor:rider.color},mine&&styles.velodromeRiderMine]}/>;
       })}
     </View>
+    {/*
+      경기장 **바로 밑 번호 줄**이 선수를 고르는 자리입니다.
+      ⚠️ 고르는 자리를 여기 하나만 둡니다. 아래에 번호 줄을 하나 더 뒀더니 같은 것을
+      두 군데에서 고르게 되어 어느 쪽이 진짜인지 헷갈렸습니다.
+      - 배팅 중에는 **등번호와 배당**을 적습니다. 누르면 고르고, 힘·전술이 위에 나옵니다.
+      - 경주가 시작되면 같은 자리가 **순위 줄**이 됩니다.
+    */}
     <View style={styles.velodromeStanding}>
-      {standing.map((rider,place)=><View key={rider.id} style={[styles.velodromeStandingItem,chosen.includes(rider.id)&&styles.velodromeStandingMine]}>
-        <Text style={styles.velodromeStandingPlace}>{place+1}</Text>
-        <View style={[styles.velodromeStandingDot,{backgroundColor:rider.color}]}/>
-        <Text style={styles.velodromeStandingName}>{rider.id}번</Text>
-      </View>)}
+      {standing.map((rider,place)=>{
+        const order=chosen.indexOf(rider.id);
+        return <Pressable key={rider.id} disabled={phase!=='betting'} onPress={()=>onPick(rider.id)}
+          style={({pressed})=>[styles.velodromeStandingItem,order>=0&&styles.velodromeStandingMine,pressed&&styles.pressed]}>
+          <Text style={styles.velodromeStandingPlace}>{phase==='betting'?rider.id:place+1}</Text>
+          <View style={[styles.velodromeStandingDot,{backgroundColor:rider.color}]}/>
+          {phase==='betting'
+            ?<Text style={styles.velodromeStandingOdds}>{oddsFor(rider).toFixed(1)}배</Text>
+            :<Text style={styles.velodromeStandingName}>{rider.id}번</Text>}
+          {/* 착순은 **두 명을 고르는 승식(복승·쌍승)** 에서만 뜻이 있습니다. 단승에 1착이라 적으면 군더더기입니다. */}
+          {phase==='betting'&&order>=0&&chosen.length>1&&<Text style={styles.velodromeStandingOrder}>{order+1}착</Text>}
+        </Pressable>;
+      })}
     </View>
   </View>;
 }
@@ -4246,7 +4261,7 @@ function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
   const winnerTime=race?Math.min(...Object.values(race.times)):1;
   return <View style={styles.cycleScreen}><ScreenHeader title="월드 벨로드롬" onBack={onBack}/><ScrollView contentContainerStyle={styles.horsePage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>GWANGMYEONG · 7 RIDERS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{phase==='betting'?'경주권 판매 중':phase==='racing'?(progress>.68?'🔔 마지막 바퀴':'대열 주행 중'):'순위 확정'}</Text></View></View>
-    <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase} laps={laps}/>
+    <Velodrome riders={riders} race={race} progress={progress} winnerTime={winnerTime} chosen={ticket?.selections??selections} phase={phase} laps={laps} onPick={choose} oddsFor={(rider)=>betType==='place'?rider.placeOdds:rider.winOdds}/>
     {/* 누른 선수의 상태. 아래 큰 목록을 없앤 대신 여기서 한 줄로 봅니다. */}
     {phase==='betting'&&shown!==null&&(()=>{const rider=riders.find(item=>item.id===shown);if(!rider)return null;
       return <View style={styles.horseFormCard}>
@@ -4257,20 +4272,6 @@ function CycleRacingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{c
     })()}
     {phase==='racing'&&race&&progress>.68&&<View style={styles.cycleBell}><Text style={styles.cycleBellTitle}>🔔 마지막 바퀴 진입</Text><Text style={styles.slotRuleText}>현재 대열 {race.lastLapOrder.slice(0,4).join(' → ')} · 막판 추입이 시작됩니다</Text></View>}
     {phase==='betting'?<><RacingPickBanner label={`${cycleBetLabels[betType]} · ${selections.length?selections.join(' → '):'선택 대기'} · ${selectedBet.toLocaleString()} WC`} disabled={selections.length!==needed||selectedBet>coins} onStart={start} startLabel="출발"/><Text style={styles.sectionTitle}>승식 선택</Text><View style={styles.horseBetTypeRow}>{(['win','place','quinella','exacta'] as CycleBetType[]).map(type=><Pressable key={type} onPress={()=>chooseType(type)} style={[styles.horseBetType,betType===type&&styles.horseBetTypeActive]}><Text style={styles.horseBetTypeTitle}>{cycleBetLabels[type]}</Text><Text style={styles.horseBetTypeDetail}>{type==='win'?'1위':type==='place'?'2위 안':type==='quinella'?'1·2위 무순서':'1·2위 순서'}</Text></Pressable>)}</View>
-    {/*
-      ⚠️ 선수를 고르는 자리는 **번호 줄 하나**입니다. 전에는 카드 일곱 장이 화면의 절반을
-      먹었습니다. 번호 옆에 배당을 같이 적어, 누르기 전에 배당을 보고 고를 수 있게 했습니다.
-      선수의 힘·전술은 누르면 트랙 바로 아래에 나옵니다.
-    */}
-    <Text style={styles.sectionTitle}>고른 선수 {selections.length}/{needed} · 번호를 눌러 고르세요</Text>
-    <View style={styles.cycleNumberRow}>{riders.map(rider=>{
-      const order=selections.indexOf(rider.id);
-      return <Pressable key={rider.id} onPress={()=>choose(rider.id)} style={({pressed})=>[styles.cycleNumberPick,order>=0&&styles.cycleNumberPickOn,pressed&&styles.pressed]}>
-        <View style={[styles.cycleJerseySmall,{backgroundColor:rider.color}]}><Text style={[styles.cycleJerseyText,rider.id===1&&{color:'#111'}]}>{rider.id}</Text></View>
-        <Text style={styles.cycleNumberOdds}>{(betType==='place'?rider.placeOdds:rider.winOdds).toFixed(1)}배</Text>
-        {order>=0&&needed>1&&<Text style={styles.cycleNumberOrder}>{order+1}착</Text>}
-      </Pressable>;
-    })}</View>
     <Text style={styles.sectionTitle}>바퀴 수</Text>
     <View style={styles.horseBetTypeRow}>{[1,2].map(count=>
       <Pressable key={count} disabled={phase!=='betting'} onPress={()=>setLaps(count)} style={[styles.horseBetType,laps===count&&styles.horseBetTypeActive]}>
@@ -9259,20 +9260,15 @@ const styles = StyleSheet.create({
   velodromeRider: { position: 'absolute', width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D7E2E9' },
   velodromeRiderMine: { borderColor: '#FFD75C', borderWidth: 4, zIndex: 3, shadowColor: '#FFD35F', shadowOpacity: 0.95, shadowRadius: 9, elevation: 9 },
   velodromeRiderText: { color: '#12202B', fontSize: 13, fontWeight: '900' },
-  // 번호 줄. 일곱 명이 두 줄로 접힙니다.
-  cycleNumberRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  cycleNumberPick: { alignItems: 'center', gap: 3, paddingVertical: 7, paddingHorizontal: 9, borderRadius: 12, backgroundColor: '#14251F', borderWidth: 1, borderColor: '#385247' },
-  cycleNumberPickOn: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },
-  cycleJerseySmall: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderWidth: 2, borderColor: '#FFF' },
-  cycleJerseyText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  cycleNumberOdds: { color: '#FFE9A6', fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
-  cycleNumberOrder: { color: colors.goldLight, fontSize: 10, fontWeight: '800' },
   velodromeStanding: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   velodromeStandingItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 9, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   velodromeStandingMine: { borderColor: '#FFD75C', borderWidth: 2, backgroundColor: 'rgba(255,215,92,.20)' },
   velodromeStandingPlace: { color: colors.gold, fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
   velodromeStandingDot: { width: 10, height: 10, borderRadius: 5 },
   velodromeStandingName: { color: '#C3CBD8', fontSize: 12, fontWeight: '800' },
+  // 배팅 중에는 이 자리에 배당을 적습니다. 경주가 시작되면 번호로 바뀝니다.
+  velodromeStandingOdds: { color: '#FFE9A6', fontSize: 12, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  velodromeStandingOrder: { color: colors.goldLight, fontSize: 10, fontWeight: '900' },
   cycleLane: { height: 49, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.32)' },
   cycleJersey: { width: 31, height: 31, marginHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 2, borderColor: '#D7E2E9' },
   cycleJerseyLarge: { width: 44, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 2, borderColor: '#D7E2E9' },
