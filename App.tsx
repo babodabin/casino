@@ -6016,8 +6016,16 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
    * 기록 한 줄에만 들어가고 **화면에는 안 보였습니다.**
    */
   const [settleNote,setSettleNote]=useState<{title:string;lines:string[]}|null>(null);
-  /** 친 순간 잠깐 크게 보이게 하는 값입니다. 0.26초 뒤 원래 크기로 돌아옵니다. */
-  const [slapPop,setSlapPop]=useState(false);
+  /**
+   * 친 순간부터 판이 넘어갈 때까지 0에서 1로 흐르는 값입니다. 이것 하나로 둘을 그립니다.
+   *
+   * - **가져가는 패** — 낸 패와 맞은 패가 **같이 떠오르며** 옅어집니다. 바닥에 안 남습니다
+   * - **못 가져온 패** — 위에서 **착 내려쳐** 바닥에 붙습니다
+   *
+   * ⚠️ 전에는 가져가는 패도 바닥에 그대로 누워 있어서, 무엇이 내 것이 되는지 크기로만
+   * 갈렸습니다. 움직임이 있어야 '가져갔다'가 보입니다.
+   */
+  const slapLift=useRef(new Animated.Value(0)).current;
   const title=mode==='matgo'?'맞고':'고스톱';
 
   const finish=(next:GoStopRound,force=false)=>{
@@ -6086,10 +6094,12 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
     if(!slap)return;
     // 화투는 놓는 것이 아니라 치는 것입니다. 패가 바닥에 닿는 순간에 소리를 냅니다.
     playCue('slap');
-    setSlapPop(true);
-    const pop=setTimeout(()=>setSlapPop(false),260);
+    slapLift.setValue(0);
+    // ⚠️ 1,100은 아래 1,200(판이 넘어가는 때)보다 조금 짧게 잡은 값입니다.
+    // 같거나 길면 다 떠오르기 전에 판이 바뀌어 뚝 끊깁니다.
+    Animated.timing(slapLift,{toValue:1,duration:1100,easing:Easing.out(Easing.cubic),useNativeDriver:false}).start();
     const timer=setTimeout(()=>takeSlap(),1200);
-    return ()=>{clearTimeout(pop);clearTimeout(timer);};
+    return ()=>clearTimeout(timer);
   },[slap]);
 
   // 컴퓨터 차례면 잠깐 쉬었다 저절로 냅니다. 친 패를 보여 주는 시간과 합쳐
@@ -6231,6 +6241,23 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
           const slapTook=took.has(slap.card.id)||hit.some((card)=>took.has(card.id));
           const drawnTook=!!drawn&&(took.has(drawn.id)||drawnHit.some((card)=>took.has(card.id)));
           const sizeFor=(taken:boolean)=>taken?'normal':'small' as const;
+          /*
+           * 가져가는 쪽은 **같이 떠오르며 옅어집니다**(바닥에 안 남습니다).
+           * 못 가져오는 쪽은 위에서 **착 내려쳐** 바닥에 붙습니다.
+           */
+          const 떠오름={
+            transform:[
+              {translateY:slapLift.interpolate({inputRange:[0,0.18,1],outputRange:[0,-8,-38]})},
+              {scale:slapLift.interpolate({inputRange:[0,0.18,0.7,1],outputRange:[1,1.32,1.14,0.86]})},
+            ],
+            opacity:slapLift.interpolate({inputRange:[0,0.7,1],outputRange:[1,1,0.15]}),
+          };
+          const 내려침={
+            transform:[
+              {translateY:slapLift.interpolate({inputRange:[0,0.1,0.18,1],outputRange:[-22,3,0,0]})},
+              {scale:slapLift.interpolate({inputRange:[0,0.1,0.18,1],outputRange:[1.2,0.95,1,1]})},
+            ],
+          };
           return <View style={styles.goStopSlapOverlay}>
             <Text style={styles.goStopSlapWho}>{slap.who===0?'내가 냈습니다':`컴퓨터 ${slap.who} 냈습니다`}</Text>
             {/* 따닥 · 쪽 · 네 장 다 먹음처럼 이름이 붙은 일은 **크게** 알려 줍니다.
@@ -6238,18 +6265,18 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
             {slap.next.lastEvents?.length?<Text style={styles.goStopSlapEvent}>{slap.next.lastEvents.join(' · ')}!</Text>:null}
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
-                <View style={[styles.goStopSlapRow,{transform:[{scale:slapPop&&slapTook?1.28:1}]}]}>
+                <Animated.View style={[styles.goStopSlapRow,slapTook?떠오름:내려침]}>
                   {hit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
                   <View style={[hit.length?(slapTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(slap.card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={slap.card} size={sizeFor(took.has(slap.card.id))}/></View>
-                </View>
+                </Animated.View>
                 <Text style={styles.goStopSlapTag}>낸 패 · {slap.card.month}월{slapTook?'':' · 못 가져옴'}</Text>
               </View>
               {drawn?<View style={styles.goStopSlapSide}>
-                <View style={styles.goStopSlapRow}>
+                <Animated.View style={[styles.goStopSlapRow,drawnTook?떠오름:내려침]}>
                   {drawnHit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   <View style={[drawnHit.length?(drawnTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>
-                </View>
+                </Animated.View>
                 <Text style={styles.goStopSlapTag}>깐 패 · {drawn.month}월{drawnTook?'':' · 그냥 깜'}</Text>
               </View>:null}
             </View>
