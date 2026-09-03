@@ -6290,7 +6290,9 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
             <View style={styles.goStopSlapPair}>
               <View style={styles.goStopSlapSide}>
                 <Animated.View style={[styles.goStopSlapRow,slapTook?튐:내려침]}>
-                  {hit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
+                  {/* ⚠️ 맞은 패가 둘일 때는 서로도 **붙여** 한 무더기로 보이게 합니다.
+                      떨어뜨려 놓으면 석 장이 따로 놀아 무엇을 친 것인지 안 보였습니다. */}
+                  {hit.map((card,index)=><View key={card.id} style={[index?styles.goStopSlapStack:null,took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   {/* 낸 패를 바닥 패 위에 얹어 놓습니다. 이게 '친' 모습입니다. */}
                   <View style={[hit.length?(slapTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(slap.card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={slap.card} size={sizeFor(took.has(slap.card.id))}/></View>
                 </Animated.View>
@@ -6298,7 +6300,7 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
               </View>
               {drawn?<View style={styles.goStopSlapSide}>
                 <Animated.View style={[styles.goStopSlapRow,drawnTook?튐:내려침]}>
-                  {drawnHit.map((card)=><View key={card.id} style={took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
+                  {drawnHit.map((card,index)=><View key={card.id} style={[index?styles.goStopSlapStack:null,took.has(card.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={card} size={sizeFor(took.has(card.id))}/></View>)}
                   <View style={[drawnHit.length?(drawnTook?styles.goStopSlapOver:styles.goStopSlapOverSmall):null,took.has(drawn.id)?styles.goStopSlapTaken:styles.goStopSlapMissed]}><HwatuCardView card={drawn} size={sizeFor(took.has(drawn.id))}/></View>
                 </Animated.View>
                 <Text style={styles.goStopSlapTag}>깐 패 · {drawn.month}월{drawnTook?'':' · 그냥 깜'}</Text>
@@ -7052,7 +7054,8 @@ function BlackjackGameScreen(props: {
     const step = Math.max(16, Math.min(card + 6, room));
     return { marginLeft: step - card };
   };
-  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 10, gap: 0 }];
+  // ⚠️ 카드 높이 + 2. 전에는 +10이라 줄마다 8이 그냥 비어 있었습니다.
+  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 2, gap: 0 }];
 
   /**
    * 딜러가 빛나야 하는지. **딜러가 그 판에서 모두를 이겼을 때만** 빛냅니다.
@@ -7980,18 +7983,21 @@ function RouletteGameScreen({
     setResultNumber(null);
     pendingSettle.current = () => onSettle(bet, selectedBet, number, betLabel);
 
-    // 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
-    // 실제 룰렛은 공이 한참 돕니다. 4.2초는 너무 빨라 "돌았다"는 느낌이 안 났습니다.
+    /*
+     * 공은 휠보다 조금 먼저 자리를 잡습니다. 실제 룰렛도 공이 먼저 떨어지고 휠이 더 돕니다.
+     * ⚠️ 4.2초는 너무 빨라 "돌았다"는 느낌이 없었고, 8.2/9.4초는 **너무 길었습니다.**
+     * 그 사이인 4.4/5.2초로 뒀습니다.
+     */
     Animated.timing(ballProgress, {
       toValue: 1,
-      duration: Math.max(260, Math.round(8200 * motion)),
+      duration: Math.max(260, Math.round(4400 * motion)),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
 
     Animated.timing(wheelProgress, {
       toValue: target,
-      duration: Math.max(300, Math.round(9400 * motion)),
+      duration: Math.max(300, Math.round(5200 * motion)),
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
@@ -8044,10 +8050,12 @@ function RouletteGameScreen({
                   </View>
                 );
               })}
-              <View style={styles.rouletteSpokes} />
+              {/* ⚠️ 여기 있던 옅은 원(`rouletteSpokes`)을 뺐습니다. 바퀴살처럼 보이라고 둔 것인데
+                  숫자 안쪽에 **흰 줄 하나**만 떠 있어 무엇인지 알 수 없었습니다. */}
             </Animated.View>
             <View style={styles.rouletteBowl}>
-              <View style={styles.rouletteHub} />
+              {/* ⚠️ 가운데 금색 꼭지(`rouletteHub`)도 뺐습니다. 숫자 바로 위에 동그라미가 하나
+                  떠 있는 것처럼 보였습니다. */}
               <Text
                 style={[
                   styles.rouletteResultNumber,
@@ -8871,15 +8879,20 @@ const styles = StyleSheet.create({
   // 딜러가 아니라 사람(컴퓨터)이 앉는 자리. 반원 반대쪽 좌석을 나타냅니다.
   dealerOpponentSeat: { width: 46, height: 22, borderTopLeftRadius: 23, borderTopRightRadius: 23, backgroundColor: '#0A3B29', borderWidth: 1, borderColor: '#12684A' },
   dealerEdgeLabel: { color: '#8FBFA8', fontSize: 10, fontWeight: '800' },
-  dealerSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, marginBottom: 4 },
+  // ⚠️ 이름 줄의 위아래 여백. 4 → 2로 줄였습니다(줄이 넷이라 판에서 16이 빕니다).
+  dealerSeatRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 2 },
   dealerSeatLabel: { color: '#D5EADF', fontSize: 13, fontWeight: '900' },
   dealerSeatNote: { color: '#8FBFA8', fontSize: 11, fontWeight: '700' },
   dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
   // 이긴 카드는 cardWinner가 위로 16 들어 올립니다. 그만큼 위쪽 자리를 비워 두지 않으면
   // 들린 카드가 바로 위 이름줄을 덮습니다.
-  // ⚠️ **접지 않습니다.** 접히면 판 높이가 못 박혀 있어 아래가 잘려 나갑니다.
-  // 대신 장수만큼 겹칩니다(`handFanFor`).
-  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 96, paddingTop: 10, flexWrap: 'nowrap' },
+  /*
+   * ⚠️ **접지 않습니다.** 접히면 판 높이가 못 박혀 있어 아래가 잘려 나갑니다.
+   * 대신 장수만큼 겹칩니다(`handFanFor`).
+   * ⚠️ 위 여백을 10 → 3으로 줄였습니다(2026-09-03). 카드는 이미 제일 작은 단계라
+   * **줄일 것이 여백뿐**이었습니다. 줄이 셋이라 한 줄에 7씩, 판에서 21이 빕니다.
+   */
+  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 96, paddingTop: 3, flexWrap: 'nowrap' },
   // 일곱 장처럼 많을 때 부채처럼 겹쳐 한 줄에 담습니다.
   dealerCardFan: { marginLeft: -30 },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
@@ -10242,14 +10255,14 @@ const styles = StyleSheet.create({
   rouletteWheel: { width: 350, height: 350, alignItems: 'center', justifyContent: 'center', borderRadius: 175, backgroundColor: '#6F541C', borderWidth: 8, borderColor: '#D8B85C', shadowColor: '#000000', shadowOpacity: 0.55, shadowRadius: 18, shadowOffset: { width: 0, height: 10 } },
   rouletteWheelSpinning: { borderColor: '#FFE39A' },
   rouletteWheelRing: { position: 'absolute', width: 334, height: 334, borderRadius: 167, backgroundColor: '#141C1A', borderWidth: 2, borderColor: '#E0C276' },
-  rouletteSpokes: { position: 'absolute', top: 60, left: 60, width: 180, height: 180, borderRadius: 90, borderWidth: 1, borderColor: 'rgba(224,194,118,0.22)' },
+
   roulettePocket: { position: 'absolute', width: 38, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 5, borderWidth: 1, borderColor: 'rgba(232,217,170,0.85)' },
   roulettePocketRed: { backgroundColor: '#B4323D' },
   roulettePocketBlack: { backgroundColor: '#121519' },
   roulettePocketGreen: { backgroundColor: '#14754F' },
   roulettePocketText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900', lineHeight: 16 },
   rouletteBowl: { width: 150, height: 150, alignItems: 'center', justifyContent: 'center', borderRadius: 75, backgroundColor: '#0A392B', borderWidth: 8, borderColor: '#B68D33' },
-  rouletteHub: { position: 'absolute', top: 18, width: 22, height: 22, borderRadius: 11, backgroundColor: '#E9CD7A', borderWidth: 4, borderColor: '#725619' },
+
   rouletteResultNumber: { color: colors.text, fontSize: 44, fontWeight: '900', marginTop: 12, fontVariant: ['tabular-nums'] },
   rouletteNumberTicking: { opacity: 0.92 },
   rouletteGreenText: { color: '#5FD6A4' },
@@ -10367,6 +10380,8 @@ const styles = StyleSheet.create({
   goStopSlapSide: { alignItems: 'center', gap: 3 },
   goStopSlapTag: { color: '#9FC4B4', fontSize: 10, fontWeight: '800' },
   // 낸 패를 바닥 패 위에 반쯤 걸쳐 놓습니다. 겹쳐야 무엇을 쳤는지 한눈에 보입니다.
+  // 맞은 패끼리 붙이는 폭. 낸 패를 얹는 것(-30)보다 조금만 겹쳐 장수는 세어지게 둡니다.
+  goStopSlapStack: { marginLeft: -18 },
   goStopSlapOver: { marginLeft: -30, marginTop: 12, transform: [{ rotate: '8deg' }] },
   // 친 패에 금빛을 둘러 눈에 띄게 합니다.
   // 이번에 가져가는 패에만 금테를 두릅니다. 무엇이 내 것이 되는지 이걸로 압니다.
