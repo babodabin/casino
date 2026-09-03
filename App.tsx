@@ -119,7 +119,6 @@ import {
   isBlackjack,
   netForResult,
   payoutForResult,
-  playDealer,
   resolveRound,
   shuffleDeck,
   type Card,
@@ -1816,6 +1815,33 @@ function useThrowGesture(onThrow: (power: number) => void, locked = false) {
   };
 }
 
+/**
+ * 주사위를 굴리다 **마지막에 천천히 멈춥니다.**
+ *
+ * ⚠️ 전에는 `setInterval`로 같은 간격(80ms)을 두고 끝나는 시각에 그냥 껐습니다.
+ * 그래서 끝까지 같은 속도로 팽팽 돌다 **뚝 끊겼습니다.** 실제 주사위는 마지막 몇 번이
+ * 눈에 띄게 느려지다 섭니다.
+ *
+ * 간격을 `fast`에서 `slow`까지 늘려 가며 굴립니다. 늘어나는 정도는 t³이라
+ * **앞은 그대로 빠르고 마지막 서너 번만** 느려집니다. 전체 시간은 `total` 그대로입니다.
+ *
+ * 돌려주는 것은 멈추는 함수입니다. 화면을 떠날 때 불러 주세요.
+ */
+function shakeDice(total: number, onTick: () => void, onDone: () => void, fast = 70, slow = 260) {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const started = Date.now();
+  const step = () => {
+    if (stopped) return;
+    const t = Math.min(1, (Date.now() - started) / Math.max(1, total));
+    if (t >= 1) { onDone(); return; }
+    onTick();
+    timer = setTimeout(step, fast + (slow - fast) * t * t * t);
+  };
+  timer = setTimeout(step, fast);
+  return () => { stopped = true; clearTimeout(timer); };
+}
+
 function useAutoStart(start: () => void) {
   const latest = useRef(start);
   latest.current = start;
@@ -2284,7 +2310,7 @@ function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettl
         <View style={styles.feltTable}><View style={styles.feltSurface}>
           <View style={styles.feltGlow} pointerEvents="none" />
           <Text style={styles.feltLabel}>{over ? '판이 끝났습니다' : `내 패 — ${picked.length}/5장 선택`}</Text>
-          <View style={styles.handRowPlain}>{run.round.hand.map((card) => <Pressable key={card.id} disabled={over} onPress={() => toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id) ? 'selected' : undefined} /></Pressable>)}</View>
+          <View style={styles.handRowPlain}>{run.round.hand.map((card) => <Pressable key={card.id} disabled={over} onPress={() => toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id) ? 'picked' : undefined} /></Pressable>)}</View>
           {/* 칩 × 배수를 **크게** 보여 줍니다. 최종 점수만 나오면 무엇이 점수를 만드는지 안 보입니다. */}
           {preview ? <View style={styles.mathRow}>
             <Text style={styles.mathHand}>{preview.hand.type}{preview.level > 1 ? ` LV.${preview.level}` : ''}</Text>
@@ -2876,7 +2902,18 @@ function SicBoGameScreen({ coins, difficulty, selectedBet, motion, onBack, onBet
   const [bet, setBet] = useState<SicBoBet>({ type: 'big' }); const [dice, setDice] = useState<SicBoDice>([1, 3, 5]); const [rolling, setRolling] = useState(false); const [net, setNet] = useState<number | null>(null);
   const selected = (candidate: SicBoBet) => JSON.stringify(candidate) === JSON.stringify(bet);
   const choose = (candidate: SicBoBet) => { if (!rolling) { setBet(candidate); setNet(null); } };
-  const roll = (power = 0) => { if (rolling || !onPlaceBet(selectedBet)) return; setRolling(true); setNet(null); const timer = setInterval(() => setDice(rollSicBo()), Math.max(30, Math.round(90 * motion))); setTimeout(() => { clearInterval(timer); const next = rollSicBo(); setDice(next); const nextNet = sicBoNet(bet, selectedBet, next); setNet(nextNet); setRolling(false); onSettle(bet, selectedBet, next); }, spinFor(power, Math.max(80, Math.round(720 * motion)))); };
+  const roll = (power = 0) => {
+    if (rolling || !onPlaceBet(selectedBet)) return;
+    setRolling(true); setNet(null);
+    shakeDice(spinFor(power, Math.max(80, Math.round(720 * motion))),
+      () => setDice(rollSicBo()),
+      () => {
+        const next = rollSicBo(); setDice(next);
+        setNet(sicBoNet(bet, selectedBet, next)); setRolling(false);
+        onSettle(bet, selectedBet, next);
+      },
+      Math.max(30, Math.round(70 * motion)), Math.max(40, Math.round(260 * motion)));
+  };
   // 그릇을 위로 쓸면 주사위를 던집니다. 버튼도 그대로 있습니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling || selectedBet > coins);
   const optionButton = (candidate: SicBoBet, title: string, odds: string) => <Pressable key={`${candidate.type}-${'value' in candidate ? candidate.value : title}`} onPress={() => choose(candidate)} style={[styles.sicboBetButton, selected(candidate) && styles.sicboBetActive]}>{selected(candidate) && <CoinStack amount={selectedBet} compact />}<Text style={styles.sicboBetTitle}>{title}</Text><Text style={styles.sicboOdds}>{odds}</Text></Pressable>;
@@ -2896,7 +2933,13 @@ function YahtzeeGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
   const [rollCount,setRollCount]=useState(0); const [card,setCard]=useState<YahtzeeScoreCard>({}); const [rolling,setRolling]=useState(false);
   const total=yahtzeeTotal(card); const completed=Object.keys(card).length;
   const begin=()=>{if(!onPlaceBet(selectedBet))return;setStarted(true);setFinished(false);setDice([1,1,1,1,1]);setHeld([false,false,false,false,false]);setRollCount(0);setCard({});};
-  const roll=(power=0)=>{if(!started||finished||rollCount>=3||rolling)return;setRolling(true);const timer=setInterval(()=>setDice((current)=>rollYahtzeeDice(current,held)),75);setTimeout(()=>{clearInterval(timer);setDice((current)=>rollYahtzeeDice(current,held));setRollCount((value)=>value+1);setRolling(false);},spinFor(power,850));};
+  const roll=(power=0)=>{
+    if(!started||finished||rollCount>=3||rolling)return;
+    setRolling(true);
+    shakeDice(spinFor(power,850),
+      ()=>setDice((current)=>rollYahtzeeDice(current,held)),
+      ()=>{setDice((current)=>rollYahtzeeDice(current,held));setRollCount((value)=>value+1);setRolling(false);});
+  };
   // 보관한 주사위는 그대로 두고 나머지만 굴립니다. 그릇을 위로 쓸면 됩니다.
   const {pull,panHandlers,spinFor}=useThrowGesture((power)=>roll(power),!started||finished||rollCount>=3||rolling);
   const choose=(category:YahtzeeCategory)=>{
@@ -3308,7 +3351,7 @@ function JokerPokerGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{co
       <View style={styles.feltTable}><View style={styles.feltSurface}>
         <View style={styles.feltGlow} pointerEvents="none"/>
         <Text style={styles.feltLabel}>{done?'낸 패':`내 패 — ${picked.length}/5장 선택`}</Text>
-        <View style={styles.handRowPlain}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}</View>
+        <View style={styles.handRowPlain}>{round.hand.map((card)=><Pressable key={card.id} disabled={done} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'picked':undefined}/></Pressable>)}</View>
         <Text style={styles.jokerPreview}>{preview?`${preview.hand.type} · 칩 ${preview.chips} × 배수 ${preview.mult} = ${preview.score.toLocaleString()}점`:done?'':'낼 카드를 고르세요'}</Text>
       </View></View>
 
@@ -3584,17 +3627,22 @@ function BigTwoGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,onS
       {state.log.length>0&&<View style={styles.bigTwoLog}>{state.log.slice(-3).map((line,index)=><Text key={index} style={styles.bigTwoLogLine}>{line}</Text>)}</View>}
 
       {/*
-        ⚠️ 손패는 **두 줄**입니다. 열세 장을 한 줄에 넣으면 크기를 줄이거나 많이 겹쳐야 해서
-        숫자가 안 읽힙니다. 두 줄로 나누면 지금 크기(mid) 그대로 거의 안 겹치고 다 들어갑니다.
-        (`chineseHandRow`를 차이니즈 포커와 같이 쓰는데, 그쪽은 자기 걸음을 따로 잽니다.)
+        ⚠️ 손패는 **판 하나 안에서 가로 두 줄**입니다. 열세 장을 한 줄에 넣으면 크기를 줄이거나
+        많이 겹쳐야 해서 숫자가 안 읽힙니다. 두 줄로 나누면 지금 크기(mid) 그대로 거의 안 겹칩니다.
+
+        ⚠️⚠️ 줄 하나에는 반드시 `bigTwoHandLine`(가로)을 쓰세요. 판 상자 `chineseHandRow`는
+        세로로 쌓는 상자입니다 — 여기에 카드를 바로 넣으면 **카드가 세로로 한 장씩 쌓입니다.**
+        차이니즈 포커와 판을 합칠 때 실제로 그렇게 됐던 자리입니다.
       */}
       <Text style={styles.sectionTitle}>내 패 {myHand.length}장</Text>
-      {(()=>{const shown=myHand.slice(0,deal.countFor(0));const half=Math.ceil(shown.length/2);
-        return [shown.slice(0,half),shown.slice(half)].map((row,rowIndex)=>row.length===0?null:
-          <View key={rowIndex} style={[styles.chineseHandRow,rowIndex?styles.bigTwoHandRowSecond:null]}>{row.map((card,index)=>
-            <Pressable key={card.id} style={index?{marginLeft:fanStep(row.length,cardSizeBox.mid.width,321)-cardSizeBox.mid.width}:null} disabled={!myTurn} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'selected':undefined}/></Pressable>)}
-          </View>);
-      })()}
+      <View style={styles.chineseHandRow}>
+        {(()=>{const shown=myHand.slice(0,deal.countFor(0));const half=Math.ceil(shown.length/2);
+          return [shown.slice(0,half),shown.slice(half)].map((row,rowIndex)=>row.length===0?null:
+            <View key={rowIndex} style={styles.bigTwoHandLine}>{row.map((card,index)=>
+              <Pressable key={card.id} style={index?{marginLeft:fanStep(row.length,cardSizeBox.mid.width,321)-cardSizeBox.mid.width}:null} disabled={!myTurn} onPress={()=>toggle(card.id)}><PlayingCard card={card} compact emphasis={picked.includes(card.id)?'picked':undefined}/></Pressable>)}
+            </View>);
+        })()}
+      </View>
 
       {state.winner===null?<>
         <Text style={styles.tujeonAdvice}>{hint}</Text>
@@ -6472,7 +6520,7 @@ function SeotdaGameScreen({level,coins,selectedBet,rules,onBack,onPlaceBet,onSet
  * 숫자와 무늬를 진짜 카드의 모서리 표시처럼 왼쪽 위에 나란히 그립니다.
  * 위 22만 남기고 겹쳐도 숫자와 무늬가 둘 다 보입니다.
  */
-function PlayingCard({ card, hidden = false, compact = false, tiny = false, stacked = false, size, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; stacked?: boolean; size?: CardSize; emphasis?: 'winner'|'selected'|'dim' }) {
+function PlayingCard({ card, hidden = false, compact = false, tiny = false, stacked = false, size, emphasis }: { card: Card; hidden?: boolean; compact?: boolean; tiny?: boolean; stacked?: boolean; size?: CardSize; emphasis?: 'winner'|'selected'|'picked'|'dim' }) {
   // size를 주면 그것이 이깁니다. compact·tiny는 예전부터 쓰던 이름이라 그대로 둡니다.
   const step: CardSize = size ?? (tiny ? 'small' : compact ? 'mid' : 'big');
   const petite = step === 'small' || step === 'mini';
@@ -6483,7 +6531,7 @@ function PlayingCard({ card, hidden = false, compact = false, tiny = false, stac
   const red = card.suit === '♥' || card.suit === '♦';
   const text = [petite && styles.tinyCardText, step === 'mini' && styles.miniCardText];
   return (
-    <View style={[...box, emphasis==='winner'&&styles.cardWinner, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim]}>
+    <View style={[...box, emphasis==='winner'&&styles.cardWinner, emphasis==='picked'&&styles.cardPicked, emphasis==='selected'&&styles.cardSelected, emphasis==='dim'&&styles.cardDim]}>
       <Text style={[styles.playingCardRank, ...text, stacked && styles.stackedCardRank, red && styles.redCard]}>{card.rank}</Text>
       <Text style={[styles.playingCardSuit, ...text, stacked && styles.stackedCardSuit, red && styles.redCard]}>{card.suit}</Text>
     </View>
@@ -6524,15 +6572,24 @@ function BlackjackGameScreen(props: {
   const [player, setPlayer] = useState(initial.player);
   const [dealer, setDealer] = useState(initial.dealer);
   /**
-   * 차례입니다. **손님 → 나 → 딜러** 순으로 돕니다.
-   * 'guests'는 손님들이 한 명씩 카드를 받는 동안,
-   * 'reveal'은 딜러가 뒷장을 뒤집고 17까지 한 장씩 뽑는 동안입니다. 다 열려야 정산합니다.
+   * 판의 단계입니다.
+   * 'play'   — 나 · 손님 · 딜러가 **자리를 돌아가며 한 장씩** 받는 동안
+   * 'reveal' — 딜러가 뒷장을 뒤집는 동안
+   * 'result' — 정산이 끝난 뒤
    */
-  const [phase, setPhase] = useState<'guests' | 'player' | 'reveal' | 'result'>('guests');
+  const [phase, setPhase] = useState<'play' | 'reveal' | 'result'>('play');
   /** 손님 패. 처음엔 두 장뿐이고 제 차례에 늘어납니다. */
   const [guestHands, setGuestHands] = useState<Card[][]>(initial.seated.map((guest) => guest.hand));
-  /** 지금 카드를 받는 손님 자리. guestCount에 닿으면 내 차례입니다. */
-  const [guestTurn, setGuestTurn] = useState(0);
+  /**
+   * 지금 카드를 받을 차례인 자리입니다.
+   *
+   * ⚠️ **0 = 나 · 1..guestCount = 손님 · 마지막 = 딜러.** 처음 나눠 주는 순서와 같습니다.
+   * 전에는 손님들이 다 받고 → 내가 다 받고 → 딜러가 혼자 다 받았습니다. 규칙으로는 맞지만
+   * 보고 있으면 **한 사람이 계속 받는 것처럼** 보였습니다. 이제 한 바퀴에 한 장씩만 받습니다.
+   */
+  const [turn, setTurn] = useState(0);
+  /** 내가 더 안 받기로 했는지(스탠드·버스트·더블다운·스플릿 두 손 끝). */
+  const [myDone, setMyDone] = useState(false);
   const [result, setResult] = useState<RoundResult | null>(null);
   const [totalBet, setTotalBet] = useState(props.bet);
   const [splitHand, setSplitHand] = useState<Card[] | null>(null);
@@ -6569,38 +6626,55 @@ function BlackjackGameScreen(props: {
     });
   };
 
+  /** 자리 수(나 + 손님들 + 딜러). 차례는 이 안에서 돕니다. */
+  const seatCount = guestCount + 2;
+  /** 그 자리가 아직 카드를 더 받아야 하는지. 손님과 딜러는 17에서 멈춥니다. */
+  const wantsCard = (seat: number) => {
+    if (seat === 0) return !myDone;
+    if (seat === dealerSeat) return handValue(dealer) < 17;
+    return handValue(guestHands[seat - 1] ?? []) < 17;
+  };
+
   /**
-   * 손님 차례. **자리를 돌아가며 한 장씩** 받습니다.
+   * **한 바퀴에 한 장씩.** 나 → 손님 1 → 손님 2 → 딜러 → 나 → … 로 돌면서
+   * 더 받을 사람만 한 장씩 받고, 다 선 자리는 건너뜁니다.
    *
-   * ⚠️ 전에는 손님 1이 17이 될 때까지 혼자 다 받고, 그다음 손님 2가 혼자 다 받았습니다.
-   * 규칙으로는 맞지만 보고 있으면 **한 사람만 계속 받는 것처럼** 보입니다.
-   * 이제 손님 1 → 손님 2 → 손님 1 → … 로 돌면서 한 장씩 받고,
-   * 17이 넘은 손님은 건너뜁니다. 다 서면 내 차례입니다.
-   *
-   * 손님이 나보다 먼저 하는 것은 일부러입니다 — 내가 고르기 전에
-   * **10이 몇 장 빠졌는지 볼 수 있어야** 셈이 됩니다.
+   * ⚠️ 내 자리(0)에서는 **아무 일도 하지 않고 기다립니다.** 히트나 스탠드를 눌러야 넘어갑니다.
+   * ⚠️ 딜러도 이 바퀴에 같이 들어갑니다. 뒷장은 그대로 덮어 두고 **새로 받는 것만** 보입니다.
+   *   딜러가 마지막에 혼자 석 장을 받아 갑자기 나타나던 것이 이래서였습니다.
    */
   useEffect(() => {
-    if (phase !== 'guests' || dealing || insuranceOpen) return;
-    // 아직 더 받아야 하는 손님이 있는지 봅니다.
-    const needsCard = guestHands.map((hand) => handValue(hand) < 17);
-    if (!needsCard.some(Boolean) || deck.length === 0) { setPhase('player'); return; }
-    // 지금 자리부터 오른쪽으로 돌면서 더 받을 손님을 찾습니다.
-    let seat = guestTurn % guestCount;
-    for (let step = 0; step < guestCount && !needsCard[seat]; step += 1) seat = (seat + 1) % guestCount;
+    if (phase !== 'play' || dealing || insuranceOpen) return;
+    // 아무도 더 안 받으면 승부입니다.
+    const anyone = Array.from({ length: seatCount }, (_, seat) => wantsCard(seat)).some(Boolean);
+    if (!anyone || deck.length === 0) {
+      if (splitHand) finishSplit(player, splitHand, deck);
+      else completeRound(player, dealer, deck);
+      return;
+    }
+    const seat = turn % seatCount;
+    // 이 자리는 다 섰습니다. 기다리지 말고 바로 넘깁니다.
+    if (!wantsCard(seat)) { setTurn(seat + 1); return; }
+    // 내 자리면 내가 누를 때까지 기다립니다.
+    if (seat === 0) return;
     const timer = setTimeout(() => {
-      const next = drawCard(deck, guestHands[seat] ?? []);
-      setDeck(next.deck);
-      setGuestHands((hands) => hands.map((item, index) => (index === seat ? next.hand : item)));
-      // 한 장 받았으면 다음 자리로 넘깁니다.
-      setGuestTurn(seat + 1);
+      if (seat === dealerSeat) {
+        const next = drawCard(deck, dealer);
+        setDeck(next.deck);
+        setDealer(next.hand);
+      } else {
+        const next = drawCard(deck, guestHands[seat - 1] ?? []);
+        setDeck(next.deck);
+        setGuestHands((hands) => hands.map((item, index) => (index === seat - 1 ? next.hand : item)));
+      }
+      setTurn(seat + 1);
     }, GUEST_TURN_MS);
     return () => clearTimeout(timer);
-  }, [phase, dealing, insuranceOpen, guestTurn, guestHands, deck]);
+  }, [phase, dealing, insuranceOpen, turn, guestHands, dealer, deck, myDone, splitHand, player]);
 
-  // 처음부터 블랙잭이면 바로 승부로 갑니다. 손님까지 다 돌고 내 차례가 된 다음에 봅니다.
+  // 처음부터 블랙잭이면 바로 승부로 갑니다.
   useEffect(() => {
-    if (dealing || phase !== 'player') return;
+    if (dealing || phase !== 'play') return;
     if (initial.dealer[0].rank === 'A') return;
     if (isBlackjack(player) || isBlackjack(dealer)) {
       completeRound(player, dealer, deck);
@@ -6623,52 +6697,43 @@ function BlackjackGameScreen(props: {
     }
   };
 
+  /** 내 차례인지. **한 바퀴에 한 번만** 누를 수 있습니다. */
+  const myTurn = phase === 'play' && !dealing && !insuranceOpen && !myDone && turn % seatCount === 0;
+
+  /**
+   * ⚠️ 히트든 스탠드든 **차례를 넘깁니다.** 넘기지 않으면 나 혼자 계속 받습니다 —
+   * 고치기 전 화면이 그랬습니다.
+   */
   const hit = () => {
-    if (phase !== 'player' || dealing) return;
+    if (!myTurn) return;
     const currentHand = activeHand === 0 ? player : splitHand!;
     const next = drawCard(deck, currentHand);
     setDeck(next.deck);
     if (activeHand === 0) setPlayer(next.hand); else setSplitHand(next.hand);
     if (handValue(next.hand) >= 21) {
-      if (splitHand) {
-        if (activeHand === 0) {
-          setActiveHand(1);
-        } else {
-          finishSplit(player, next.hand, next.deck);
-        }
-        return;
-      }
-      if (handValue(next.hand) > 21) {
-        completeRound(next.hand, dealer, next.deck);
-      } else {
-        const dealerResult = playDealer(next.deck, dealer);
-        completeRound(next.hand, dealerResult.hand, dealerResult.deck);
-      }
+      // 스플릿이면 두 손을 다 끝내야 내 차례가 끝납니다.
+      if (splitHand && activeHand === 0) setActiveHand(1);
+      else setMyDone(true);
     }
+    setTurn(1);
   };
 
   const stand = () => {
-    if (phase !== 'player' || dealing) return;
-    if (splitHand) {
-      if (activeHand === 0) {
-        setActiveHand(1);
-      } else {
-        finishSplit(player, splitHand, deck);
-      }
-      return;
-    }
-    const dealerResult = playDealer(deck, dealer);
-    completeRound(player, dealerResult.hand, dealerResult.deck);
+    if (!myTurn) return;
+    if (splitHand && activeHand === 0) setActiveHand(1);
+    else setMyDone(true);
+    setTurn(1);
   };
 
+  /**
+   * 스플릿 두 손의 승부. 딜러 패는 이미 바퀴를 돌며 다 받았습니다.
+   * 스플릿한 손의 21은 블랙잭이 아니므로 2.5배가 아닌 2배로 정산합니다.
+   */
   const finishSplit = (firstHand: Card[], secondHand: Card[], nextDeck: Card[]) => {
-    const dealerResult = playDealer(nextDeck, dealer);
-    // 스플릿한 손의 21은 블랙잭이 아니므로 2.5배가 아닌 2배로 정산합니다.
-    const results = [resolveRound(firstHand, dealerResult.hand, false), resolveRound(secondHand, dealerResult.hand, false)];
+    const results = [resolveRound(firstHand, dealer, false), resolveRound(secondHand, dealer, false)];
     setPlayer(firstHand);
     setSplitHand(secondHand);
-    setDealer(dealerResult.hand);
-    setDeck(dealerResult.deck);
+    setDeck(nextDeck);
     setSplitResults(results);
     reveal.reset();
     setPhase('reveal');
@@ -6681,7 +6746,7 @@ function BlackjackGameScreen(props: {
   };
 
   const split = () => {
-    if (phase !== 'player' || dealing || !canSplit(player) || !props.onDoubleDown()) return;
+    if (!myTurn || !canSplit(player) || !props.onDoubleDown()) return;
     const firstDraw = drawCard(deck, [player[0]]);
     const secondDraw = drawCard(firstDraw.deck, [player[1]]);
     setPlayer(firstDraw.hand);
@@ -6691,16 +6756,15 @@ function BlackjackGameScreen(props: {
     setActiveHand(0);
   };
 
+  /** 더블다운은 **딱 한 장**만 더 받고 섭니다. 그다음은 바퀴가 알아서 돕니다. */
   const doubleDown = () => {
-    if (phase !== 'player' || dealing || splitHand || player.length !== 2 || !props.onDoubleDown()) return;
-    const doubledBet = props.bet * 2;
+    if (!myTurn || splitHand || player.length !== 2 || !props.onDoubleDown()) return;
     const next = drawCard(deck, player);
-    if (handValue(next.hand) > 21) {
-      completeRound(next.hand, dealer, next.deck, doubledBet);
-      return;
-    }
-    const dealerResult = playDealer(next.deck, dealer);
-    completeRound(next.hand, dealerResult.hand, dealerResult.deck, doubledBet);
+    setDeck(next.deck);
+    setPlayer(next.hand);
+    setTotalBet(props.bet * 2);
+    setMyDone(true);
+    setTurn(1);
   };
 
   /**
@@ -6741,17 +6805,17 @@ function BlackjackGameScreen(props: {
     && guestHands.every((hand) => { const outcome = guestResult(hand, dealer); return outcome === 'loss' || outcome === 'push'; });
   const net = result ? netForResult(totalBet, result) : 0;
   const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
-  // 딜러 카드는 앞장 한 장만 보이다가, 승부가 되면 뒷장과 뽑는 카드가 저절로 한 장씩 열립니다.
-  const dealerOpen = phase === 'guests' || phase === 'player' ? 1 : phase === 'reveal' ? Math.min(dealer.length, 1 + reveal.opened) : dealer.length;
-  const dealerLeft = Math.max(0, dealer.length - 1);
   /**
-   * 딜러 앞에 **놓인** 장수(뒤집힌 장수와 다릅니다).
-   * ⚠️ 전에는 뽑을 카드를 처음부터 다 그려 놓고 뒤집기만 했습니다. 그래서 승부가 되는 순간
-   * **뒷면 석 장이 한꺼번에 나타났습니다.** 이제 한 장씩 놓이고, 놓인 다음에 뒤집힙니다.
+   * 딜러 카드에서 **덮여 있는 것은 뒷장(두 번째) 하나뿐**입니다.
+   *
+   * ⚠️ 전에는 딜러가 마지막에 혼자 다 받아서, 승부가 되는 순간 뒷면 석 장이 한꺼번에
+   * 나타났습니다. 지금은 바퀴를 돌며 한 장씩 받으므로 **받는 즉시 보입니다.**
+   * 남은 것은 처음에 덮어 둔 뒷장 하나이고, 승부가 되면 그것만 뒤집습니다.
    */
-  const dealerLaid = phase === 'result' ? dealer.length
-    : phase === 'reveal' ? Math.min(dealer.length, 2 + Math.max(0, reveal.opened - 1))
-    : Math.min(dealer.length, 2);
+  const holeHidden = phase === 'play';
+  const dealerLeft = 1;
+  // 놓인 장수는 늘 받은 만큼입니다. 받자마자 보여야 순서가 보입니다.
+  const dealerLaid = dealer.length;
   // 실제 딜러처럼 스스로 뒤집고 뽑습니다. 누르게 하면 카드를 받은 것이 화면에 안 나타납니다.
   useEffect(() => {
     if (phase !== 'reveal') return;
@@ -6764,7 +6828,8 @@ function BlackjackGameScreen(props: {
     const timer = setTimeout(() => reveal.open(dealerLeft), DEALER_REVEAL_MS);
     return () => clearTimeout(timer);
   }, [phase, reveal.opened, dealerLeft]);
-  const dealerScore = phase === 'result' ? handValue(dealer) : phase === 'reveal' ? handValue(dealer.slice(0, dealerOpen)) : '?';
+  // 뒷장을 덮어 둔 동안에는 점수를 못 셉니다. 뒤집히면 그때부터 보여 줍니다.
+  const dealerScore = holeHidden ? '?' : handValue(dealer);
 
   return (
     <View style={styles.blackjackTable}>
@@ -6790,7 +6855,7 @@ function BlackjackGameScreen(props: {
         <DealerTable height={470}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
-            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index >= dealerOpen} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
+            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index === 1 && holeHidden} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
@@ -6806,7 +6871,7 @@ function BlackjackGameScreen(props: {
             const done = phase === 'result';
             const outcome = done ? guestResult(hand, dealer) : null;
             const mark = outcome === 'blackjack' ? 'BJ' : outcome === 'win' ? '승' : outcome === 'loss' ? '패' : outcome === 'push' ? '무' : '';
-            const nowPlaying = phase === 'guests' && !dealing && guestTurn % guestCount === seat && handValue(hand) < 17;
+            const nowPlaying = phase === 'play' && !dealing && turn % seatCount === seat + 1 && handValue(hand) < 17;
             return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
               {/* 손님 패를 실제로 보여 줍니다 — 10이 몇 장 빠졌는지 세려면 패가 보여야 합니다. */}
               {/*
@@ -6821,14 +6886,14 @@ function BlackjackGameScreen(props: {
             </View>;
           })}</View>
 
-          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${phase === 'player' && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${phase === 'player' && !dealing ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
+          <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${myTurn && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${myTurn ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
           <View style={handRow}>
             {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           {splitHand && (
             <>
-              <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{phase === 'player' && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
+              <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{myTurn && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
               <View style={handRow}>
                 {splitHand.map((card, index) => <View key={`split-${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} /></View>)}
               </View>
@@ -6855,15 +6920,17 @@ function BlackjackGameScreen(props: {
         )}
         {insuranceMessage && <Text style={styles.insuranceMessage}>{insuranceMessage}</Text>}
 
-        {phase === 'guests' && !dealing && !insuranceOpen && (
-          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>손님 {Math.min(guestTurn + 1, guestCount)}이 카드를 받는 중…</Text></View>
+        {phase === 'play' && !dealing && !insuranceOpen && !myTurn && (
+          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>
+            {turn % seatCount === dealerSeat ? '딜러' : `손님 ${turn % seatCount}`}이(가) 카드를 받는 중…
+          </Text></View>
         )}
 
         {phase === 'reveal' && (
-          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>딜러가 카드를 받는 중…</Text></View>
+          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>딜러가 뒷장을 엽니다…</Text></View>
         )}
 
-        {phase === 'player' && !insuranceOpen && (
+        {myTurn && (
           <View>
             <View style={[styles.gameActions, styles.gameActionsTight]}>
             <Pressable style={[styles.gameActionButton, styles.gameActionButtonTight, styles.hitButton]} onPress={hit}><Text style={styles.gameActionText}>히트</Text><Text style={styles.gameActionSubtext}>카드 받기</Text></Pressable>
@@ -7331,7 +7398,20 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
 function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
   const [bet, setBet] = useState<CrapsBet>('pass'); const [point, setPoint] = useState<number | null>(null); const [last, setLast] = useState<CrapsRollResult | null>(null); const [active, setActive] = useState(false); const [rolling,setRolling]=useState(false); const [rollingDice,setRollingDice]=useState<[number,number]>([1,6]); const option = difficultyOptions.find((item) => item.name === savedTier) ?? difficultyOptions[2]; const difficulty = betTierName(savedTier);
   const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
-  const roll = (power = 0) => { if(rolling)return;if (!active && !onPlaceBet(selectedBet)) return;setRolling(true);setLast(null);const timer=setInterval(()=>setRollingDice(rollDice()),80);setTimeout(()=>{clearInterval(timer);const dice=rollDice();setRollingDice(dice);const result = resolveCrapsRoll(bet, point, dice); setLast(result);setRolling(false); if (result.outcome === 'continue') { setPoint(result.point); setActive(true); } else { setPoint(null); setActive(false); onSettle(bet, selectedBet, result); }},spinFor(power,900)); };
+  const roll = (power = 0) => {
+    if(rolling)return;
+    if (!active && !onPlaceBet(selectedBet)) return;
+    setRolling(true);setLast(null);
+    shakeDice(spinFor(power,900),
+      ()=>setRollingDice(rollDice()),
+      ()=>{
+        const dice=rollDice();setRollingDice(dice);
+        const result = resolveCrapsRoll(bet, point, dice);
+        setLast(result);setRolling(false);
+        if (result.outcome === 'continue') { setPoint(result.point); setActive(true); }
+        else { setPoint(null); setActive(false); onSettle(bet, selectedBet, result); }
+      });
+  };
   // 테이블을 위로 쓸면 주사위를 던집니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling);
   const shownDice=rolling?rollingDice:last?.dice??rollingDice;
@@ -8648,6 +8728,13 @@ const styles = StyleSheet.create({
   tableSeatDim: { opacity: 0.45 },
   tableTurnMark: { color: colors.goldLight, fontSize: 11, fontWeight: '900' },
   cardWinner: { transform: [{ translateY: -16 }, { scale: 1.06 }], borderWidth: 3, borderColor: '#F2C85B', shadowColor: '#FFD35F', shadowOpacity: 0.9, shadowRadius: 10, elevation: 9 },
+  /*
+   * **내가 고른 카드**입니다. 금색 테두리에 살짝 들립니다.
+   * ⚠️ 아래 `cardSelected`(흰 테두리)와 섞지 마세요. 그쪽은 **비긴 패**를 나타냅니다.
+   * 고른 카드에 흰 테두리를 쓰면 어두운 판에서 안 보입니다 — 발라트로에서 그랬습니다.
+   */
+  cardPicked: { transform: [{ translateY: -10 }, { scale: 1.04 }], borderWidth: 3, borderColor: '#F2C85B', shadowColor: '#FFD35F', shadowOpacity: 0.8, shadowRadius: 9, elevation: 8 },
+  // 비긴 패. 이겼을 때(금색)와 졌을 때(흐림) 사이의 색입니다.
   cardSelected: { transform: [{ translateY: -10 }, { scale: 1.04 }], borderWidth: 2, borderColor: '#D6DCE6' },
   cardDim: { opacity: 0.4, transform: [{ scale: 0.96 }] },
   holdemGuide: { padding: 18, borderRadius: 18, backgroundColor: '#18251F', borderWidth: 1, borderColor: '#3D7658', gap: 8 },
@@ -8818,7 +8905,8 @@ const styles = StyleSheet.create({
   pusherTrayEmpty: { color: '#5D6675', fontSize: 12, fontWeight: '700' },
   pusherPayout: { color: colors.gold, fontSize: 20, fontWeight: '900' },
   // 두 줄로 나눈 손패의 아랫줄. 줄 사이를 좁게 붙여 한 덩이로 보이게 합니다.
-  bigTwoHandRowSecond: { marginTop: 4 },
+  // 손패 한 줄. **가로**입니다 — 이걸 안 쓰면 카드가 세로로 쌓입니다.
+  bigTwoHandLine: { flexDirection: 'row', alignItems: 'center' },
   bigTwoSeats: { width: '100%', flexDirection: 'row', gap: 8 },
   bigTwoSeat: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: 9, borderRadius: 10, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   bigTwoSeatActive: { borderColor: colors.gold, backgroundColor: 'rgba(42,34,14,0.72)' },

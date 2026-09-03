@@ -454,59 +454,89 @@ function expertBonus(plan: ExpertPlan, card: HwatuCard, matches: HwatuCard[]): n
 }
 
 /**
- * 고를 외칠지 스톱할지. **실력에 따라 다릅니다.**
+ * 고를 외칠지 스톱할지. **재 본 값으로 셉니다.**
  *
- * 전에는 컴퓨터가 점수만 되면 **무조건 스톱**했습니다. 그래서 컴퓨터가 고를 외치는 것을
- * 볼 수가 없었고, 판이 늘 3점에서 끝났습니다.
+ * ⚠️ 어림으로 정하면 안 됩니다. 세 번 틀렸던 자리입니다.
+ *   - 처음: 점수만 되면 무조건 스톱 → 컴퓨터가 고를 외치는 것을 볼 수가 없었습니다
+ *   - 다음: 어림 셈 → **전문가가 보통보다 고를 덜 불렀습니다**(800판에 12번 대 28번)
+ *   - 지금: `scripts/go-sweep.ts`와 `scripts/go-odds.ts`로 **판당 점수와 승률을 재서** 맞췄습니다
  *
- * 보는 것 네 가지입니다.
- *   1. **남은 차례** — 낼 패가 없으면 고를 외쳐도 점수를 못 올립니다
- *   2. **상대 점수** — 상대가 기준에 닿았으면 굳히는 편이 낫습니다
- *   3. **이미 외친 고** — 고를 외칠수록 지면 크게 물립니다(고박)
- *   4. **내 점수** — 크게 났으면 굳히고, 겨우 넘겼으면 더 갑니다
+ * 재 본 것 두 가지입니다.
+ *
+ * ① 무작정 고는 크게 손해입니다(맞고 판당 −2.25 → 끝까지 고 −7.86).
+ *    손해의 대부분은 **낼 패가 없는데 고를 부른 자리**입니다. 못 올리는데 고박만 집니다.
+ * ② 낼 패가 두 장 이상 남았을 때 부른 고는 **이득입니다**(맞고 −2.25 → −0.53,
+ *    고스톱 1.17 → 1.65). 이때 실제 승률은 **52~84%**입니다.
+ *
+ * 그래서 셈은 이렇습니다.
+ *   - 지금 스톱하면 받는 점수 — 피박·광박·흔들기까지 **정산 함수 그대로**
+ *   - 더 가서 이기면 받는 점수 — 점수가 오르고 고 배수가 붙습니다
+ *   - 지면 무는 점수 — **고박**이 붙고, 사람이 셋이면 두 사람 몫입니다
+ *   - 이길 가망 — 상대가 기준까지 얼마나 남았는지와 사람 수로 정합니다(위 ②에서 잰 값)
  */
 export function chooseComputerGoStop(round: GoStopRound, playerIndex = round.turn, level: GoStopLevel = '보통'): 'go' | 'stop' {
   const me = round.players[playerIndex];
   if (!me) return 'stop';
-  const threshold = goStopThreshold(round.mode);
-  const score = scoreGoStop(me.captured).total;
-  const handLeft = me.hand.length;
-  const rivalBest = Math.max(0, ...round.players.map((player, seat) => seat === playerIndex ? 0 : scoreGoStop(player.captured).total));
 
   // 쉬움은 늘 스톱합니다. 처음 배우는 사람과 붙는 자리입니다.
   if (level === '쉬움') return 'stop';
-  // 낼 패가 한 장 남짓이면 고를 외쳐도 올릴 자리가 없습니다.
-  if (handLeft <= 1) return 'stop';
-  // 상대가 기준 점수에 닿았습니다. 다음 차례에 뒤집힐 수 있으니 굳힙니다.
-  if (rivalBest >= threshold - 1) return 'stop';
-
-  /**
-   * 전문가는 **셈으로 정합니다.** 몇 고까지라는 천장이 없습니다.
-   *
-   * 더 가서 얻는 것: 고를 한 번 더 외치면 배수가 오르고, 남은 차례만큼 점수도 오릅니다.
-   * 더 가서 잃는 것: 상대가 뒤집으면 **고박**이라 내가 다 뭅니다.
-   * 두 값을 견줘 얻는 것이 클 때만 갑니다. 그래서 손패가 많고 상대가 멀면 4고도 부르고,
-   * 상대가 붙어 있으면 1고에서도 멈춥니다.
+  /*
+   * ⚠️ **이 한 줄이 제일 큽니다.** 낼 패가 없으면 고를 불러도 점수를 못 올리는데
+   * 고박만 집니다. 맞고에서 이 줄 하나로 판당 −7.86점이 −0.53점이 됐습니다.
    */
-  if (level === '전문가') {
-    const rivalHands = round.players.reduce((sum, player, seat) => seat === playerIndex ? sum : sum + player.hand.length, 0);
-    const rivals = Math.max(1, round.players.length - 1);
-    // 남은 차례에 점수가 더 오를 가망. 손패가 많고 바닥에 짝이 많을수록 큽니다.
-    const pairable = me.hand.filter((card) => round.floor.some((item) => item.month === card.month)).length;
-    const chanceToGrow = Math.min(0.9, (pairable + handLeft * 0.5) / Math.max(1, handLeft + 2));
-    // 상대가 나를 넘을 가망. 붙어 있을수록, 손패가 많을수록 큽니다.
-    const chanceToLose = Math.min(0.85, (rivalBest / Math.max(1, threshold)) * 0.55 + (rivalHands / Math.max(1, rivalHands + handLeft)) * 0.35);
-    const nowPoints = goStopPayoutPoints(score, me.goCount);
-    const goPoints = goStopPayoutPoints(score + 2, me.goCount + 1);
-    const gain = (goPoints - nowPoints) * chanceToGrow;
-    // 고박은 상대 몫까지 뭅니다. 사람 수만큼 곱해집니다.
-    const risk = nowPoints * rivals * chanceToLose;
-    return gain > risk ? 'go' : 'stop';
-  }
+  if (me.hand.length < 2) return 'stop';
 
-  // 보통은 두 번까지만 보고, 점수가 크면 굳힙니다.
-  if (me.goCount >= 2) return 'stop';
-  return handLeft >= 3 && score <= threshold + 1 ? 'go' : 'stop';
+  const rivals = round.players.filter((_, seat) => seat !== playerIndex);
+  const threshold = goStopThreshold(round.mode);
+  const score = scoreGoStop(me.captured).total;
+  const handLeft = me.hand.length;
+
+  // ① 지금 스톱하면 받는 점수.
+  const bills = rivals.map((rival) => calculateGoStopSettlement(me, rival, round.mode));
+  const stopValue = bills.reduce((sum, bill) => sum + bill.finalPoints, 0);
+
+  // ② 더 가면 얼마나 오를까. 바닥에 짝이 있는 손패가 많을수록 잘 오릅니다.
+  const pairable = me.hand.filter((card) => round.floor.some((item) => item.month === card.month)).length;
+  const grow = Math.min(1, pairable / handLeft);
+  const delta = 1 + grow * 2 + Math.min(handLeft, 6) * 0.2;
+  // 배수(피박 등)는 그대로 두고 점수와 고만 올려 다시 셉니다.
+  const winValue = bills.reduce((sum, bill) => sum + bill.multiplier * goStopPayoutPoints(score + delta, me.goCount + 1), 0);
+
+  /*
+   * ③ 지면 무는 점수. 고를 부른 뒤의 나로 계산해야 고박이 들어갑니다.
+   *
+   * ⚠️ **더하면 안 됩니다.** 지는 판에는 이기는 사람이 **하나뿐**입니다. 상대 둘의 몫을
+   * 더하면 두 배로 겁을 먹어, 이득인 자리에서도 스톱합니다(고스톱에서 2,000판에 고 28번).
+   * 제일 센 상대가 이긴다고 보고 그 한 사람 몫만 셉니다.
+   */
+  const afterGo: GoStopPlayer = { ...me, goCount: me.goCount + 1 };
+  const loseValue = Math.max(0, ...rivals.map((rival) => {
+    const bill = calculateGoStopSettlement(rival, afterGo, round.mode);
+    // 상대가 이길 때는 적어도 기준 점수는 됩니다.
+    const base = Math.max(threshold, scoreGoStop(rival.captured).total);
+    return bill.multiplier * goStopPayoutPoints(base, rival.goCount);
+  }));
+
+  /*
+   * ④ 가망. `scripts/go-odds.ts`가 센 값에 맞춘 식입니다.
+   *   맞고(상대 하나)에서 상대가 4점 남았을 때 짐 8~15% → 0.55 × 1 / 5 ≈ 0.11
+   *   고스톱(상대 둘)에서 상대가 3점 남았을 때 짐 16~28% → 0.55 × 2 / 4 ≈ 0.28
+   * 나가리로 0점이 되는 판이 5~26% 있어서 이기는 가망에 0.85를 곱합니다.
+   */
+  const rivalBest = Math.max(0, ...rivals.map((rival) => scoreGoStop(rival.captured).total));
+  const gap = Math.max(0, threshold - rivalBest);
+  const pLose = Math.min(0.85, 0.55 * rivals.length / (gap + 1));
+  const pWin = (1 - pLose) * 0.9;
+
+  const goValue = pWin * winValue - pLose * loseValue;
+  /*
+   * 여기서 실력이 갈립니다.
+   *   보통  — **여유를 둡니다.** 이득이 조금 더 커야 부르고, 2고에서 멈춥니다
+   *   전문가 — 셈 그대로 가고 **천장이 없습니다.** 상대가 멀면 4고도 부르고,
+   *            붙어 있으면 1고에서도 멈춥니다
+   */
+  if (level !== '전문가') return me.goCount < 2 && goValue > stopValue * 1.05 ? 'go' : 'stop';
+  return goValue > stopValue ? 'go' : 'stop';
 }
 
 /** 점수가 난 뒤 고를 수 있는 고/스톱. 고는 계속, 스톱은 즉시 승리입니다. */

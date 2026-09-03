@@ -442,27 +442,25 @@ test('낼 패가 거의 없거나 상대가 기준에 닿으면 스톱한다', (
   assert.equal(chooseComputerGoStop(rivalReady, 1, '전문가'), 'stop');
 });
 
-test('보통은 두 번까지만 고를 외친다', () => {
+test('보통은 두 고에서 멈추고, 전문가는 천장이 없다', () => {
   const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
   const hand = [card(5), card(6), card(7), card(9)];
-  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 1), 1, '보통'), 'go');
+  // 보통은 이미 두 번 불렀으면 셈이 아무리 좋아도 멈춥니다.
   assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 2), 1, '보통'), 'stop');
+  // 전문가는 천장이 없습니다. 상대가 아직 멀면 3고를 부른 뒤에도 더 갑니다.
+  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 3), 1, '전문가'), 'go');
 });
 
-test('전문가는 몇 고라는 천장이 없고 이익과 위험을 견줘 정한다', () => {
+test('전문가는 상대가 기준에 닿으면 몇 고를 불렀든 멈춘다', () => {
   const scoring = [card(1, '광'), card(3, '광'), card(8, '광')];
-  const hand = [card(5), card(6), card(7), card(9)];
-  // 상대는 한 장씩만 남았고 나는 넉 장입니다. 3고를 외친 뒤에도 더 갑니다.
-  assert.equal(chooseComputerGoStop(levelRound(hand, scoring, 3), 1, '전문가'), 'go');
-  // 상대가 점수를 내고 있고 손패도 많이 남았으면, 같은 3고 자리에서도 고박이 무서워 멈춥니다.
-  const 열끗다섯 = [card(2, '열끗'), card(4, '열끗'), card(5, '열끗'), card(6, '열끗'), card(9, '열끗')];
-  const rivalHand = [card(10), card(11), card(12), card(1, '피'), card(2, '피'), card(3, '피')];
+  // 상대가 홍단(3점)을 이미 지어 다음 차례에 뒤집힙니다. 고박까지 물면 크게 잃습니다.
+  const rivalReady = [card(1, '띠'), card(2, '띠'), card(3, '띠')];
   const rivalClose: GoStopRound = {
     mode: 'gostop',
     players: [
-      { hand: rivalHand, captured: 열끗다섯, goCount: 0 },
+      { hand: [card(10), card(11), card(12)], captured: rivalReady, goCount: 0 },
       { hand: [card(5), card(6)], captured: scoring, goCount: 3 },
-      { hand: rivalHand, captured: [], goCount: 0 },
+      { hand: [card(4), card(7), card(9)], captured: [], goCount: 0 },
     ],
     floor: [], deck: [card(4)], turn: 1, finished: false, winner: null, pendingDecision: 1, message: '',
   };
