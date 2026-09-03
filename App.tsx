@@ -6247,7 +6247,12 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
 
       {/* 바닥과 뒤집을 더미 */}
       <View style={styles.goStopFloorArea}>
-        <HwatuFloor cards={round.floor} deckCount={round.deck.length} compact/>
+        {/*
+          치는 동안에는 **위에 올라온 패를 바닥에서 뺍니다.**
+          ⚠️ 전에는 맞은 바닥 패가 위(친 자리)와 아래(바닥) **두 군데에 같이** 있었습니다.
+          같은 패가 둘로 보여서 무엇을 친 것인지 헷갈렸습니다. 친 자리에만 남깁니다.
+        */}
+        <HwatuFloor cards={slap?round.floor.filter((item)=>item.month!==slap.card.month&&item.month!==round.deck.find((card)=>!card.bonus)?.month):round.floor} deckCount={round.deck.length} compact/>
         {slap?(()=>{
           const hit=round.floor.filter((item)=>item.month===slap.card.month);
           // 낸 패를 처리한 뒤 더미에서 한 장을 뒤집습니다. 그 패도 바닥을 칠 수 있습니다.
@@ -7026,8 +7031,28 @@ function BlackjackGameScreen(props: {
     outerTrim: 64,
     biggest: 'big',
   });
-  const handFan = handFit.crowded ? { marginLeft: cardFanMargin(handFit.fit) } : null;
-  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 10, gap: handFit.crowded ? 0 : 6 }];
+  /**
+   * 카드 줄이 **절대 안 접히게** 겹치는 폭을 셉니다.
+   *
+   * ⚠️ 전에는 `flexWrap: 'wrap'`이라 카드가 여덟 장쯤 되면 줄이 두 줄로 접혔습니다.
+   * 판 높이는 못 박혀 있어서, 접힌 만큼 **아래가 판 밖으로 잘려 나갔습니다.**
+   * 내 카드가 안 보인다고 하신 것이 이것입니다.
+   *
+   * 이제 장수만큼 겹쳐서 한 줄에 다 넣습니다. 겹치는 걸음의 바닥은 16이라
+   * 스무 장까지도 들어갑니다(40 + 19×16 = 344 … 실제로는 21장에서 꽉 찹니다).
+   *
+   * ⚠️ 301은 **반원 테이블 안쪽 폭**입니다(판 347 − 테두리 9×2 − 안 여백 14×2).
+   * 테두리나 여백을 바꾸면 이 값도 다시 재세요.
+   */
+  const BLACKJACK_ROW_WIDTH = 301;
+  const handFanFor = (count: number) => {
+    const card = cardSizeBox[handFit.fit].width;
+    if (count <= 1) return null;
+    const room = Math.floor((BLACKJACK_ROW_WIDTH - card) / (count - 1));
+    const step = Math.max(16, Math.min(card + 6, room));
+    return { marginLeft: step - card };
+  };
+  const handRow = [styles.dealerCardRow, { minHeight: cardSizeBox[handFit.fit].height + 10, gap: 0 }];
 
   /**
    * 딜러가 빛나야 하는지. **딜러가 그 판에서 모두를 이겼을 때만** 빛냅니다.
@@ -7082,13 +7107,14 @@ function BlackjackGameScreen(props: {
       {/* 스크롤 없이 한 화면에 고정합니다. 위쪽은 테이블, 아래쪽은 버튼 자리로 나눕니다. */}
       <View style={styles.fixedTableArea} onLayout={handFit.onLayout}>
         {/*
+          ⚠️ 470 → 515로 키웠습니다(2026-09-03). 아래에 66이 남아 있었고 그중 45를 판에 줬습니다.
           ⚠️ 판 높이를 못 박습니다. 전에는 끝나면 결과 칸이 생기면서 판이 90쯤 **눌려**
           아래(내 자리 칩)가 잘렸습니다. 판은 언제나 같은 자리·같은 크기여야 합니다.
         */}
-        <DealerTable height={470}>
+        <DealerTable height={515}>
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>딜러</Text><Text style={styles.dealerSeatScore}>{dealerScore}</Text></View>
           <View style={handRow}>
-            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} hidden={index === 1 && holeHidden} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
+            {dealer.slice(0, dealing ? openDeal.countFor(dealerSeat) : dealerLaid).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} hidden={index === 1 && holeHidden} emphasis={phase==='result'&&result?(dealerSwept?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           <Text style={styles.dealerFeltRule}>BLACKJACK PAYS 3 TO 2 · 딜러는 17 이상에서 멈춥니다</Text>
@@ -7121,14 +7147,14 @@ function BlackjackGameScreen(props: {
 
           <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>{splitHand ? `손 1${myTurn && activeHand === 0 ? ' · 진행 중' : ''}` : `플레이어${myTurn ? ' · 내 차례' : ''}`}</Text><Text style={styles.dealerSeatScore}>{handValue(player)}</Text></View>
           <View style={handRow}>
-            {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index) => <View key={`${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
+            {player.slice(0, dealing ? openDeal.countFor(0) : player.length).map((card, index, row) => <View key={`${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} emphasis={phase==='result'&&result?(result==='win'||result==='blackjack'?'winner':result==='push'?'selected':'dim'):undefined} /></View>)}
           </View>
 
           {splitHand && (
             <>
               <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>손 2{myTurn && activeHand === 1 ? ' · 진행 중' : ''}</Text><Text style={styles.dealerSeatScore}>{handValue(splitHand)}</Text></View>
               <View style={handRow}>
-                {splitHand.map((card, index) => <View key={`split-${card.id}-${index}`} style={index ? handFan : null}><PlayingCard card={card} size={handFit.fit} /></View>)}
+                {splitHand.map((card, index, row) => <View key={`split-${card.id}-${index}`} style={index ? handFanFor(row.length) : null}><PlayingCard card={card} size={handFit.fit} /></View>)}
               </View>
             </>
           )}
@@ -8030,7 +8056,9 @@ function RouletteGameScreen({
                   phase === 'spinning' && styles.rouletteNumberTicking,
                 ]}
               >
-                {shownNumber ?? '◎'}
+                {/* ⚠️ 값이 없을 때 '◎'을 넣었더니 휠 한가운데에 **흰 동그라미**가 하나 떠 있었습니다.
+                    무엇을 뜻하는지 알 수 없는 표라 빈칸으로 둡니다 — 아래 '베팅 선택' 글이 자리를 지킵니다. */}
+                {shownNumber ?? ''}
               </Text>
               <Text style={styles.rouletteWheelLabel}>
                 {phase === 'spinning' ? '멈추는 중…' : resultNumber === null ? '베팅 선택' : rouletteColor(resultNumber).toUpperCase()}
@@ -8849,7 +8877,9 @@ const styles = StyleSheet.create({
   dealerSeatScore: { minWidth: 30, height: 24, textAlign: 'center', lineHeight: 24, overflow: 'hidden', borderRadius: 12, color: '#171107', backgroundColor: colors.goldLight, fontSize: 13, fontWeight: '900' },
   // 이긴 카드는 cardWinner가 위로 16 들어 올립니다. 그만큼 위쪽 자리를 비워 두지 않으면
   // 들린 카드가 바로 위 이름줄을 덮습니다.
-  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 96, paddingTop: 10, flexWrap: 'wrap' },
+  // ⚠️ **접지 않습니다.** 접히면 판 높이가 못 박혀 있어 아래가 잘려 나갑니다.
+  // 대신 장수만큼 겹칩니다(`handFanFor`).
+  dealerCardRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 96, paddingTop: 10, flexWrap: 'nowrap' },
   // 일곱 장처럼 많을 때 부채처럼 겹쳐 한 줄에 담습니다.
   dealerCardFan: { marginLeft: -30 },
   dealerFeltRule: { color: '#79B39A', fontSize: 11, fontWeight: '700', letterSpacing: 0.3, marginVertical: 4, textAlign: 'center' },
