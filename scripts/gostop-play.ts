@@ -80,13 +80,15 @@ function playOne(mode: GoStopMode, level: GoStopLevel, seed: number) {
   const score = scoreGoStop(round.players[winner].captured);
   // 총통은 패를 안 먹고 그 자리에서 이깁니다. 기준 점수를 따지지 않습니다.
   const chongtong = round.lastEvents?.includes('총통') === true;
-  if (!chongtong && score.total < goStopThreshold(mode)) throw new Error(`${score.total}점으로 이겼습니다(기준 ${goStopThreshold(mode)}점)`);
+  // 삼뻑도 기준 점수를 안 따집니다 — 뻑을 세 번 낸 것으로 이깁니다.
+  const sambbeok = round.lastEvents?.includes('삼뻑') === true;
+  if (!chongtong && !sambbeok && score.total < goStopThreshold(mode)) throw new Error(`${score.total}점으로 이겼습니다(기준 ${goStopThreshold(mode)}점)`);
   // 진 사람 가운데 **제일 많이 딴 사람**과 견줍니다. 셋이 하면 나머지 둘 중 하나입니다.
   const losers = round.players.filter((_, seat) => seat !== winner);
   const worst = losers.reduce((low, player) => scoreGoStop(player.captured).total > scoreGoStop(low.captured).total ? player : low, losers[0]);
-  const settlement = calculateGoStopSettlement(round.players[winner], worst, mode, { chongtong });
-  if (!chongtong && settlement.finalPoints < score.total) throw new Error('정산 점수가 딴 점수보다 적습니다');
-  return { turns, nagari: false, points: settlement.finalPoints, score: score.total, reasons: settlement.reasons, chongtong };
+  const settlement = calculateGoStopSettlement(round.players[winner], worst, mode, { chongtong, sambbeok });
+  if (!chongtong && !sambbeok && settlement.finalPoints < score.total) throw new Error('정산 점수가 딴 점수보다 적습니다');
+  return { turns, nagari: false, points: settlement.finalPoints, score: score.total, reasons: settlement.reasons, chongtong, sambbeok };
 }
 
 const tally: Record<string, { 판: number; 나가리: number; 점수합: number; 최고: number; 이유: Record<string, number> }> = {};

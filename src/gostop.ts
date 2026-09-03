@@ -23,6 +23,11 @@ export type GoStopPlayer = {
    * 다시 묻습니다. 이 값이 없으면 기준 점수만 넘으면 차례마다 계속 물어봅니다.
    */
   decidedAtScore?: number;
+  /**
+   * 이 판에서 **뻑을 낸 횟수**. 세 번이면 삼뻑으로 그 자리에서 이깁니다.
+   * ⚠️ 판마다 0에서 다시 셉니다 — 판이 바뀌면 `dealGoStop`이 새 사람을 만듭니다.
+   */
+  bbeokCount?: number;
   /** 흔들기와 폭탄은 각각 최종 금액을 두 배로 만듭니다. */
   shakeCount?: number;
   shakenMonths?: number[];
@@ -199,8 +204,16 @@ export function playGoStopTurn(round: GoStopRound, cardId: string, choice: Match
   }
 
   if (drawnBonuses.length) events.unshift(...drawnBonuses.map((card) => `${card.bonus}피 보너스`));
+  /*
+   * 뻑을 낸 횟수를 셉니다. **세 번째 뻑이면 삼뻑**이라 그 자리에서 이깁니다.
+   * ⚠️ 뻑은 원래 손해입니다 — 낸 패도 못 가져가고 바닥에 쌓입니다. 삼뻑은 그 억울함을
+   * 덜어 주는 규칙이라, 이긴 값도 크지 않게 `sambbeokPoints`로 따로 둡니다.
+   */
+  const bbeok = events.includes('뻑');
+  const bbeokCount = (player.bbeokCount ?? 0) + (bbeok ? 1 : 0);
+  if (bbeok && bbeokCount >= SAMBBEOK_COUNT) events.push('삼뻑');
   let players = round.players.map((item, index) => index === round.turn
-    ? { ...item, hand: removeCard(item.hand, played.id), captured: [...item.captured, ...drawnBonuses, ...captured] }
+    ? { ...item, hand: removeCard(item.hand, played.id), captured: [...item.captured, ...drawnBonuses, ...captured], bbeokCount }
     : { ...item, hand: [...item.hand], captured: [...item.captured] });
   /*
    * 상대 피를 한 장씩 가져오는 일들.
@@ -212,6 +225,15 @@ export function playGoStopTurn(round: GoStopRound, cardId: string, choice: Match
   const 피뺏는일 = ['쪽', '따닥', '싹쓸이', '폭탄', '네 장 다 먹음', '깐 패로 네 장 다 먹음'];
   players = stealPiFromOpponents(players, round.turn, events.filter((event) => 피뺏는일.includes(event)).length);
   const deck = drawn ? round.deck.slice(drawIndex + 1) : [];
+  // 삼뻑은 손패가 남아 있어도 그 자리에서 판을 끝냅니다.
+  if (events.includes('삼뻑')) {
+    return {
+      ...round, players, floor, deck,
+      turn: round.turn, finished: true, winner: round.turn, pendingDecision: null,
+      lastEvents: events, nagari: false,
+      message: `${round.turn + 1}번 삼뻑 · 즉시 승리`,
+    };
+  }
   return finishGoStopTurn(round, players, floor, deck, events);
 }
 
@@ -576,11 +598,27 @@ export function goStopPayoutPoints(baseScore: number, goCount: number) {
  */
 export const chongtongPoints = 10;
 
-export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPlayer, mode: GoStopMode, options: { chongtong?: boolean } = {}): GoStopSettlement {
+/** 삼뻑이 되는 뻑 횟수. */
+export const SAMBBEOK_COUNT = 3;
+
+/**
+ * 삼뻑(한 판에 뻑을 세 번)으로 이겼을 때 치는 점수.
+ *
+ * ⚠️ 총통(10점)보다 **작게** 둡니다. 총통은 제일 센 손을 잡고 시작하는 것이지만,
+ * 삼뻑은 세 번 손해를 본 끝에 얻는 위로에 가깝습니다. 기준 점수(고스톱 3점)와 같게 두면
+ * 이겨도 본전 언저리라 규칙을 넣은 뜻이 없어져서, 그 갑절인 6점으로 뒀습니다.
+ * ⚠️ 모은 패로 센 점수가 더 크면 **큰 쪽**을 씁니다.
+ */
+export const sambbeokPoints = 6;
+
+export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPlayer, mode: GoStopMode, options: { chongtong?: boolean; sambbeok?: boolean } = {}): GoStopSettlement {
   const winnerScore = scoreGoStop(winner.captured);
   const loserScore = scoreGoStop(loser.captured);
   // 총통은 먹은 패가 없으니 모은 패 대신 정해진 점수로 셉니다.
-  const baseScore = options.chongtong ? chongtongPoints : winnerScore.total;
+  // 삼뻑은 먹은 것이 있을 수도 있어서 **모은 점수와 견줘 큰 쪽**을 씁니다.
+  const baseScore = options.chongtong ? chongtongPoints
+    : options.sambbeok ? Math.max(sambbeokPoints, winnerScore.total)
+    : winnerScore.total;
   const goScore = goStopPayoutPoints(baseScore, winner.goCount);
   let multiplier = 1;
   const reasons: string[] = [];
@@ -595,6 +633,7 @@ export function calculateGoStopSettlement(winner: GoStopPlayer, loser: GoStopPla
   if (mode === 'gostop' && loser.goCount > 0) double('고박');
 
   if (options.chongtong) reasons.unshift(`총통 ${chongtongPoints}점`);
+  if (options.sambbeok) reasons.unshift(`삼뻑 ${baseScore}점`);
   return { baseScore, goScore, multiplier, finalPoints: goScore * multiplier, reasons };
 }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { calculateGoStopSettlement, chongtongPoints, chooseGoStopMatch, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, goStopLevelOf, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
+import { calculateGoStopSettlement, chongtongPoints, sambbeokPoints, chooseGoStopMatch, chooseComputerGoStop, chooseComputerGoStopCard, chooseGoOrStop, goStopLevelOf, createGoStopBonusCards, dealGoStop, declareGoStopShake, goStopPayoutPoints, goStopThreshold, playGoStopBomb, playGoStopTurn, scoreGoStop, type GoStopPlayer, type GoStopRound } from '../src/gostop.ts';
 import { createHwatuDeck, type HwatuCard } from '../src/hwatu.ts';
 
 const deck = createHwatuDeck();
@@ -113,6 +113,53 @@ test('뻑이면 같은 월 세 장이 잡히지 않고 바닥에 붙는다', () 
   assert.deepEqual(next.lastEvents, ['뻑']);
   assert.equal(next.floor.filter((item) => item.month === 7).length, 3);
   assert.equal(next.players[0].captured.length, 0);
+});
+
+test('뻑을 세 번 내면 삼뻑으로 그 자리에서 이긴다', () => {
+  const month = deck.filter((item) => item.month === 3);
+  // 이미 두 번 뻑을 낸 사람이 세 번째 뻑을 냅니다.
+  const round: GoStopRound = {
+    mode: 'matgo',
+    players: [
+      { hand: [month[0]], captured: [], goCount: 0, bbeokCount: 2 },
+      { hand: [card(9)], captured: [], goCount: 0 },
+    ],
+    floor: [month[1], card(2, '띠')], deck: [month[2]], turn: 0,
+    finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopTurn(round, month[0].id);
+  assert.equal(next.lastEvents?.includes('뻑'), true);
+  assert.equal(next.lastEvents?.includes('삼뻑'), true);
+  assert.equal(next.finished, true);
+  assert.equal(next.winner, 0);
+  assert.equal(next.players[0].bbeokCount, 3);
+});
+
+test('뻑 두 번까지는 판이 이어진다', () => {
+  const month = deck.filter((item) => item.month === 6);
+  const round: GoStopRound = {
+    mode: 'matgo',
+    players: [
+      { hand: [month[0], card(9)], captured: [], goCount: 0, bbeokCount: 1 },
+      { hand: [card(10)], captured: [], goCount: 0 },
+    ],
+    floor: [month[1], card(2, '띠')], deck: [month[2], card(11)], turn: 0,
+    finished: false, winner: null, pendingDecision: null, message: '',
+  };
+  const next = playGoStopTurn(round, month[0].id);
+  assert.equal(next.players[0].bbeokCount, 2);
+  assert.equal(next.lastEvents?.includes('삼뻑'), false);
+  assert.equal(next.finished, false);
+});
+
+test('삼뻑으로 이기면 기준 점수를 못 넘겨도 정산된다', () => {
+  // 뻑은 한 장도 못 먹는 일이라 삼뻑으로 이길 때 모은 패가 0점일 수 있습니다.
+  const winner = { hand: [], captured: [], goCount: 0, bbeokCount: 3 };
+  const loser = { hand: [], captured: [card(1, '피'), card(2, '피')], goCount: 0 };
+  const bill = calculateGoStopSettlement(winner, loser, 'matgo', { sambbeok: true });
+  assert.equal(bill.baseScore, sambbeokPoints);
+  assert.ok(bill.finalPoints >= sambbeokPoints);
+  assert.equal(bill.reasons.some((reason) => reason.startsWith('삼뻑')), true);
 });
 
 test('따닥이면 같은 월 네 장을 모두 먹고 상대 피를 가져온다', () => {

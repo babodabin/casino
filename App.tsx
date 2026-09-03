@@ -6011,7 +6011,7 @@ function GoStopSetupScreen(props:{mode:GoStopMode;deckStyle:GoStopDeckStyle;coin
       <Pressable onPress={()=>props.onDeckStyleChange('classic')} style={[styles.slotModeCard,props.deckStyle==='classic'&&styles.slotModeActive]}><Text style={props.deckStyle==='classic'?styles.slotModeTitleActive:styles.slotModeTitle}>기본판 · 48장</Text><Text style={styles.slotModeText}>정규 화투패만 사용</Text></Pressable>
       <Pressable onPress={()=>props.onDeckStyleChange('bonus')} style={[styles.slotModeCard,props.deckStyle==='bonus'&&styles.slotModeActive]}><Text style={props.deckStyle==='bonus'?styles.slotModeTitleActive:styles.slotModeTitle}>보너스판 · 50장</Text><Text style={styles.slotModeText}>2피·3피 보너스 추가</Text></Pressable>
     </View>
-    <View style={styles.slotRules}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>{props.mode==='gostop'?'손패 7장씩·바닥 6장':'손패 10장씩·바닥 8장'}으로 시작합니다.</Text><Text style={styles.slotRuleText}>같은 월을 맞춰 광·열끗·띠·피를 모으고 기준 점수부터 고 또는 스톱을 고릅니다.</Text><Text style={styles.slotRuleText}>쪽·따닥·뻑·싹쓸이·폭탄·흔들기와 피박·광박·멍박·고박을 적용합니다.</Text>{props.deckStyle==='bonus'?<><Text style={styles.slotRuleText}>처음 받은 보너스패는 즉시 획득하고 손패를 보충합니다.</Text><Text style={styles.slotRuleText}>더미에서 보너스패가 나오면 획득한 뒤 일반 패가 나올 때까지 더 뒤집습니다.</Text></>:null}</View>
+    <View style={styles.slotRules}><Text style={styles.slotRulesTitle}>규칙</Text><Text style={styles.slotRuleText}>{props.mode==='gostop'?'손패 7장씩·바닥 6장':'손패 10장씩·바닥 8장'}으로 시작합니다.</Text><Text style={styles.slotRuleText}>같은 월을 맞춰 광·열끗·띠·피를 모으고 기준 점수부터 고 또는 스톱을 고릅니다.</Text><Text style={styles.slotRuleText}>쪽·따닥·뻑·싹쓸이·폭탄·흔들기와 피박·광박·멍박·고박을 적용합니다.</Text><Text style={styles.slotRuleText}>쪽·따닥·싹쓸이·폭탄과 같은 월 넉 장을 쓸어 갈 때는 상대 피를 한 장씩 가져옵니다.</Text><Text style={styles.slotRuleText}>한 판에 뻑을 세 번 내면 삼뻑으로 그 자리에서 이깁니다.</Text>{props.deckStyle==='bonus'?<><Text style={styles.slotRuleText}>처음 받은 보너스패는 즉시 획득하고 손패를 보충합니다.</Text><Text style={styles.slotRuleText}>더미에서 보너스패가 나오면 획득한 뒤 일반 패가 나올 때까지 더 뒤집습니다.</Text></>:null}</View>
     <Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View>
     <Text style={styles.sectionTitle}>시작 베팅</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View>
     <Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton,props.selectedBet>props.coins&&styles.disabledCard]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{title} {props.deckStyle==='bonus'?'보너스판':'기본판'} 시작</Text></Pressable>
@@ -6101,13 +6101,14 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
     if(next.winner===0){
       // 총통이면 먹은 패가 없어도 정해진 점수로 칩니다.
       const chongtong=next.lastEvents?.includes('총통')===true;
-      const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode,{chongtong}));
+      const sambbeok=next.lastEvents?.includes('삼뻑')===true;
+      const bills=next.players.slice(1).map((loser)=>calculateGoStopSettlement(winner,loser,mode,{chongtong,sambbeok}));
       const wonPoints=bills.reduce((sum,bill)=>sum+Math.max(1,bill.finalPoints),0)*carryMultiplier;
       const reasons=Array.from(new Set(bills.flatMap((bill)=>bill.reasons)));
       setSettleNote(goStopBill(`내가 이겼습니다`,winner,bills[0],reasons,wonPoints,carryMultiplier,selectedBet,true));
       onSettle(selectedBet,selectedBet*wonPoints,'win',`${title} · ${scoreGoStop(winner.captured).total}점 · ${carryMultiplier>1?`나가리 ${carryMultiplier}배 · `:''}${reasons.length?reasons.join(' · '):'기본 정산'}`);
     }else{
-      const bill=calculateGoStopSettlement(winner,next.players[0],mode,{chongtong:next.lastEvents?.includes('총통')===true});
+      const bill=calculateGoStopSettlement(winner,next.players[0],mode,{chongtong:next.lastEvents?.includes('총통')===true,sambbeok:next.lastEvents?.includes('삼뻑')===true});
       const wantedLoss=selectedBet*Math.max(1,bill.finalPoints)*carryMultiplier;
       const extra=Math.min(Math.max(0,wantedLoss-selectedBet),coins);
       setSettleNote(goStopBill(`컴퓨터 ${next.winner} 승리`,winner,bill,bill.reasons,Math.max(1,bill.finalPoints)*carryMultiplier,carryMultiplier,selectedBet,false,selectedBet+extra));
