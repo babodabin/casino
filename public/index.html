@@ -68,6 +68,21 @@
       html body #root [data-display] {
         font-family: 'Cinzel', 'Times New Roman', serif;
       }
+      /*
+         사파리가 스스로 그리는 **파란 표시** 두 가지를 끕니다.
+         ① 입력칸을 눌렀을 때 둘레에 생기는 파란 테두리(outline).
+         ② 무엇이든 누르는 순간 번쩍하는 파란 네모(tap highlight).
+         눌린 것을 알려 주는 표시는 App.tsx가 금색 테두리로 따로 그립니다.
+         ⚠️ 입력칸 글자는 **16px 아래로 내리지 마세요**. 사파리가 그보다 작은 칸을
+         누르면 화면을 저절로 확대해서, 화면이 줄어든 것처럼 보입니다.
+      */
+      html body #root * {
+        -webkit-tap-highlight-color: transparent;
+      }
+      html body #root input:focus,
+      html body #root textarea:focus {
+        outline: none;
+      }
     </style>
   </head>
 
