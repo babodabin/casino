@@ -2153,6 +2153,22 @@ const VIDEO_POKER_COINS = 9;
  */
 const DEALER_REVEAL_MS = 1250;
 
+/**
+ * 뒷장을 연 **다음** 딜러가 한 장씩 받는 간격.
+ *
+ * ⚠️ **620(손님과 같은 걸음) → 1250으로 늦췄습니다(2026-09-18).** 판의 마지막이라
+ * 한 장 한 장이 읽혀야 합니다. 뒷장 여는 값과 같은 값을 씁니다 —
+ * **딜러가 하는 동작은 뭐든 한 박자 1250**입니다. 손님은 620 그대로 빠르게 갑니다.
+ */
+const DEALER_HIT_MS = DEALER_REVEAL_MS;
+
+/**
+ * 딜러가 멈춘 뒤 **결과 칸이 올라오기까지** 쉬는 시간.
+ * ⚠️ 바로 올렸더니 "이기는 게 너무 빨리 올라온다"고 하셨습니다(2026-09-18).
+ * 딜러의 마지막 장과 합계를 읽을 참을 줍니다. 이 사이에는 `딜러가 멈췄습니다`가 떠 있습니다.
+ */
+const SHOWDOWN_HOLD_MS = DEALER_REVEAL_MS;
+
 /** 한 장씩 여는 버튼. 몇 장 열었는지 같이 보여 줍니다. */
 function RevealButton({ opened, total, onPress, label = '상대 패 열기', disabled = false }: { opened: number; total: number; onPress: () => void; label?: string; disabled?: boolean }) {
   return (
@@ -5305,6 +5321,19 @@ function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet
     const timer=setTimeout(()=>setDealt((value)=>Math.min(boardTarget,value+1)),DEAL_THEIRS_MS);
     return ()=>clearTimeout(timer);
   },[opening,dealt,boardTarget]);
+  /**
+   * **내가 폴드한 뒤에는 열기 버튼을 안 누르게 합니다.** 판은 컴퓨터끼리 알아서 끝까지 갑니다.
+   * ⚠️ 전에는 죽고 나서도 플랍·턴·리버를 내가 하나하나 눌러 열어야 했습니다(2026-09-18).
+   *   이미 판에서 빠진 사람이 남의 판을 진행시켜 주는 꼴이었습니다.
+   * 컴퓨터가 두는 것과 같은 박자(`TABLE_THINK_MS`)로 쉬었다가 저절로 엽니다.
+   * 승부가 끝나면 그때 `다시 플레이`만 내가 누릅니다.
+   */
+  const iFolded=!!round&&round.seats[0].folded;
+  useEffect(()=>{
+    if(!iFolded||!needBoard||opening||dealing)return;
+    const timer=setTimeout(openBoard,TABLE_THINK_MS);
+    return ()=>clearTimeout(timer);
+  },[iFolded,needBoard,opening,dealing,stage]);
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
@@ -5446,7 +5475,8 @@ function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet
       <View style={styles.tableOutcomeSlot}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:null}</View>
     </>:<Text style={styles.sevenPokerHint}>{omaha?'개인 카드 넉 장 중 두 장을 반드시 씁니다':'개인 카드 두 장과 공용 다섯 장으로 만듭니다'}</Text>}
   </View>
-  <View style={styles.tableBottomSlot}>{needBoard?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} disabled={opening} label={`${boardLabel} 열기`}/>
+  <View style={styles.tableBottomSlot}>{needBoard&&!iFolded?<RevealButton opened={dealt-shownFor(stage-1<1?1:stage-1)} total={boardTarget-shownFor(stage-1<1?1:stage-1)} onPress={openBoard} disabled={opening} label={`${boardLabel} 열기`}/>
+    :iFolded&&stage<5?<Text style={styles.tableBottomHint}>폴드 · 남은 사람끼리 끝까지 갑니다…</Text>
     :myTurn?<Text style={styles.tableBottomHint}>내 차례입니다 · 판 가운데 버튼으로 고르세요</Text>
     :<Pressable disabled={busy||selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,(busy||selectedBet>coins)&&styles.disabledCard]} onPress={busy?undefined:start}><Text style={styles.primaryButtonText}>{stage===5?'다시 플레이':stage===0?'카드 받기':'진행 중'}{busy?'':` · ${selectedBet.toLocaleString()} WC`}</Text></Pressable>}</View>
   <View style={styles.tableLegendSlot}><Text style={styles.sevenPokerLegend}>{['대기','프리플랍','플랍','턴','리버','승부'][stage]}{myTurn&&(round?.raises??0)>=MAX_RAISES_PER_STREET?' · 레이즈 한도':''}</Text></View>
@@ -5464,7 +5494,7 @@ function RiichiBeginnerGuide(){
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>1</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>무엇을 만들면 되나요?</Text><Text style={styles.mahjongLessonText}>내 패 14장을 <Text style={styles.mahjongStrong}>몸통 4개 + 머리 1개</Text>로 나누면 기본 완성입니다. 머리는 똑같은 패 2장입니다. 예외로 서로 다른 일곱 쌍인 칠대자와 1·9·자패 13종을 모으는 국사무쌍도 있습니다.</Text><Text style={styles.mahjongExample}>🀇🀈🀉　🀙🀚🀛　🀐🀐🀐　🀀🀀🀀　🀄🀄</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>2</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>몸통은 두 종류예요</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>연속 3장</Text>: 같은 무늬의 3·4·5처럼 이어지는 숫자입니다. <Text style={styles.mahjongStrong}>같은 3장</Text>: 똑같은 패 세 장입니다. 동·남·서·북과 백·발·중은 숫자가 아니므로 연속으로 만들 수 없습니다.</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>3</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>패의 종류</Text><Text style={styles.mahjongLessonText}>🀇~🀏 만수, 🀙~🀡 통수, 🀐~🀘 삭수는 각각 1부터 9입니다. 🀀🀁🀂🀃은 동·남·서·북, 🀆🀅🀄은 백·발·중입니다. 모든 패는 네 장씩 있습니다.</Text></View></View>
-    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>4</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>내 차례에 하는 일</Text><Text style={styles.mahjongLessonText}>패 한 장을 자동으로 뽑아 14장이 됩니다. 필요 없는 패 하나를 누르면 버리고 다시 13장이 됩니다. 이 과정을 반복하면서 완성에 가까워지면 됩니다. 밝게 올라온 패가 방금 뽑은 패입니다.</Text></View></View>
+    <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>4</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>내 차례에 하는 일</Text><Text style={styles.mahjongLessonText}>패 한 장을 자동으로 뽑아 14장이 됩니다. 필요 없는 패 하나를 누르면 버리고 다시 13장이 됩니다. 이 과정을 반복하면서 완성에 가까워지면 됩니다. 오른쪽에 따로 놓인 패가 방금 뽑은 패입니다.</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>5</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>쯔모와 론</Text><Text style={styles.mahjongLessonText}><Text style={styles.mahjongStrong}>쯔모</Text>는 내가 뽑은 패로 완성하는 승리, <Text style={styles.mahjongStrong}>론</Text>은 다른 사람이 버린 패로 완성하는 승리입니다. 상대의 버림패로 완성되면 론 버튼이 나타납니다.</Text></View></View>
     <View style={styles.mahjongLesson}><Text style={styles.mahjongLessonNumber}>6</Text><View style={styles.mahjongLessonCopy}><Text style={styles.mahjongLessonTitle}>치·퐁·깡·리치는 무엇인가요?</Text><Text style={styles.mahjongLessonText}>치·퐁은 상대의 버림패를 가져와 몸통을 만드는 것, 깡은 같은 패 4장을 공개하는 것입니다. 치는 바로 왼쪽 상대의 패만 가져올 수 있지만 퐁·깡은 누구의 패든 가능합니다. 리치는 패를 공개하지 않은 텐파이 상태에서 1,000점을 맡기고 선언합니다. 선언 후에는 새로 뽑은 패만 그대로 버립니다.</Text></View></View>
     <View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>현재 이 앱에서 먼저 연습하는 것</Text><Text style={styles.mahjongLessonText}>패 뽑기 → 필요 없는 패 버리기 → 몸통 4개와 머리 1개 만들기 → 쯔모 판정. 처음에는 점수보다 패 모양을 익히면 됩니다.</Text></View>
@@ -5558,6 +5588,13 @@ function WorldMahjongSetupScreen(props:{mode:Exclude<MahjongMode,'riichi'>;coins
   return <View style={styles.detailScreen}><ScreenHeader title={`${profile.title} 준비`} onBack={props.onBack}/><ScrollView {...useScrollMemory('WorldMahjongSetupScreen')} contentContainerStyle={styles.detailPage}><View style={styles.mahjongGuide}><Text style={styles.mahjongHeroTiles}>{props.mode==='sichuan'?'🀇 🀈 🀉　🀙 🀚 🀛':'🀇 🀈 🀉　🀀 🀀'}</Text><Text style={styles.detailLead}>{profile.lead}</Text>{profile.rules.map((rule,index)=><Text key={index} style={styles.slotRuleText}>{index+1}. {rule}</Text>)}</View><View style={styles.mahjongCurrentRule}><Text style={styles.mahjongCurrentTitle}>처음 플레이하는 방법</Text><Text style={styles.mahjongLessonText}>밝게 올라온 패가 새로 뽑은 패입니다. 내 패 중 필요 없는 한 장을 누르면 컴퓨터 3명의 차례가 자동으로 진행됩니다. 완성 패가 되면 쯔모 버튼이 켜집니다.</Text><Text style={[styles.mahjongLessonText,{marginTop:6}]}>{profile.note}</Text></View><MahjongGlossary/><MahjongLevelPicker level={props.level} onChange={props.onLevelChange}/><Text style={styles.sectionTitle}>베팅 등급</Text><View style={styles.setupOptions}>{difficultyOptions.map((item)=><Pressable key={item.name} style={[styles.setupOption,props.difficulty===item.name&&styles.setupOptionActive]} onPress={()=>props.onDifficultyChange(item.name)}><Text style={[styles.setupOptionTitle,props.difficulty===item.name&&styles.setupOptionTitleActive]}>{betTierName(item.name)}</Text><Text style={styles.setupOptionRange}>{item.min.toLocaleString()}~{item.max.toLocaleString()} WC</Text></Pressable>)}</View><Text style={styles.sectionTitle}>참가 코인</Text><View style={styles.betGrid}>{option.bets.map((amount,index)=><BetOptionCoin key={amount} amount={amount} level={index+1} selected={props.selectedBet===amount} disabled={amount>props.coins} onPress={()=>props.onBetChange(amount)}/>)}</View><Pressable disabled={props.selectedBet>props.coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={props.onStart}><Text style={styles.primaryButtonText}>{profile.title} 시작</Text></Pressable></ScrollView></View>;
 }
 
+/**
+ * 마작에서 컴퓨터 한 명이 두기 전에 쉬는 시간.
+ * ⚠️ 전에는 0이었습니다 — 셋이 한꺼번에 둬서 컴퓨터 차례가 안 보였습니다(2026-09-18).
+ * 고스톱의 생각 시간(700)과 같습니다. 세 명이면 한 바퀴 2.1초입니다.
+ */
+const MAHJONG_THINK_MS=700;
+
 function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{mode:MahjongMode;level:OpponentLevel;coins:number;selectedBet:number;onBack:()=>void;onPlaceBet:(v:number)=>boolean;onSettle:(stake:number,result:'win'|'loss'|'push',detail:string)=>void}) {
   const profile=mahjongProfiles[mode];
   type PendingCall={tile:MahjongTile;discarder:number;nextComputer:number;options:MahjongCallOption[];canRon:boolean;otherRonSeats?:number[];onPassRon?:()=>void;kanRefundTransfers?:SichuanKanTransfer[]};
@@ -5612,6 +5649,20 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
   const [turnsTaken,setTurnsTaken]=useState(0);
   // 친이 컴퓨터인 국은 그 자리부터 먼저 진행한 뒤 플레이어 차례로 넘깁니다.
   const [openingComputerSeat,setOpeningComputerSeat]=useState<number|null>(null);
+  /**
+   * 지금 두고 있는 컴퓨터 자리(1~3). 없으면 내 차례입니다.
+   * ⚠️ 전에는 컴퓨터 셋이 **0초에 한꺼번에** 뒀습니다(2026-09-18 이전). 내가 버리는 순간 강 세 개가
+   *   같이 바뀌고 새 패가 바로 와서, 컴퓨터 차례라는 게 아예 안 보였습니다.
+   *   "내 차례인지 뭔지 모르겠다"고 하신 것이 이것입니다. 이제 한 명씩 한 박자 쉬고 둡니다.
+   * 이 값이 있는 동안은 **패를 못 누릅니다.** 컴퓨터가 두는 중에 내 손이 바뀌면 안 됩니다.
+   */
+  const [computerTurn,setComputerTurn]=useState<number|null>(null);
+  /**
+   * 컴퓨터 진행에 붙이는 번호표. 새 국을 시작하거나 나가면 번호가 바뀌어,
+   * 기다리던 이전 진행은 깨어나서 **아무것도 안 하고** 끝납니다.
+   */
+  const computerRun=useRef(0);
+  useEffect(()=>()=>{computerRun.current++;},[]);
   // 공통 시작 버튼은 원래 리치 반장전 종료만 보고 있었습니다.
   // 다른 세 종목의 최종 종료도 연결해 새 경기에서 참가 코인을 다시 받습니다.
   useEffect(()=>{
@@ -5627,6 +5678,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
   const kanCount=openMelds.filter((meld)=>meld.length===4).length+concealedKans.length;
   const start=()=>{
     if((phase==='ready'||matchState.finished)&&!onPlaceBet(selectedBet))return;
+    computerRun.current++;setComputerTurn(null);
     const freshMatch=phase==='ready'||matchState.finished;
     if(freshMatch)setMatchState({roundIndex:0,honba:0,riichiSticks:0,scores:[25000,25000,25000,25000],finished:false});
     const dealerSeat=freshMatch?0:mode==='riichi'?mahjongDealerSeat(matchState.roundIndex):mode==='hongkong'?mahjongDealerSeat(hkMatch.roundIndex):mode==='chinese'?mahjongDealerSeat(cnMatch.roundIndex):0;
@@ -5662,7 +5714,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
   // 준비 화면에서 이미 시작을 눌렀습니다. 여기서 또 받기를 누르게 하지 않습니다.
   useAutoStart(() => start());
 
-  const finish=(result:'win'|'loss'|'push',text:string)=>{setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
+  const finish=(result:'win'|'loss'|'push',text:string)=>{setComputerTurn(null);setPhase('result');setMessage(text);onSettle(selectedBet,result,text);};
   // 도중유국: 친이 그대로 유지되고 본장만 하나 올라갑니다.
   const settleAbortiveDraw=(label:string,detail:string)=>{
     setMatchState((current)=>advanceRiichiMatch(current,{abortive:true}));
@@ -5736,6 +5788,14 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
     const draw=drawMahjongTile(nextHand,nextWall);if(!draw.drawn){settleExhaustiveDraw(nextHand,nextOpponents);return;}if(!riichiDeclared)setTemporaryFuriten(false);
     setPlayer(draw.hand);setWall(draw.wall);setDrawnId(draw.drawn.id);const permanent=isMahjongFuriten(nextHand,rivers[0],openMelds.length,profile.honors);setMessage(permanent?'새 패를 뽑았습니다 · 내 버림패에 대기패가 있어 후리텐(론 불가, 쯔모 가능)':'새 패를 뽑았습니다 · 한 장을 버리세요');};
   const runComputers=(from:number,nextOpponents:MahjongTile[][],nextWall:MahjongTile[],nextRivers:MahjongTile[][],nextPlayer:MahjongTile[],lockedRiichi=riichiDeclared,blockedFuriten=temporaryFuriten,openCounts=opponentOpenMelds,computerMelds=opponentMelds)=>{
+    /**
+     * 이 진행의 번호표. 기다리는 사이에 새 국이 시작되거나 화면을 나가면 번호가 달라집니다.
+     * 그러면 깨어난 뒤 **아무것도 안 하고** 끝나야 합니다 — 안 그러면 새 판 위에 옛 판이 덮어씁니다.
+     */
+    const myRun=++computerRun.current;
+    const stale=()=>computerRun.current!==myRun;
+    /** 한 컴퓨터가 두기 전에 쉬는 시간. 그 사이 화면에 직전 버림패와 `컴퓨터 N 차례`가 보입니다. */
+    const think=()=>new Promise<void>((resolve)=>setTimeout(resolve,MAHJONG_THINK_MS));
     const hands=nextOpponents.map((hand)=>[...hand]);
     const streams=nextRivers.map((river)=>[...river]);
     const riichiStates=[...opponentRiichi];
@@ -5816,8 +5876,14 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
       finish('loss',`${names} 동시 론 · 내가 아닌 컴퓨터 ${discarder+1}의 ${winningTile.glyph} 방총`);
     };
 
-    const processTurn=(index:number):void=>{
-      if(index>=3){persist();setPendingCall(null);drawForPlayer(nextPlayer,remaining,hands);return;}
+    const processTurn=async(index:number):Promise<void>=>{
+      if(index>=3){persist();setPendingCall(null);setComputerTurn(null);drawForPlayer(nextPlayer,remaining,hands);return;}
+      /**
+       * **한 명씩, 한 박자 쉬고.** 먼저 지금까지의 강·손패를 화면에 올리고 이 자리를 `차례`로 켠 다음
+       * 기다립니다. 그 사이 사람은 직전 컴퓨터가 뭘 버렸는지 봅니다. 기다리다 판이 바뀌었으면 그만둡니다.
+       */
+      persist();setComputerTurn(index+1);
+      await think();if(stale())return;
       if(mode==='hongkong'&&remainingFlowerWall.length){
         const bloom=drawHongKongTurn({hand:hands[index],wall:[],flowerWall:remainingFlowerWall,collected:flowerSets[index+1],flowerChance:0.06,random:Math.random});
         flowerSets[index+1]=bloom.collected;remainingFlowerWall=bloom.flowerWall;
@@ -5831,11 +5897,11 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
         setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:current.scores.map((score,seat)=>seat===index+1?score-1000:score) as RiichiMatchState['scores']}));
       }
       if(turn.win){finishComputerWin(index,turn.hand,turn.winningTile!,'tsumo');return;}
-      if(turn.discarded)resolveDiscard(index,turn.discarded,index+1,Boolean(turn.riichi));
-      else processTurn(index+1);
+      if(turn.discarded)await resolveDiscard(index,turn.discarded,index+1,Boolean(turn.riichi));
+      else await processTurn(index+1);
     };
 
-    const resolveDiscard=(discarder:number,discarded:MahjongTile,nextComputer:number,declaredNow=false,kanRefundTransfers:SichuanKanTransfer[]=[]):void=>{
+    const resolveDiscard=async(discarder:number,discarded:MahjongTile,nextComputer:number,declaredNow=false,kanRefundTransfers:SichuanKanTransfer[]=[]):Promise<void>=>{
       streams[discarder+1].push(discarded);
       const playerOptions=lockedRiichi?[]:getModeCallOptions(mode,nextPlayer,discarded,discarder===2,voidSuits[0]);
       const structurallyRon=canRonMahjong(nextPlayer,discarded,meldCount);
@@ -5853,7 +5919,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
       });
       if(playerRon||playerOptions.length){
         if(!playerRon&&ronWinners.length){finishComputerRons(ronWinners,discarded,discarder,kanRefundTransfers);return;}
-        persist();
+        persist();setComputerTurn(null);
         setPendingCall({tile:discarded,discarder:discarder+1,nextComputer,options:ronWinners.length?[]:playerOptions,canRon:playerRon,otherRonSeats:ronWinners.map((winner)=>winner+1),onPassRon:ronWinners.length?()=>finishComputerRons(ronWinners,discarded,discarder,kanRefundTransfers):undefined,kanRefundTransfers});
         setMessage(`컴퓨터 ${discarder+1}(${['쉬움','보통','전문가'][discarder]})이 ${discarded.glyph} 버림 · ${playerRon?'론할 수 있어요':'가져올까요?'}${declaredNow?' · 컴퓨터 리치 선언':''}`);
         return;
@@ -5873,6 +5939,9 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
       const callReaction=chooseCallByPriority(callReactions.map((reaction)=>({...reaction,seat:reaction.candidate+1})),discarder+1);
       if(callReaction){
         const {candidate:caller,call}=callReaction;
+          // 우는 것도 한 걸음입니다. 버림패가 강에 놓인 채로 한 박자 보이고 나서 가져갑니다.
+          persist();setComputerTurn(caller+1);
+          await think();if(stale())return;
           const called=applyMahjongCall(hands[caller],discarded,call);
           streams[discarder+1].pop();
           counts[caller]++;
@@ -5901,13 +5970,13 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
           hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));
           setIppatsuEligible(false);
           setMessage(`컴퓨터 ${caller+1}이 컴퓨터 ${discarder+1}의 패로 ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);
-          resolveDiscard(caller,thrown,caller+1,false,callKanTransfers);
+          await resolveDiscard(caller,thrown,caller+1,false,callKanTransfers);
           return;
       }
-      processTurn(nextComputer);
+      await processTurn(nextComputer);
     };
 
-    processTurn(from);
+    void processTurn(from);
   };
   useEffect(()=>{
     if(phase!=='playing'||openingComputerSeat===null)return;
@@ -6011,7 +6080,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
       const ronNames=computerRons.map((index)=>`컴퓨터 ${index+1}`).join('·');
       finish('loss',`${ronNames} 론${computerRons.length>1?' · 일포다향':''} · 내가 버린 ${mine.discarded.glyph}으로 완성 · ${result.grade}\n${result.lines.map((line)=>`${line.name} ${line.value}`).join(' · ')}`);
       return;}if(declaration)setMatchState((current)=>({...current,riichiSticks:current.riichiSticks+1,scores:[current.scores[0]-1000,current.scores[1],current.scores[2],current.scores[3]]}));const levels=mahjongLevelsFor(level);const calls=opponents.map((hand,index)=>opponentRiichi[index]?null:chooseComputerCall(hand,mine.discarded,index===0,{level:levels[index],openMeldCount:opponentOpenMelds[index],includeHonors:profile.honors,allowedCalls:getModeCallOptions(mode,hand,mine.discarded,index===0,voidSuits[index+1])}));const callReaction=chooseCallByPriority(calls.flatMap((call,index)=>call?[{seat:index+1,candidate:index,call}]:[]),0);const caller=callReaction?.candidate??-1;if(caller>=0){const call=callReaction!.call;const called=applyMahjongCall(opponents[caller],mine.discarded,call);const hands=opponents.map((hand)=>[...hand]);const counts=[...opponentOpenMelds];counts[caller]++;const computerMeldSets=opponentMelds.map((melds)=>melds.map((meld)=>[...meld]));computerMeldSets[caller].push(called.meld);setOpponentMelds(computerMeldSets);setAnyCallMade(true);setMyDiscardClaimed(true);if(call.kind==='kan')setKanOwners((current)=>[...current,caller+1]);let remaining=[...wall],callHand=called.hand;if(call.kind==='kan'){const supplement=mode==='riichi'?drawReplacementTile(callHand,remaining,deadWall,revealedKans):{...drawSichuanReplacement(callHand,remaining),deadWall};callHand=supplement.hand;remaining=supplement.wall;setDeadWall(supplement.deadWall);setRevealedKans((value)=>value+1);}const thrown=chooseComputerDiscard(callHand,{level:levels[caller],openMeldCount:counts[caller],includeHonors:profile.honors,riichiRivers:[...(riichiDeclared||declaration?[nextRivers[0]]:[]),...opponentRiichi.flatMap((declared,seat)=>declared&&seat!==caller?[nextRivers[seat+1]]:[])],visibleTiles:[...callHand,...nextRivers.flat(),...computerMeldSets.flat(2)]});hands[caller]=sortMahjongHand(callHand.filter((candidate)=>candidate.id!==thrown.id));nextRivers[0].pop();nextRivers[caller+1].push(thrown);setOpponentOpenMelds(counts);setOpponents(hands);setRivers(nextRivers);setPlayer(mine.hand);setDrawnId('');setIppatsuEligible(false);setMessage(`컴퓨터 ${caller+1}(${mahjongLevelNames[levels[caller]]}) ${call.kind==='chi'?'치':call.kind==='pon'?'퐁':'깡'} · ${thrown.glyph} 버림`);runComputers(caller+1,hands,remaining,nextRivers,mine.hand,declaration||riichiDeclared,temporaryFuriten,counts,computerMeldSets);return;}runComputers(0,opponents,wall,nextRivers,mine.hand,declaration||riichiDeclared);};
-  const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;const onPassRon=pendingCall.onPassRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}setPendingCall(null);if(onPassRon){onPassRon();return;}runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
+  const passCall=()=>{if(!pendingCall)return;const next=pendingCall.nextComputer;const passedRon=pendingCall.canRon;const onPassRon=pendingCall.onPassRon;if(passedRon){setTemporaryFuriten(true);setMessage(riichiDeclared?'론을 넘겨 리치 후리텐 · 이번 판에는 더 이상 론할 수 없습니다':'론을 넘겨 임시 후리텐 · 다음에 내 패를 뽑을 때까지 론할 수 없습니다');}else setMessage(`${pendingCall.tile.glyph} 넘김`);setPendingCall(null);if(onPassRon){onPassRon();return;}runComputers(next,opponents,wall,rivers,player,riichiDeclared,passedRon||temporaryFuriten);};
   const claim=(option:MahjongCallOption)=>{if(!pendingCall)return;setAnyCallMade(true);if(option.kind==='kan')setKanOwners((current)=>[...current,0]);setIppatsuEligible(false);const called=applyMahjongCall(player,pendingCall.tile,option);const nextRivers=rivers.map((river)=>[...river]);nextRivers[pendingCall.discarder].pop();const melds=[...openMelds,called.meld];setOpenMelds(melds);setRivers(nextRivers);setPendingCall(null);if(option.kind==='kan'){if(mode==='sichuan'){const settled=settleSichuanKan(bloodState,{kanner:0,kind:'minkan',discarder:pendingCall.discarder,basePoints:1});setBloodState(settled.state);setSichuanKanTransfers((current)=>[...current,...settled.transfers]);setSichuanLastKanTransfers(settled.transfers);setBloodLog((current)=>[...current,`${settled.label} · ${settled.gained}점 받음`]);}const draw=drawModeSupplement(mode,called.hand,wall,deadWall,revealedKans);if(!draw.drawn){settleExhaustiveDraw(called.hand,opponents);return;}setPlayer(draw.hand);setWall(draw.wall);setDeadWall(draw.deadWall);setRevealedKans((value)=>value+1);setDrawnId(draw.drawn.id);setAfterKanDraw(true);setMessage(`깡! 보충패 ${draw.drawn.glyph}을 뽑았습니다 · 한 장을 버리세요`);}else{setPlayer(called.hand);setDrawnId('');setMessage(`${option.kind==='chi'?'치':'퐁'}! 공개 몸통을 만들었습니다 · 한 장을 버리세요`);}};
   const opponentMeldView=(index:number)=><>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{sichuanSeatStatus(index+1)}</Text>}{opponentMelds[index]?.length?<View style={styles.mahjongOpponentMeldRow}>{opponentMelds[index].map((meld,meldIndex)=><View key={meldIndex} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>:null}</>;
   const sichuanSeatStatus=(seat:number)=>`${seat===0?'나':`C${seat}`} · 정결 ${suitNames[voidSuits[seat]]} · ${bloodState.finished[seat]?'화료 후 이탈':'진행 중'} · ${bloodState.scores[seat]>0?'+':''}${bloodState.scores[seat]}점 · 깡 ${sichuanKanTransfers.filter((transfer)=>transfer.to===seat).length}건`;
@@ -6028,7 +6097,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
   const permanentFuritenNow=mode==='riichi'&&phase==='playing'&&getMahjongWaits(player,meldCount,profile.honors).length>0&&isMahjongFuriten(player,rivers[0],meldCount,profile.honors);
   const dangerGroups={safe:[] as MahjongTile[],caution:[] as MahjongTile[],danger:[] as MahjongTile[]};
   if(activeRiichiRivers.length)new Map(player.map((tile)=>[`${tile.suit}${tile.value}`,tile])).forEach((tile)=>{const score=tileDangerScore(tile,{riichiRivers:activeRiichiRivers,visibleTiles:visibleMahjongTiles});if(score===0)dangerGroups.safe.push(tile);else if(score<30)dangerGroups.caution.push(tile);else dangerGroups.danger.push(tile);});
-  const quit=()=>{if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
+  const quit=()=>{computerRun.current++;if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
   const winWithRiichi=(text:string)=>{
     const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';
     const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];
@@ -6106,8 +6175,11 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
           ? {step:'상대 버림패',title:`${pendingCall.tile.glyph}에 반응할지 고르세요`,detail:'론은 즉시 승리, 치·퐁·깡은 공개 몸통을 만듭니다. 필요하지 않다면 넘기기를 누르세요.'}
           : choosingRiichi
             ? {step:'리치 선언',title:'노랗게 표시된 패를 하나 버리세요',detail:'각 선택지 아래에 그 패를 버렸을 때 기다리는 패가 표시됩니다. 선언 뒤에는 새로 뽑은 패만 버립니다.'}
-            : {step:'내 차례',title:'밝게 올라온 패를 확인하고 한 장을 버리세요',detail:mode==='sichuan'?`정결한 ${suitNames[voidSuits[0]]}가 남아 있다면 그 종류부터 버리세요.`:'이어질 숫자나 같은 그림을 남기고, 몸통을 만들기 어려운 패를 누르세요.'};
-  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView ref={boardScroll} contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={styles.mahjongSeat}>북 · 컴퓨터 3 · 전문가</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>서 · 컴퓨터 2 · 보통</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={styles.mahjongSeat}>남 · 컴퓨터 1 · 쉬움</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
+            : computerTurn!==null
+              // ⚠️ 전에는 컴퓨터가 둘 때도 `내 차례`라고 적혀 있었습니다. 믿을 수 없는 안내였습니다.
+              ? {step:`컴퓨터 ${computerTurn} 차례`,title:'생각하는 중… 잠시 기다리세요',detail:'컴퓨터가 한 장을 뽑고 한 장을 버립니다. 내 차례가 오면 새로 뽑은 패가 오른쪽에 따로 놓입니다.'}
+              : {step:'내 차례',title:'따로 놓인 패가 방금 뽑은 패 · 한 장을 버리세요',detail:mode==='sichuan'?`정결한 ${suitNames[voidSuits[0]]}가 남아 있다면 그 종류부터 버리세요.`:'이어질 숫자나 같은 그림을 남기고, 몸통을 만들기 어려운 패를 누르세요.'};
+  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView ref={boardScroll} contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={[styles.mahjongSeat,computerTurn===3&&styles.mahjongSeatTurn]}>북 · 컴퓨터 3 · 전문가{computerTurn===3?" · 차례":""}</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===2&&styles.mahjongSeatTurn]}>서 · 컴퓨터 2 · 보통{computerTurn===2?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===1&&styles.mahjongSeatTurn]}>남 · 컴퓨터 1 · 쉬움{computerTurn===1?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
     {/* 요령 한 줄은 도움말을 폈을 때만 보입니다. 판이 화면에 들어오는 것이 먼저입니다. */}
     {/* ⚠️ 사천의 정결 고르기 상자가 떠 있을 때는 이 줄을 뺍니다 — 같은 말을 두 번 하는 데다
         둘을 같이 두면 판이 47만큼 넘쳐 아래가 잘렸습니다. */}
@@ -6140,7 +6212,15 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
     </View>}
     {mode==='riichi'&&phase==='playing'&&showPlayHelp&&beginnerYakuHints.length>0&&<View style={styles.mahjongYakuHintPanel}><Text style={styles.mahjongYakuHintTitle}>현재 패에서 생각해 볼 역</Text><Text style={styles.mahjongYakuHintCaution}>승리 확정이 아닌 방향 안내입니다. 패를 버리면 후보도 달라집니다.</Text>{beginnerYakuHints.map((hint)=><View key={hint.name} style={styles.mahjongYakuHintRow}><Text style={styles.mahjongYakuHintName}>{hint.name}</Text><Text style={styles.mahjongYakuHintReason}>{hint.reason}</Text></View>)}</View>}
     {mode==='riichi'&&phase==='playing'&&activeRiichiRivers.length>0&&<View style={styles.mahjongDefensePanel}><Text style={styles.mahjongDefenseTitle}>상대 리치 · 버릴 패 안전도</Text><Text style={styles.mahjongDefenseIntro}>현물은 그 리치자가 이미 버린 패라 론당하지 않습니다. 주의·위험 표시는 스지와 보이는 패까지 계산한 참고값이며 절대 안전을 뜻하지 않습니다.</Text><View style={styles.mahjongDefenseRow}><Text style={[styles.mahjongDefenseLabel,styles.mahjongDefenseSafe]}>안전</Text><Text style={styles.mahjongDefenseTiles}>{dangerGroups.safe.length?dangerGroups.safe.map((tile)=>tile.glyph).join(' '):'없음'}</Text></View><View style={styles.mahjongDefenseRow}><Text style={[styles.mahjongDefenseLabel,styles.mahjongDefenseCaution]}>주의</Text><Text style={styles.mahjongDefenseTiles}>{dangerGroups.caution.length?dangerGroups.caution.map((tile)=>tile.glyph).join(' '):'없음'}</Text></View><View style={styles.mahjongDefenseRow}><Text style={[styles.mahjongDefenseLabel,styles.mahjongDefenseDanger]}>위험</Text><Text style={styles.mahjongDefenseTiles}>{dangerGroups.danger.length?dangerGroups.danger.map((tile)=>tile.glyph).join(' '):'없음'}</Text></View></View>}
-    {choosingVoid&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>버릴 종류를 하나 고르세요 (정결)</Text><Text style={styles.mahjongWaitText}>고른 종류를 전부 버려야 화료할 수 있습니다. 적게 가진 쪽이 유리합니다.</Text><View style={styles.mahjongVoidRow}>{sichuanSuits.map((suit)=>{const held=player.filter((tile)=>tile.suit===suit).length;return <Pressable key={suit} onPress={()=>{setVoidSuits((current)=>[suit,current[1],current[2],current[3]]);setChoosingVoid(false);setMessage(`정결 ${suitNames[suit]} · ${suitNames[suit]}를 전부 버리세요`);}} style={[styles.mahjongVoidButton,voidSuits[0]===suit&&styles.mahjongVoidButtonActive]}><Text style={styles.mahjongVoidButtonText}>{suitNames[suit]}</Text><Text style={styles.mahjongVoidCount}>{held}장</Text></Pressable>;})}</View></View>}{bloodLog.length>0&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 진행</Text>{bloodLog.map((line,index)=><Text key={index} style={styles.mahjongWaitText}>{line}</Text>)}</View>}{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}<View style={styles.mahjongHand}>{sortMahjongHand(player).map((tile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} showRed={mode==='riichi'&&rules.redFives} onPress={canDiscard?()=>discard(tile):undefined}/>;})}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&mode==='riichi'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='sichuan'&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 결과 · {bloodState.winners.length}명 화료</Text>{rankSichuanScores(bloodState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}</Text>)}</View>}{phase==='result'&&mode==='hongkong'&&hkMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankHongKongScores(hkMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='chinese'&&cnMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankChineseScores(cnMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'새 반장전':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}{canAbortNineTerminals&&<Pressable onPress={declareNineTerminals} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>구종구패</Text></Pressable>}{kanOptions.map((option,index)=><Pressable key={`kan-${index}`} onPress={()=>declareKan(option)} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>{option.kind==='ankan'?'암깡':'가깡'} {option.tiles[0].glyph}</Text></Pressable>)}<Pressable onPress={()=>setPlayer(sortMahjongHand(player))} style={styles.mahjongSortButton}><Text style={styles.holdemActionText}>패 정렬</Text></Pressable><Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{winButtonLabel(mode,structuralWin,tsumoSummary)}</Text></Pressable></View>}{/* 맨 아래 규칙 줄은 도움말을 폈을 때만 둡니다. 리치 중에는 꼭 알아야 해서 그때는 늘 보입니다. */}
+    {choosingVoid&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>버릴 종류를 하나 고르세요 (정결)</Text><Text style={styles.mahjongWaitText}>고른 종류를 전부 버려야 화료할 수 있습니다. 적게 가진 쪽이 유리합니다.</Text><View style={styles.mahjongVoidRow}>{sichuanSuits.map((suit)=>{const held=player.filter((tile)=>tile.suit===suit).length;return <Pressable key={suit} onPress={()=>{setVoidSuits((current)=>[suit,current[1],current[2],current[3]]);setChoosingVoid(false);setMessage(`정결 ${suitNames[suit]} · ${suitNames[suit]}를 전부 버리세요`);}} style={[styles.mahjongVoidButton,voidSuits[0]===suit&&styles.mahjongVoidButtonActive]}><Text style={styles.mahjongVoidButtonText}>{suitNames[suit]}</Text><Text style={styles.mahjongVoidCount}>{held}장</Text></Pressable>;})}</View></View>}{bloodLog.length>0&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 진행</Text>{bloodLog.map((line,index)=><Text key={index} style={styles.mahjongWaitText}>{line}</Text>)}</View>}{choosingRiichi&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>노란 패 중 하나를 버려 리치 선언</Text>{riichiChoices.map((choice)=><Text key={choice.tile.id} style={styles.mahjongWaitText}>{choice.tile.glyph} 버림 → {choice.waits.map((tile)=>tile.glyph).join(' ')} 대기</Text>)}</View>}{/*
+  ⚠️ **뽑은 패는 정렬에 안 넣고 오른쪽에 따로** 놓습니다(2026-09-18). 전에는 정렬돼서 가운데로
+    끼어들어, 밝은 테두리 하나로만 구분해야 했습니다. 실제 마작처럼 따로 두면 "내 차례다 ·
+    이게 뽑은 패다"가 한눈에 보입니다. 그래서 `패 정렬` 버튼도 뺐습니다 — 화면이 늘 정렬해
+    그려서 눌러도 아무 변화가 없던 버튼입니다.
+  ⚠️ 컴퓨터가 두는 동안(`computerTurn`)은 패를 못 누릅니다. 그 사이 내 손이 바뀌면 컴퓨터가
+    들고 있던 옛 손패 위에 새 진행이 덮어씁니다.
+*/}
+<View style={styles.mahjongHand}>{(()=>{const drawn=player.find((tile)=>tile.id===drawnId)??null;const rest=drawn?player.filter((tile)=>tile.id!==drawnId):player;const tileView=(tile:MahjongTile)=>{const riichiChoice=choosingRiichi&&riichiChoices.some((choice)=>choice.tile.id===tile.id);const canDiscard=phase==='playing'&&!pendingCall&&computerTurn===null&&(!riichiDeclared||tile.id===drawnId);return <MahjongTileView key={tile.id} tile={tile} selected={tile.id===drawnId||riichiChoice} showRed={mode==='riichi'&&rules.redFives} onPress={canDiscard?()=>discard(tile):undefined}/>;};return <>{sortMahjongHand(rest).map(tileView)}{drawn&&<View style={styles.mahjongDrawnSlot}>{tileView(drawn)}</View>}</>;})()}</View></View>{phase==='result'&&roundResult&&<View style={styles.mahjongResultPanel}><Text style={styles.mahjongResultTitle}>{roundResult.winner===null?'유국':`${roundResult.winner===0?'내가':`컴퓨터 ${roundResult.winner}이`} ${roundResult.method}`}</Text>{roundResult.concealed.length>0&&<View style={styles.mahjongResultTiles}>{roundResult.concealed.map((tile)=><Text key={tile.id} style={styles.mahjongResultTile}>{tile.glyph}</Text>)}</View>}{roundResult.melds.length>0&&<View style={styles.mahjongMeldRow}>{roundResult.melds.map((meld,index)=><View key={index} style={styles.mahjongOpponentOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongOpponentMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View>}<Text style={styles.mahjongResultGrade}>{roundResult.grade}</Text>{roundResult.yaku.length>0&&<Text style={styles.mahjongResultYaku}>{roundResult.yaku.join(' · ')}</Text>}<Text style={styles.mahjongResultScore}>{roundResult.scoreText}</Text></View>}{phase==='result'&&mode==='riichi'&&matchState.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>반장전 최종 순위</Text>{rankRiichiScores(matchState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='sichuan'&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>혈전 결과 · {bloodState.winners.length}명 화료</Text>{rankSichuanScores(bloodState.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}</Text>)}</View>}{phase==='result'&&mode==='hongkong'&&hkMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankHongKongScores(hkMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score.toLocaleString()}점</Text>)}</View>}{phase==='result'&&mode==='chinese'&&cnMatch.finished&&<View style={styles.mahjongWaitPanel}><Text style={styles.mahjongWaitTitle}>최종 순위</Text>{rankChineseScores(cnMatch.scores).map((entry)=><Text key={entry.seat} style={styles.mahjongWaitText}>{entry.rank}위 · {entry.seat===0?'나':`컴퓨터 ${entry.seat}`} · {entry.score>0?'+':''}{entry.score}점</Text>)}</View>}{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?(matchState.finished?'새 반장전':'다음 국'):'패 13장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:pendingCall?<View style={styles.mahjongCallPanel}><Text style={styles.mahjongCallTitle}>{pendingCall.tile.glyph}에 반응할 수 있어요</Text><View style={styles.mahjongCallButtons}>{pendingCall.canRon&&<Pressable onPress={()=>winWithRiichi(`론! 컴퓨터 ${pendingCall.discarder}의 ${pendingCall.tile.glyph}으로 완성`)} style={styles.mahjongRonButton}><Text style={styles.primaryButtonText}>론</Text></Pressable>}{pendingCall.options.map((option,index)=><Pressable key={`${option.kind}-${index}`} onPress={()=>claim(option)} style={styles.mahjongCallButton}><Text style={styles.holdemActionText}>{option.label}</Text></Pressable>)}<Pressable onPress={passCall} style={styles.mahjongPassButton}><Text style={styles.holdemActionText}>넘기기</Text></Pressable></View></View>:computerTurn!==null?<View style={[styles.mahjongActions,{justifyContent:'center'}]}><Text style={styles.tableBottomHint}>컴퓨터 {computerTurn}이 두는 중…</Text></View>:<View style={styles.mahjongActions}>{mode==='riichi'&&!riichiDeclared&&openMelds.length===0&&riichiChoices.length>0&&<Pressable onPress={()=>setChoosingRiichi((value)=>!value)} style={styles.mahjongRiichiButton}><Text style={styles.primaryButtonText}>{choosingRiichi?'취소':'리치'}</Text></Pressable>}{canAbortNineTerminals&&<Pressable onPress={declareNineTerminals} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>구종구패</Text></Pressable>}{kanOptions.map((option,index)=><Pressable key={`kan-${index}`} onPress={()=>declareKan(option)} style={styles.mahjongKanButton}><Text style={styles.holdemActionText}>{option.kind==='ankan'?'암깡':'가깡'} {option.tiles[0].glyph}</Text></Pressable>)}<Pressable disabled={!win} onPress={()=>winWithRiichi('쯔모! 완성 패입니다')} style={[styles.mahjongTsumoButton,!win&&styles.disabledCard]}><Text style={styles.primaryButtonText}>{winButtonLabel(mode,structuralWin,tsumoSummary)}</Text></Pressable></View>}{/* 맨 아래 규칙 줄은 도움말을 폈을 때만 둡니다. 리치 중에는 꼭 알아야 해서 그때는 늘 보입니다. */}
     {(showPlayHelp||riichiDeclared)&&<Text style={styles.disclaimer}>{riichiDeclared?'리치 후에는 새로 뽑은 패만 그대로 버릴 수 있습니다':mahjongMinimumNote[mode]} · {profile.note}</Text>}</ScrollView></View>;
 }
 
@@ -7162,7 +7242,6 @@ function BlackjackGameScreen(props: {
   */
   const settled = useRef(false);
   const reveal = useReveal();
-  const [pendingSettle, setPendingSettle] = useState<(() => void) | null>(null);
   /**
    * 첫 두 바퀴는 실제 딜러처럼 **나 · 손님 1 · 손님 2 · 딜러** 자리 순서대로 한 장씩 놓입니다.
    * 전에는 나와 딜러 둘만 한 장씩 놓고 손님 패는 통째로 나타났습니다.
@@ -7172,38 +7251,71 @@ function BlackjackGameScreen(props: {
   const dealerSeat = guestCount + 1;
   const dealing = openDeal.dealing;
 
+  /**
+   * 모두가 섰습니다. 이제 딜러 차례입니다.
+   * ⚠️ **여기서는 승부를 내지 않습니다.** 딜러가 뒷장을 뒤집고 17까지 받은 다음에야
+   * 패가 정해집니다. 정산은 아래 뒤집기 효과의 마지막 걸음에서 합니다.
+   */
   const completeRound = (nextPlayer: Card[], nextDealer: Card[], nextDeck: Card[], roundBet = totalBet) => {
-    const nextResult = resolveRound(nextPlayer, nextDealer);
     setPlayer(nextPlayer);
     setDealer(nextDealer);
     setDeck(nextDeck);
-    setResult(nextResult);
     setTotalBet(roundBet);
-    reveal.reset();
+    // ⚠️ `reveal.reset()`을 하면 **이미 뒤집은 뒷장이 다시 덮입니다.** 딜러가 받으려고
+    //   내 차례 사이에서 먼저 열어 뒀을 수 있습니다. 새 판은 화면째로 새로 뜨니 되돌릴 것이 없습니다.
     setPhase('reveal');
-    setPendingSettle(() => () => {
-      if (settled.current) return;
-      settled.current = true;
-      props.onSettle(nextResult, roundBet);
-    });
   };
 
-  /** 자리 수(나 + 손님들 + 딜러). 차례는 이 안에서 돕니다. */
-  const seatCount = guestCount + 2;
-  /** 그 자리가 아직 카드를 더 받아야 하는지. 손님과 딜러는 17에서 멈춥니다. */
+  /** 딜러가 덮어 두는 뒷장은 **둘째 장 하나**입니다. */
+  const dealerLeft = 1;
+  /**
+   * 뒷장이 아직 덮여 있는지.
+   *
+   * ⚠️ 순서가 곧 규칙입니다(2026-09-18).
+   *   첫 장 앞면 → 둘째 장 뒷면 → **딜러가 더 받기 전에 그 뒷장을 먼저 뒤집고** →
+   *   셋째 장부터는 처음부터 앞면입니다.
+   *   덮인 카드를 낀 채로 새 카드를 받는 자리(`앞 · 뒤 · 앞`)는 실제 블랙잭에 없습니다.
+   *
+   * ⚠️ **뒷장은 내 차례 중에는 안 열립니다.** 한 번 딜러를 바퀴에 넣어 봤다가 되돌렸습니다.
+   *   딜러가 번갈아 받으려면 받기 전에 뒷장을 열어야 하는데, 그러면 제 차례 내내 딜러 합계가
+   *   보입니다. 18을 들고 딜러 19를 보고 있으면 고를 것이 없습니다 — 화면이 아니라
+   *   **게임이 달라집니다.** 규칙서(pagat.com)도 손님이 다 끝낸 **다음에** 딜러가 뒷장을 열고
+   *   17까지 받는다고 적고 있고, 딜러가 유리한 이유가 바로 **손님이 먼저 행동하는 것**이라고 합니다.
+   */
+  const holeHidden = reveal.opened < dealerLeft;
+  /**
+   * 딜러가 더 받을 이유가 있는지. **상대할 손이 하나도 안 남았으면 안 받습니다** —
+   * 다 죽었거나 딜러가 블랙잭이면 더 받아도 결과가 안 바뀝니다.
+   * 실제 딜러도 그럴 때는 뒷장만 열고 끝냅니다(그러면 뒷장도 끝까지 덮여 있습니다).
+   * ⚠️ 스플릿한 손의 21은 블랙잭이 아니라 **살아 있는 손**입니다. 딜러는 그 손을 상대해야 합니다.
+   */
+  const dealerHasSomeoneToBeat = !isBlackjack(dealer) && [
+    ...(splitHand
+      ? [handValue(player) <= 21, handValue(splitHand) <= 21]
+      : [handValue(player) <= 21 && !isBlackjack(player)]),
+    ...guestHands.map((hand) => handValue(hand) <= 21 && !isBlackjack(hand)),
+  ].some(Boolean);
+
+  /**
+   * 자리 수(나 + 손님들). 차례는 이 안에서 돕니다.
+   * ⚠️ **딜러는 이 바퀴에 없습니다.** 나와 딜러가 번갈아 받는 곳은 **처음 두 장 나눠 줄 때
+   *   하나뿐**입니다(`openDeal` — 나 → 딜러 → 나 → 딜러). 그다음 딜러는 끝까지 기다립니다.
+   */
+  const seatCount = guestCount + 1;
+  /** 그 자리가 아직 카드를 더 받아야 하는지. 손님은 17에서 멈춥니다. */
   const wantsCard = (seat: number) => {
     if (seat === 0) return !myDone;
-    if (seat === dealerSeat) return handValue(dealer) < 17;
     return handValue(guestHands[seat - 1] ?? []) < 17;
   };
 
   /**
-   * **한 바퀴에 한 장씩.** 나 → 손님 1 → 손님 2 → 딜러 → 나 → … 로 돌면서
+   * **한 바퀴에 한 장씩.** 나 → 손님 1 → 손님 2 → 나 → … 로 돌면서
    * 더 받을 사람만 한 장씩 받고, 다 선 자리는 건너뜁니다.
    *
    * ⚠️ 내 자리(0)에서는 **아무 일도 하지 않고 기다립니다.** 히트나 스탠드를 눌러야 넘어갑니다.
-   * ⚠️ 딜러도 이 바퀴에 같이 들어갑니다. 뒷장은 그대로 덮어 두고 **새로 받는 것만** 보입니다.
-   *   딜러가 마지막에 혼자 석 장을 받아 갑자기 나타나던 것이 이래서였습니다.
+   * ⚠️ **딜러는 여기 없습니다.** 딜러가 이 바퀴에서 받으면 둘 중 하나가 됩니다 —
+   *   뒷장을 덮은 채 받아 `앞 · 뒤 · 앞`이 되거나, 받으려고 뒷장을 열어 **내가 딜러 합계를 보게** 되거나.
+   *   둘 다 실제 블랙잭이 아닙니다. 딜러는 모두가 선 다음 `reveal` 단계에서 움직입니다.
    */
   useEffect(() => {
     if (phase !== 'play' || dealing) return;
@@ -7220,15 +7332,9 @@ function BlackjackGameScreen(props: {
     // 내 자리면 내가 누를 때까지 기다립니다.
     if (seat === 0) return;
     const timer = setTimeout(() => {
-      if (seat === dealerSeat) {
-        const next = drawCard(deck, dealer);
-        setDeck(next.deck);
-        setDealer(next.hand);
-      } else {
-        const next = drawCard(deck, guestHands[seat - 1] ?? []);
-        setDeck(next.deck);
-        setGuestHands((hands) => hands.map((item, index) => (index === seat - 1 ? next.hand : item)));
-      }
+      const next = drawCard(deck, guestHands[seat - 1] ?? []);
+      setDeck(next.deck);
+      setGuestHands((hands) => hands.map((item, index) => (index === seat - 1 ? next.hand : item)));
       setTurn(seat + 1);
     }, GUEST_TURN_MS);
     return () => clearTimeout(timer);
@@ -7273,23 +7379,14 @@ function BlackjackGameScreen(props: {
   };
 
   /**
-   * 스플릿 두 손의 승부. 딜러 패는 이미 바퀴를 돌며 다 받았습니다.
-   * 스플릿한 손의 21은 블랙잭이 아니므로 2.5배가 아닌 2배로 정산합니다.
+   * 스플릿 두 손도 딜러를 기다립니다. 딜러는 아직 뒷장도 안 뒤집었습니다.
+   * 스플릿한 손의 21은 블랙잭이 아니므로 2.5배가 아닌 2배로 정산합니다(뒤집기 효과에서).
    */
   const finishSplit = (firstHand: Card[], secondHand: Card[], nextDeck: Card[]) => {
-    const results = [resolveRound(firstHand, dealer, false), resolveRound(secondHand, dealer, false)];
     setPlayer(firstHand);
     setSplitHand(secondHand);
     setDeck(nextDeck);
-    setSplitResults(results);
-    reveal.reset();
     setPhase('reveal');
-    setPendingSettle(() => () => {
-      if (settled.current) return;
-      settled.current = true;
-      props.onSettle(results[0], props.bet);
-      props.onSettle(results[1], props.bet);
-    });
   };
 
   const split = () => {
@@ -7385,29 +7482,49 @@ function BlackjackGameScreen(props: {
     && guestHands.every((hand) => { const outcome = guestResult(hand, dealer); return outcome === 'loss' || outcome === 'push'; });
   const net = result ? netForResult(totalBet, result) : 0;
   const splitNet = splitResults ? splitResults.reduce((sum, item) => sum + netForResult(props.bet, item), 0) : 0;
-  /**
-   * 딜러 카드에서 **덮여 있는 것은 뒷장(두 번째) 하나뿐**입니다.
-   *
-   * ⚠️ 전에는 딜러가 마지막에 혼자 다 받아서, 승부가 되는 순간 뒷면 석 장이 한꺼번에
-   * 나타났습니다. 지금은 바퀴를 돌며 한 장씩 받으므로 **받는 즉시 보입니다.**
-   * 남은 것은 처음에 덮어 둔 뒷장 하나이고, 승부가 되면 그것만 뒤집습니다.
-   */
-  const holeHidden = phase === 'play';
-  const dealerLeft = 1;
   // 놓인 장수는 늘 받은 만큼입니다. 받자마자 보여야 순서가 보입니다.
   const dealerLaid = dealer.length;
-  // 실제 딜러처럼 스스로 뒤집고 뽑습니다. 누르게 하면 카드를 받은 것이 화면에 안 나타납니다.
+  /**
+   * **딜러 차례.** 손님이 다 끝낸 다음 여기서 세 걸음으로 움직입니다 —
+   *   1) 뒷장 열기 → 2) 17이 될 때까지 **한 장씩** 받기 → 3) 승부.
+   * 규칙서(pagat.com)의 순서 그대로입니다. 실제 딜러처럼 스스로 합니다 —
+   * 누르게 하면 카드를 받은 것이 화면에 안 나타납니다.
+   */
   useEffect(() => {
     if (phase !== 'reveal') return;
-    if (reveal.opened >= dealerLeft) {
-      setPhase('result');
-      pendingSettle?.();
-      setPendingSettle(null);
-      return;
+    // 1) 뒷장을 **먼저** 엽니다. 덮인 채로 받는 자리는 없습니다.
+    if (holeHidden) {
+      const timer = setTimeout(() => reveal.open(dealerLeft), DEALER_REVEAL_MS);
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => reveal.open(dealerLeft), DEALER_REVEAL_MS);
+    // 2) 열고 나서 받습니다. **한 장씩** 놓이고 합계도 같이 올라갑니다.
+    if (handValue(dealer) < 17 && deck.length > 0 && dealerHasSomeoneToBeat) {
+      const timer = setTimeout(() => {
+        const next = drawCard(deck, dealer);
+        setDeck(next.deck);
+        setDealer(next.hand);
+      }, DEALER_HIT_MS);
+      return () => clearTimeout(timer);
+    }
+    // 3) 딜러가 멈췄습니다. **한 박자 쉬고** 결과를 올립니다 — 마지막 장을 읽을 참입니다.
+    if (settled.current) return;
+    const timer = setTimeout(() => {
+      settled.current = true;
+      if (splitHand) {
+        const results = [resolveRound(player, dealer, false), resolveRound(splitHand, dealer, false)];
+        setSplitResults(results);
+        setPhase('result');
+        props.onSettle(results[0], props.bet);
+        props.onSettle(results[1], props.bet);
+        return;
+      }
+      const outcome = resolveRound(player, dealer);
+      setResult(outcome);
+      setPhase('result');
+      props.onSettle(outcome, totalBet);
+    }, SHOWDOWN_HOLD_MS);
     return () => clearTimeout(timer);
-  }, [phase, reveal.opened, dealerLeft]);
+  }, [phase, reveal.opened, dealer, player, splitHand, totalBet]);
   // 뒷장을 덮어 둔 동안에는 점수를 못 셉니다. 뒤집히면 그때부터 보여 줍니다.
   const dealerScore = holeHidden ? '?' : handValue(dealer);
 
@@ -7449,26 +7566,47 @@ function BlackjackGameScreen(props: {
             손님은 **왼쪽·오른쪽 끝**에 붙입니다. 가운데는 딜러와 내 카드가 지나가는 길입니다.
             이긴 손님은 금색으로 빛납니다 — 누가 이겼는지 한눈에 보여야 합니다.
           */}
+          {/*
+            손님 카드가 겹치는 폭. **넉 장부터는 자리에 맞춰 더 겹칩니다.**
+            ⚠️ 재 보니 줄 안쪽이 **302**, 상자 좌우 여백이 **8**, 미니 카드 폭이 **40**입니다.
+              손님이 셋이면 한 자리에 100뿐이라 카드에 쓸 수 있는 폭은 **92**입니다.
+              안 줄이면 넉 장짜리 손님(40 + 26×3 = 118)에서 **마지막 상자가 판 밖으로 밀려납니다.**
+            석 장까지는 예전 그대로 -14라 무늬(♥ ♠ ♣ ♦)가 다 보입니다. 손님이 하나면 자리가
+            넉넉해서 여러 장이어도 안 줄어듭니다.
+          */}
           <View style={styles.tableGuestRow}>{initial.seated.map((guest, seat) => {
+            const cardRoom = Math.floor(302 / Math.max(1, guestCount)) - 8 - 40;
+            const guestFan = (count: number) => Math.round(Math.min(26, cardRoom / Math.max(1, count - 1))) - 40;
             const hand = guestHands[seat] ?? [];
             // 아직 깔리는 중이면 놓인 만큼만 보입니다.
             const shown = dealing ? hand.slice(0, openDeal.countFor(1 + seat)) : hand;
             const done = phase === 'result';
             const outcome = done ? guestResult(hand, dealer) : null;
+            /**
+             * 죽은 손님은 **판이 끝나기를 기다리지 않고 그 자리에서 바로** 빨갛게 바뀝니다.
+             * 내 패가 그러는 것과 같습니다(아래 `myBust`). 깔리는 중에는 아직 판단하지 않습니다.
+             * ⚠️ 승부가 나도 `버스트` 글자를 그대로 둡니다 — `패`보다 왜 졌는지가 보입니다.
+             */
+            const guestBust = !dealing && handValue(hand) > 21;
             const mark = outcome === 'blackjack' ? 'BJ' : outcome === 'win' ? '승' : outcome === 'loss' ? '패' : outcome === 'push' ? '무' : '';
             const nowPlaying = phase === 'play' && !dealing && turn % seatCount === seat + 1 && handValue(hand) < 17;
-            return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost]}>
+            return <View key={guest.name} style={[styles.tableGuest, nowPlaying && styles.tableGuestTurn, (outcome === 'win' || outcome === 'blackjack') && styles.tableGuestWon, outcome === 'loss' && styles.tableGuestLost, guestBust && styles.tableGuestBust]}>
               {/* 손님 패를 실제로 보여 줍니다 — 10이 몇 장 빠졌는지 세려면 패가 보여야 합니다. */}
               {/*
                 ⚠️ 겹치는 정도를 **-26에서 -14로** 줄였습니다. 많이 겹치니 무늬(♥ ♠ ♣ ♦)가
                 가려져서 10이 몇 장 빠졌는지 셀 수가 없었습니다. 셀 수 있으라고 보여 주는 패입니다.
               */}
               <View style={styles.tableGuestCards}>{shown.map((card, index) => (
-                <View key={card.id} style={index ? { marginLeft: -14 } : null}><PlayingCard card={card} size="mini" /></View>
+                <View key={card.id} style={index ? { marginLeft: guestFan(shown.length) } : null}><PlayingCard card={card} size="mini" /></View>
               ))}</View>
               {/* ⚠️ 승·패 글자를 카드 위에 얹었더니 **카드에 가려 안 보였습니다.**
                   이름 옆에 나란히 적습니다. */}
-              <Text style={styles.tableGuestName}>{guest.name} · {handValue(shown)}{mark ? ` · ${mark}` : ''}</Text>
+              {/*
+                ⚠️ 죽으면 **숫자를 빼고 `버스트`만** 적습니다. 몇 점인지는 이미 뜻이 없고,
+                `손님 3 · 23 · 버스트`로 다 적으면 손님 셋일 때 **줄이 판 밖으로 잘립니다.**
+                자리가 301인데 상자 셋이 들어가야 합니다.
+              */}
+              <Text style={[styles.tableGuestName, guestBust && styles.tableGuestNameBust]}>{guest.name} · {guestBust ? '버스트' : `${handValue(shown)}${mark ? ` · ${mark}` : ''}`}</Text>
             </View>;
           })}</View>
 
@@ -7499,12 +7637,13 @@ function BlackjackGameScreen(props: {
         <View style={styles.fixedActionArea}>
         {phase === 'play' && !dealing && !myTurn && (
           <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>
-            {turn % seatCount === dealerSeat ? '딜러' : `손님 ${turn % seatCount}`}이(가) 카드를 받는 중…
+            손님 {turn % seatCount}이(가) 카드를 받는 중…
           </Text></View>
         )}
 
+        {/* 뒤집는 중 · 받는 중 · 멈춤 — 세 걸음이 그대로 보여야 순서가 읽힙니다. */}
         {phase === 'reveal' && (
-          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>딜러가 뒷장을 엽니다…</Text></View>
+          <View style={styles.blackjackDealerTurn}><Text style={styles.blackjackDealerTurnText}>{holeHidden ? '딜러가 뒷장을 엽니다…' : handValue(dealer) < 17 && dealerHasSomeoneToBeat ? '딜러가 카드를 받는 중…' : '딜러가 멈췄습니다'}</Text></View>
         )}
 
         {myTurn && (
@@ -9967,6 +10106,8 @@ const styles = StyleSheet.create({
   mahjongTable: { minHeight: 590, padding: 12, borderRadius: 34, backgroundColor: '#0A5940', borderWidth: 7, borderColor: '#5C321B', justifyContent: 'space-between' },
   mahjongOpponent: { alignItems: 'center', minHeight: 72 },
   mahjongSeat: { color: '#FFF0B6', fontSize: 10, fontWeight: '900', textAlign: 'center', marginBottom: 5 },
+  /** 지금 두는 컴퓨터. 이름 줄이 금색으로 바뀌고 `· 차례`가 붙습니다 — 누가 두는지 보여야 합니다(2026-09-18). */
+  mahjongSeatTurn: { color: colors.goldLight, backgroundColor: 'rgba(201,151,31,0.28)', borderRadius: 6, paddingHorizontal: 6, alignSelf: 'center' },
   mahjongBacks: { flexDirection: 'row', justifyContent: 'center', gap: 1 },
   mahjongBack: { width: 18, height: 28, borderRadius: 3, backgroundColor: '#183D71', borderWidth: 1, borderColor: '#D8B95E' },
   mahjongMiddle: { minHeight: 210, flexDirection: 'row', alignItems: 'center', gap: 7 },
@@ -10058,6 +10199,8 @@ const styles = StyleSheet.create({
   mahjongWaitTitle: { color: '#FFE080', fontSize: 10, fontWeight: '900', textAlign: 'center', marginBottom: 3 },
   mahjongWaitText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 16 },
   mahjongHand: { minHeight: 112, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', justifyContent: 'center', gap: 2 },
+  /** 뽑은 패 자리. 손패와 **한 장 폭만큼 띄워** 따로 놓습니다 — 실제 마작에서 뽑은 패를 오른쪽에 두는 그 자리입니다(2026-09-18). */
+  mahjongDrawnSlot: { marginLeft: 10 },
   mahjongTile: { width: 26, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 4, backgroundColor: '#FFF7DC', borderWidth: 1, borderColor: '#C9B98A', shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 2 },
   mahjongTileRecommended: { borderWidth: 2, borderColor: '#88D89D', backgroundColor: '#ECFFD9' },
   mahjongTileDrawn: { transform: [{ translateY: -7 }], borderWidth: 2, borderColor: '#FFD45B', backgroundColor: '#FFF0AE' },
@@ -10073,7 +10216,6 @@ const styles = StyleSheet.create({
   mahjongRonButton: { minHeight: 44, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#B3232C', borderWidth: 1, borderColor: '#F0C75B' },
   mahjongPassButton: { minHeight: 44, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', borderRadius: 11, backgroundColor: '#39444A' },
   mahjongKanButton: { minHeight: 44, paddingHorizontal: 14, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#8C6A2A', backgroundColor: '#2A2113' },
-  mahjongSortButton: { flex: 0.8, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#244B63' },
   mahjongTsumoButton: { flex: 1.2, minHeight: 54, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#B3232C', borderWidth: 2, borderColor: '#F0C75B' },
   sevenPokerCards: { minHeight: 112, paddingTop: 16, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
   sevenPokerHint: { color: '#BBD7C8', fontSize: 10, fontWeight: '700' },
@@ -10657,6 +10799,14 @@ const styles = StyleSheet.create({
   // 이긴 손님은 금색으로 빛납니다.
   tableGuestWon: { borderColor: colors.gold, backgroundColor: 'rgba(60,46,10,0.7)', shadowColor: colors.gold, shadowOpacity: 0.9, shadowRadius: 10 },
   tableGuestLost: { opacity: 0.45 },
+  /**
+   * 죽은 손님. **판이 끝나기 전에도 그 자리에서 바로** 빨갛게 바뀝니다.
+   * ⚠️ `opacity: 1`은 위 `tableGuestLost`(0.45)를 되돌리려고 넣었습니다.
+   *   승부가 나면 둘 다 붙는데, 흐려지면 빨간 것이 안 보입니다. 순서상 이쪽이 뒤에 와야 합니다.
+   * 색은 내 버스트 표시(`blackjackTotalBust`)와 같은 계열입니다.
+   */
+  tableGuestBust: { opacity: 1, borderColor: '#8E2230', backgroundColor: 'rgba(94,18,32,0.6)' },
+  tableGuestNameBust: { color: '#FFC9CF' },
   tableGuestName: { color: '#9FC4B4', fontSize: 9, fontWeight: '800' },
   tableGuestValue: { color: '#E8F3EC', fontSize: 12, fontWeight: '900' },
   tableGuestMark: { position: 'absolute', right: 3, top: 0, color: '#FFE080', fontSize: 10, fontWeight: '900' },
