@@ -6,6 +6,8 @@ import {
   Easing,
   Image,
   ImageBackground,
+  // 뒤로가기를 눌렀을 때 뜨는 `포기 / 계속하기` 창에 씁니다. 판 위에 덮여야 해서 Modal입니다.
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -2591,14 +2593,44 @@ function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettl
   </ScrollView></View>;
 }
 
-function ScreenHeader({ title, onBack }: { title: string; onBack: () => void }) {
+/**
+ * 화면 위쪽 제목줄. **뒤로가기는 모든 게임에서 왼쪽 위 같은 자리**입니다.
+ *
+ * `onForfeit`을 주면 **판이 도는 중에 뒤로가기를 눌렀을 때 물어봅니다**(2026-09-28).
+ * ⚠️ 전에는 묻지 않았습니다. 마작만 바로 포기 처리였고, 나머지는 그냥 나가서
+ *   이미 빠져나간 참가 코인을 **조용히 잃었습니다.** 기록에도 안 남았습니다.
+ * `atStake`는 창에 보여 줄 금액입니다. 0이면 금액 줄을 뺍니다.
+ *
+ * 판이 끝났거나 아직 시작 전이면 `onForfeit`을 넘기지 마세요 — 그때는 묻지 않고 바로 나갑니다.
+ */
+function ScreenHeader({ title, onBack, onForfeit, atStake = 0 }: { title: string; onBack: () => void; onForfeit?: () => void; atStake?: number }) {
+  const [asking, setAsking] = useState(false);
+  // 판이 끝나면 창을 닫습니다. 열어 둔 채로 판이 끝나는 일이 있습니다(컴퓨터가 이기는 등).
+  useEffect(() => { if (!onForfeit && asking) setAsking(false); }, [onForfeit, asking]);
+  const press = () => { if (onForfeit) setAsking(true); else onBack(); };
   return (
     <View style={styles.detailHeader}>
+      <Modal transparent animationType="fade" visible={asking} onRequestClose={() => setAsking(false)}>
+        {/* 바깥을 눌러도 닫힙니다 — 실수로 뒤로가기를 눌렀을 때 빠져나갈 길이 있어야 합니다. */}
+        <Pressable style={styles.quitBackdrop} onPress={() => setAsking(false)}>
+          <Pressable style={styles.quitSheet} onPress={() => {}}>
+            <Text style={styles.quitTitle}>판이 아직 안 끝났습니다</Text>
+            <Text style={styles.quitBody}>지금 나가면 <Text style={styles.quitBodyStrong}>포기</Text>가 되어 건 돈을 잃습니다. 기록에는 중도 포기로 남습니다.</Text>
+            {atStake > 0 && <Text style={styles.quitStake}>잃는 금액 {atStake.toLocaleString()} WC</Text>}
+            <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={() => setAsking(false)}>
+              <Text style={styles.primaryButtonText}>계속하기</Text>
+            </Pressable>
+            <Pressable style={[styles.quitGiveUp]} onPress={() => { setAsking(false); onForfeit?.(); }}>
+              <Text style={styles.quitGiveUpText}>포기하고 나가기</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="뒤로"
         style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-        onPress={onBack}
+        onPress={press}
         hitSlop={10}
       >
         <Text style={styles.backButtonArrow}>‹</Text>
@@ -3214,7 +3246,7 @@ function YahtzeeGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
     const value=scoreYahtzeeCategory(category,dice); const next={...card,[category]:value}; setCard(next); setHeld([false,false,false,false,false]); setRollCount(0);
     if(Object.keys(next).length===yahtzeeCategories.length){const finalScore=yahtzeeTotal(next);const multiplier=yahtzeePayoutMultiplier(finalScore);setFinished(true);onSettle(selectedBet,finalScore,multiplier);}
   };
-  return <View style={styles.sicboScreen}><ScreenHeader title="야찌(Yahtzee)" onBack={onBack}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.sicboScreen}><ScreenHeader title="야찌(Yahtzee)" onBack={onBack} atStake={selectedBet} onForfeit={started&&!finished?()=>{onSettle(selectedBet,0,0);onBack();}:undefined}/><ScrollView contentContainerStyle={styles.sicboPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>WORLD DICE GAME</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{completed}/13칸</Text></View></View>
     {!started?<><View style={styles.sicboBowl}><Text style={styles.sicboResult}>한 판은 13라운드입니다</Text><Text style={styles.slotRuleText}>200점 이상 2배 · 250점 이상 3배</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={begin}><Text style={styles.primaryButtonText}>{selectedBet.toLocaleString()} WC로 시작</Text></Pressable></>:
     <><View {...panHandlers} style={[styles.sicboBowl,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':finished?'게임 종료':rollCount===0?'새 라운드':`${rollCount}/3회 굴림`}</Text><View style={[styles.sicboDiceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{dice.map((value,index)=><Pressable key={index} disabled={rollCount===0||finished||rolling} onPress={()=>setHeld((current)=>current.map((item,i)=>i===index?!item:item))} style={[styles.yahtzeeDieButton,held[index]&&styles.yahtzeeHeld]}><Die value={value} rolling={rolling&&!held[index]} index={index} size={52}/><Text style={styles.yahtzeeHoldText}>{held[index]?'KEEP':'보관'}</Text></Pressable>)}</View><Text style={styles.sicboResult}>현재 {total}점{yahtzeeUpperBonus(card)>0?' · 상단 보너스 +35':''}</Text></View>
@@ -3269,7 +3301,7 @@ function TeenPattiGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coi
    */
   const openNext=()=>{if(!pending)return;reveal.openAll(3);setResult(pending.result);onSettle(pending.mine,pending.theirs,pending.result,pending.detail);setPending(null);};
   const fold=()=>{if(!round||result||dealing)return;setFolded(true);setResult('loss');onSettle(mine,theirs,'loss',`다이 · 상대 카드 비공개`);};
-  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
+  return <View style={styles.pokerTable}><ScreenHeader title="틴 파티(Teen Patti)" onBack={onBack} atStake={selectedBet} onForfeit={round&&!result?()=>{onSettle(mine,theirs,'loss','중도 포기 · 상대 패 비공개');onBack();}:undefined}/><View style={styles.fixedTableArea}><View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>POT {(mine+theirs).toLocaleString()} WC</Text></View></View>{!round?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>세 장 받기 · {selectedBet.toLocaleString()} WC</Text></Pressable>:<><DealerTable host="computer">
       <View style={styles.dealerSeatRow}><Text style={styles.dealerSeatLabel}>컴퓨터</Text><Text style={styles.dealerSeatNote}>{folded?'비공개':result?evaluateTeenPatti(round.opponent).label:`${reveal.opened}/3 공개`}</Text></View>
       <View style={styles.dealerCardRow}>{round.opponent.slice(0,deal.countFor(1)).map((card,index)=><PlayingCard key={card.id} card={card} compact hidden={folded||index>=reveal.opened} emphasis={result&&!folded?(result==='loss'?'winner':'dim'):undefined}/>)}</View>
       <Text style={styles.dealerFeltRule}>트레일 · 스트레이트 플러시 · 스트레이트 · 플러시 · 페어 순으로 셉니다</Text>
@@ -3394,7 +3426,7 @@ function PaiGowGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
     onSettle(selectedBet,pending.result,`하이 ${playerSplit.highRank.label} ${pending.high==='win'?'승':'패'} · 로우 ${playerSplit.lowRank.label} ${pending.low==='win'?'승':'패'}`);
     setPending(null);
   };
-  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack}/><View style={styles.fixedTableArea} onLayout={fit.onLayout}>
+  return <View style={styles.pokerTable}><ScreenHeader title="파이 고우 포커(Pai Gow Poker)" onBack={onBack} atStake={selectedBet} onForfeit={round&&!outcome?()=>{onSettle(selectedBet,'loss','중도 포기');onBack();}:undefined}/><View style={styles.fixedTableArea} onLayout={fit.onLayout}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<><View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 7장을 받은 뒤</Text><Text style={styles.slotRuleText}>앞에 둘 로우 카드 2장을 직접 고릅니다. 나머지 5장은 자동으로 하이 핸드가 됩니다.</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>7장 받기</Text></Pressable></>:
     <><DealerTable>
@@ -3548,7 +3580,7 @@ function ChinesePokerGameScreen({players,coins,selectedBet,onBack,onPlaceBet,onS
     :result.units<0?`${-result.units}줄 밀려 ${Math.round(selectedBet*result.multiplier).toLocaleString()} WC`
     :'비겨서 베팅금을 돌려받았습니다';
 
-  return <View style={styles.pokerTable}><ScreenHeader title={gameDisplayName('차이니즈 포커')} onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.pokerTable}><ScreenHeader title={gameDisplayName('차이니즈 포커')} onBack={onBack} atStake={selectedBet} onForfeit={round&&!result?()=>{onSettle(selectedBet,0,'중도 포기');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<>
       <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>카드 열세 장을 받아</Text><Text style={styles.slotRuleText}>뒷줄 5장 · 가운뎃줄 5장 · 앞줄 3장으로 직접 나눕니다.</Text><Text style={styles.slotRuleText}>뒤로 갈수록 세야 하고, 어기면 파울로 세 줄을 모두 내줍니다.</Text></View>
@@ -3932,7 +3964,7 @@ function BigTwoGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,onS
     :myHand.length<=3?`${bigTwoSeatName(state.winner)}가 먼저 냈지만 ${myHand.length}장만 남아 절반을 돌려받았습니다`
     :`${bigTwoSeatName(state.winner)}가 먼저 냈습니다 · 내 손에 ${myHand.length}장`;
 
-  return <View style={styles.pokerTable}><ScreenHeader title="빅투(Big Two)" onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.pokerTable}><ScreenHeader title="빅투(Big Two)" onBack={onBack} atStake={selectedBet} onForfeit={state&&state.winner===null?()=>{onSettle(selectedBet,0,'중도 포기');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!state?<>
       <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>네 명이 열세 장씩</Text><Text style={styles.slotRuleText}>먼저 다 내려놓으면 이깁니다. 3이 가장 약하고 2가 가장 셉니다.</Text><Text style={styles.slotRuleText}>앞사람과 같은 장수로만, 더 세게 받아쳐야 합니다.</Text></View>
@@ -4040,7 +4072,7 @@ function TujeonGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins:
       :outcome.result==='push'?'같은 패라 베팅금을 돌려받았습니다'
       :`${outcome.opponentHand.label}에 졌습니다`
     :'';
-  return <View style={styles.pokerTable}><ScreenHeader title={gameDisplayName('투전')} onBack={onBack}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
+  return <View style={styles.pokerTable}><ScreenHeader title={gameDisplayName('투전')} onBack={onBack} atStake={selectedBet} onForfeit={round&&!outcome&&!folded?()=>{onSettle(selectedBet,0,'중도 포기');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.pokerPage} showsVerticalScrollIndicator={false}>
     <View style={styles.rouletteStatusRow}><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>BET {selectedBet.toLocaleString()} WC</Text></View></View>
     {!round?<>
       <View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>여든 장 투전목에서 다섯 장</Text><Text style={styles.slotRuleText}>같은 숫자가 몇 장 모였는지로 겨룹니다. 오동 · 사동 · 삼동 · 두동동 · 동동 순입니다.</Text><Text style={styles.slotRuleText}>짝이 없으면 다섯 장을 더한 끝자리가 끗이고 9가 가보, 0이 망통입니다.</Text></View>
@@ -4742,7 +4774,7 @@ function FiveDrawGameScreen({level,coins,selectedBet,onBack,onPlaceBet,onSettle}
 
   const emphasis=(card:Card,side:'player'|'opponent'):'winner'|'selected'|'dim'|undefined=>{if(!showdown)return undefined;const own=madeHandCards(side==='player'?showdown.playerHand:showdown.opponentHand);if(!own.some((used)=>used.id===card.id))return'dim';if(showdown.result==='push')return'selected';return(side==='player')===(showdown.result==='win')?'winner':'selected';};
 
-  return <View style={styles.detailScreen}><ScreenHeader title="파이브 카드 드로우(Five-card Draw)" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={[styles.holdemTable,styles.fiveDrawTable]}><Text style={styles.holdemSeat}>컴퓨터</Text><View style={styles.fiveDrawHand}>{opponent.map((card)=><PlayingCard key={card.id} card={card} compact hidden={!showdown} emphasis={emphasis(card,'opponent')}/>)}</View>{drawDone?<Text style={styles.sevenPokerHint}>컴퓨터가 {opponentExchanged}장 교환</Text>:phase==='result'?<Text style={styles.sevenPokerHint}>교환 전에 끝난 판입니다</Text>:null}<Text style={styles.holdemPot}>POT {(betting.mine+betting.theirs).toLocaleString()} WC</Text><Text style={styles.pokerContribution}>내가 낸 돈 {betting.mine.toLocaleString()} · 컴퓨터 {betting.theirs.toLocaleString()} WC</Text><Text style={styles.holdemSeat}>나</Text><View style={styles.fiveDrawHand}>{player.map((card,index)=><Pressable key={card.id} disabled={phase!=='draw'} onPress={()=>setHeld((current)=>current.map((value,i)=>i===index?!value:value))} style={[styles.videoPokerCardWrap,held[index]&&phase==='draw'&&styles.videoPokerHeld]}><PlayingCard card={card} compact emphasis={emphasis(card,'player')}/>{phase==='draw'?<Text style={[styles.videoPokerHoldLabel,held[index]&&styles.videoPokerHoldActive]}>{held[index]?'보관':'교환'}</Text>:null}</Pressable>)}</View>{opponentNote?<Text style={styles.pokerOpponentNote}>{opponentNote}</Text>:null}<Text style={styles.holdemOutcome}>{outcome||'카드 5장을 받아 시작하세요'}</Text>{showdown?<Text style={styles.pokerInlineResult}>내 패: {showdown.playerHand.label} · 상대 패: {showdown.opponentHand.label}</Text>:null}</View>{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 플레이':'카드 5장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:phase==='draw'?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={exchange}><Text style={styles.primaryButtonText}>선택 완료 · 카드 교환</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={fold}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={callOrCheck}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable><Pressable disabled={toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={raise}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}<Text style={styles.disclaimer}>{phase==='preBet'?'교환 전 첫 베팅 · 다음에 카드를 한 번 교환합니다':phase==='draw'?'남길 카드를 눌러 보관하세요 · 교환은 한 번':'상대 카드는 끝까지 승부했을 때만 공개됩니다'}{canAct&&betting.raises>=MAX_RAISES_PER_STREET?' · 이 라운드 레이즈 한도 도달':''}</Text></ScrollView></View>;
+  return <View style={styles.detailScreen}><ScreenHeader title="파이브 카드 드로우(Five-card Draw)" onBack={onBack} atStake={selectedBet} onForfeit={phase!=='ready'&&phase!=='result'?()=>{onSettle(betting.mine,betting.theirs,'loss','중도 포기 · 상대 패 비공개');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.holdemPage}><View style={[styles.holdemTable,styles.fiveDrawTable]}><Text style={styles.holdemSeat}>컴퓨터</Text><View style={styles.fiveDrawHand}>{opponent.map((card)=><PlayingCard key={card.id} card={card} compact hidden={!showdown} emphasis={emphasis(card,'opponent')}/>)}</View>{drawDone?<Text style={styles.sevenPokerHint}>컴퓨터가 {opponentExchanged}장 교환</Text>:phase==='result'?<Text style={styles.sevenPokerHint}>교환 전에 끝난 판입니다</Text>:null}<Text style={styles.holdemPot}>POT {(betting.mine+betting.theirs).toLocaleString()} WC</Text><Text style={styles.pokerContribution}>내가 낸 돈 {betting.mine.toLocaleString()} · 컴퓨터 {betting.theirs.toLocaleString()} WC</Text><Text style={styles.holdemSeat}>나</Text><View style={styles.fiveDrawHand}>{player.map((card,index)=><Pressable key={card.id} disabled={phase!=='draw'} onPress={()=>setHeld((current)=>current.map((value,i)=>i===index?!value:value))} style={[styles.videoPokerCardWrap,held[index]&&phase==='draw'&&styles.videoPokerHeld]}><PlayingCard card={card} compact emphasis={emphasis(card,'player')}/>{phase==='draw'?<Text style={[styles.videoPokerHoldLabel,held[index]&&styles.videoPokerHoldActive]}>{held[index]?'보관':'교환'}</Text>:null}</Pressable>)}</View>{opponentNote?<Text style={styles.pokerOpponentNote}>{opponentNote}</Text>:null}<Text style={styles.holdemOutcome}>{outcome||'카드 5장을 받아 시작하세요'}</Text>{showdown?<Text style={styles.pokerInlineResult}>내 패: {showdown.playerHand.label} · 상대 패: {showdown.opponentHand.label}</Text>:null}</View>{phase==='ready'||phase==='result'?<Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton]} onPress={start}><Text style={styles.primaryButtonText}>{phase==='result'?'다시 플레이':'카드 5장 받기'} · {selectedBet.toLocaleString()} WC</Text></Pressable>:phase==='draw'?<Pressable style={[styles.primaryButton,styles.fullWidthButton]} onPress={exchange}><Text style={styles.primaryButtonText}>선택 완료 · 카드 교환</Text></Pressable>:<View style={styles.holdemActions}><Pressable style={styles.holdemFold} onPress={fold}><Text style={styles.holdemActionText}>폴드</Text></Pressable><Pressable disabled={toCall>coins} style={[styles.holdemAction,toCall>coins&&styles.disabledCard]} onPress={callOrCheck}><Text style={styles.primaryButtonText}>{toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}</Text></Pressable><Pressable disabled={toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||betting.raises>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={raise}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable></View>}<Text style={styles.disclaimer}>{phase==='preBet'?'교환 전 첫 베팅 · 다음에 카드를 한 번 교환합니다':phase==='draw'?'남길 카드를 눌러 보관하세요 · 교환은 한 번':'상대 카드는 끝까지 승부했을 때만 공개됩니다'}{canAct&&betting.raises>=MAX_RAISES_PER_STREET?' · 이 라운드 레이즈 한도 도달':''}</Text></ScrollView></View>;
 }
 
 function SevenPokerSetupScreen(props: { coins:number; difficulty:string; selectedBet:number; players:number; onPlayersChange:(v:number)=>void; onBack:()=>void; onDifficultyChange:(v:string)=>void; onBetChange:(v:number)=>void; onStart:()=>void }) {
@@ -4764,11 +4796,19 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
   const [pending,setPending]=useState<{round:TableRound;winners:number[]}|null>(null);
   // 거리마다 늘어나는 장수. 대기 0 · 첫 거리 3장에서 한 장씩 늘어 마지막에 7장입니다.
   const dealTarget=street===0?0:street===5?7:Math.min(7,street+2);
+  /**
+   * 죽은 자리가 **그 순간 들고 있던 장수**. 그 뒤로는 카드를 안 받습니다.
+   * ⚠️ 전에는 폴드한 자리도 거리마다 한 장씩 계속 받았습니다(2026-09-27).
+   *   실제 스터드에서는 죽는 순간 그 손이 죽고 딜러가 더 안 줍니다.
+   */
+  const [foldedCards,setFoldedCards]=useState<Record<number,number>>({});
+  const freezeFold=(seat:number,atStreet:number)=>setFoldedCards((current)=>current[seat]===undefined?{...current,[seat]:Math.min(7,atStreet+2)}:current);
   const deal=useTableDeal(hands,players,dealTarget);
   const dealing=deal.dealing;
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    setFoldedCards({});
     setHands(dealSevenPokerTable(players));
     setRound(openTable(players,selectedBet));
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
@@ -4812,6 +4852,7 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
       const live=tableLive(round).length;
       const toCall=tableToCall(round,seat);
       const action=decidePokerAction({level,equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
+      if(action.kind==='fold')freezeFold(seat,street);
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
       seatActions.show(seat,tableActionLabel(action.kind,toCall));
@@ -4844,7 +4885,7 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
     if(action.kind==='call'&&toCall>0&&!onPlaceBet(toCall))return;
     if(action.kind==='raise'&&!onPlaceBet(toCall+action.amount))return;
     const next=applyTableAction(round,action);
-    if(action.kind==='fold')setNote('내가 폴드했습니다');
+    if(action.kind==='fold'){setNote('내가 폴드했습니다');freezeFold(0,street);}
     seatActions.show(0,tableActionLabel(action.kind,toCall));
     if(next.closed)advance(next,hands); else setRound(next);
   };
@@ -4862,7 +4903,8 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
   const seatCards=(seat:number,spot:TableSpot)=>{
     if(!hands||!round)return null;
     const folded=round.seats[seat].folded;
-    const count=street===5&&!pending&&winners&&!winners.includes(seat)&&folded?0:deal.countFor(seat);
+    // 죽은 자리는 **죽을 때 장수에서 멈춥니다.** 승부까지 가면 진 죽은 패는 아예 치웁니다.
+    const count=street===5&&!pending&&winners&&!winners.includes(seat)&&folded?0:Math.min(deal.countFor(seat),foldedCards[seat]??7);
     const side=spot==='left'||spot==='right';
     return hands[seat].slice(0,count).map((card,index)=>{
       const privateCard=index<2||index===6;
@@ -4906,7 +4948,7 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
     <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
   </View>;
 
-  return <View style={styles.detailScreen}><ScreenHeader title="세븐 포커(Seven-card Poker)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
+  return <View style={styles.detailScreen}><ScreenHeader title="세븐 포커(Seven-card Poker)" onBack={onBack} atStake={round?round.seats[0].contributed:0} onForfeit={round&&street>=1&&street<=4?()=>{onSettle(round.seats[0].contributed,tableOthersPot(round),"loss","중도 포기 · 상대 패 비공개");onBack();}:undefined}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
     {round?<>
       <View style={styles.tableTopRow}>{spots.top.map(seat=>seatRow(seat,'top'))}</View>
       <View style={styles.tableMiddleRow}>
@@ -4947,11 +4989,18 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
   const [pending,setPending]=useState<{round:TableRound;table:HighLowTableResult}|null>(null);
   // 세븐 포커와 같습니다. 대기 0 · 첫 거리 3장에서 한 장씩 늘어 마지막에 7장.
   const dealTarget=street===0?0:street===5?7:Math.min(7,street+2);
+  /**
+   * 죽은 자리가 **그 순간 들고 있던 장수**. 그 뒤로는 카드를 안 받습니다.
+   * ⚠️ 세븐 포커와 같은 문제였습니다(2026-09-27). 거기 주석을 같이 보세요.
+   */
+  const [foldedCards,setFoldedCards]=useState<Record<number,number>>({});
+  const freezeFold=(seat:number,atStreet:number)=>setFoldedCards((current)=>current[seat]===undefined?{...current,[seat]:Math.min(7,atStreet+2)}:current);
   const deal=useTableDeal(hands,players,dealTarget);
   const dealing=deal.dealing;
 
   const start=()=>{
     if(selectedBet>coins||!onPlaceBet(selectedBet))return;
+    setFoldedCards({});
     setHands(dealHighLowTable(players));
     setRound(openTable(players,selectedBet));
     setStreet(1);setNote(players===2?'컴퓨터도 같은 금액을 냈습니다':`컴퓨터 ${players-1}명도 같은 금액을 냈습니다`);
@@ -4989,6 +5038,7 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
       const live=tableLive(round).length;
       const toCall=tableToCall(round,seat);
       const action=decidePokerAction({level,equity:multiwayEquity(oneOnOne,live-1),toCall,pot:tablePot(round),raiseSize:selectedBet,canRaise:round.raises<MAX_RAISES_PER_STREET,street:street-1});
+      if(action.kind==='fold')freezeFold(seat,street);
       const next=applyTableAction(round,action.kind==='fold'?{kind:'fold'}:action.kind==='raise'?{kind:'raise',amount:action.amount}:toCall>0?{kind:'call',amount:toCall}:{kind:'check'});
       setNote(`${tableSeatName(seat)} ${action.kind==='fold'?'폴드':action.kind==='raise'?`레이즈 +${action.amount.toLocaleString()}`:toCall>0?`콜 ${toCall.toLocaleString()}`:'체크'}`);
       seatActions.show(seat,tableActionLabel(action.kind,toCall));
@@ -5021,7 +5071,7 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
     if(action.kind==='call'&&toCall>0&&!onPlaceBet(toCall))return;
     if(action.kind==='raise'&&!onPlaceBet(toCall+action.amount))return;
     const next=applyTableAction(round,action);
-    if(action.kind==='fold')setNote('내가 폴드했습니다');
+    if(action.kind==='fold'){setNote('내가 폴드했습니다');freezeFold(0,street);}
     seatActions.show(0,tableActionLabel(action.kind,toCall));
     if(next.closed)advance(next,hands); else setRound(next);
   };
@@ -5049,7 +5099,8 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
           :label?<Text style={styles.tableSeatWinner}>{label} 승</Text>
           :round.actor===seat&&!round.closed?<Text style={styles.tableTurnMark}>차례</Text>:null}</View>
       </View>
-      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{hands[seat].slice(0,info.folded&&table?0:deal.countFor(seat)).map((card,index)=>{
+      <View style={[styles.tableSeatCards,side&&styles.tableSeatCardsColumn,spot==='mine'&&styles.tableSeatCardsMine,spot==='mine'&&styles.tableMyCardsSeven]}>{/* 죽은 자리는 죽을 때 장수에서 멈추고, 승부가 나면 아예 치웁니다. */}
+      {hands[seat].slice(0,info.folded&&table?0:Math.min(deal.countFor(seat),foldedCards[seat]??7)).map((card,index)=>{
         const privateCard=index<2||index===6;
         const hide=seat!==0&&privateCard&&!(street===5&&openedHidden(index)&&!info.folded);
         return <View key={card.id} style={[styles.sevenPokerCardSlot,privateCard?styles.sevenPokerSlotPrivate:styles.sevenPokerSlotPublic,
@@ -5078,7 +5129,7 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
     <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
   </View>;
 
-  return <View style={styles.detailScreen}><ScreenHeader title="하이로우(High–Low)" onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
+  return <View style={styles.detailScreen}><ScreenHeader title="하이로우(High–Low)" onBack={onBack} atStake={round?round.seats[0].contributed:0} onForfeit={round&&street>=1&&street<=4?()=>{onSettle(round.seats[0].contributed,tableOthersPot(round),0,"중도 포기 · 상대 패 비공개");onBack();}:undefined}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.sevenPokerTable]}>
     {round&&hands?<>
       <View style={styles.tableTopRow}>{spots.top.map(seat=>seatRow(seat,'top'))}</View>
       <View style={styles.tableMiddleRow}>
@@ -5452,7 +5503,7 @@ function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet
     <Pressable disabled={toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET} style={[styles.holdemAction,(toCall+selectedBet>coins||(round?.raises??0)>=MAX_RAISES_PER_STREET)&&styles.disabledCard]} onPress={()=>act({kind:'raise',amount:selectedBet})}><Text style={styles.primaryButtonText}>레이즈 +{selectedBet.toLocaleString()}</Text></Pressable>
   </View>;
 
-  return <View style={styles.detailScreen}><ScreenHeader title={omaha?'오마하(Omaha)':'텍사스 홀덤(Texas Hold’em)'} onBack={onBack}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.pokerFixedTable]}>
+  return <View style={styles.detailScreen}><ScreenHeader title={omaha?'오마하(Omaha)':'텍사스 홀덤(Texas Hold’em)'} onBack={onBack} atStake={round?round.seats[0].contributed:0} onForfeit={round&&stage>=1&&stage<=4?()=>{onSettle(round.seats[0].contributed,tableOthersPot(round),'loss','중도 포기 · 상대 패 비공개');onBack();}:undefined}/><View style={styles.fixedTableArea}><View style={[styles.holdemTable,styles.pokerFixedTable]}>
     {round&&hands?<>
       <View style={styles.tableTopRow}>{spots.top.map(seat=>seatRow(seat,'top'))}</View>
       {/*
@@ -6097,7 +6148,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
   const permanentFuritenNow=mode==='riichi'&&phase==='playing'&&getMahjongWaits(player,meldCount,profile.honors).length>0&&isMahjongFuriten(player,rivers[0],meldCount,profile.honors);
   const dangerGroups={safe:[] as MahjongTile[],caution:[] as MahjongTile[],danger:[] as MahjongTile[]};
   if(activeRiichiRivers.length)new Map(player.map((tile)=>[`${tile.suit}${tile.value}`,tile])).forEach((tile)=>{const score=tileDangerScore(tile,{riichiRivers:activeRiichiRivers,visibleTiles:visibleMahjongTiles});if(score===0)dangerGroups.safe.push(tile);else if(score<30)dangerGroups.caution.push(tile);else dangerGroups.danger.push(tile);});
-  const quit=()=>{computerRun.current++;if(phase==='playing')onSettle(selectedBet,'loss','중도 종료');onBack();};
+  const quit=()=>{computerRun.current++;if(phase==='playing')onSettle(selectedBet,'loss','중도 포기');onBack();};
   const winWithRiichi=(text:string)=>{
     const winType:'tsumo'|'ron'=pendingCall?'ron':'tsumo';
     const winningTile=pendingCall?.tile??player.find((tile)=>tile.id===drawnId)??player[player.length-1];
@@ -6179,7 +6230,7 @@ function RiichiGameScreen({mode,level,coins,selectedBet,onBack,onPlaceBet,onSett
               // ⚠️ 전에는 컴퓨터가 둘 때도 `내 차례`라고 적혀 있었습니다. 믿을 수 없는 안내였습니다.
               ? {step:`컴퓨터 ${computerTurn} 차례`,title:'생각하는 중… 잠시 기다리세요',detail:'컴퓨터가 한 장을 뽑고 한 장을 버립니다. 내 차례가 오면 새로 뽑은 패가 오른쪽에 따로 놓입니다.'}
               : {step:'내 차례',title:'따로 놓인 패가 방금 뽑은 패 · 한 장을 버리세요',detail:mode==='sichuan'?`정결한 ${suitNames[voidSuits[0]]}가 남아 있다면 그 종류부터 버리세요.`:'이어질 숫자나 같은 그림을 남기고, 몸통을 만들기 어려운 패를 누르세요.'};
-  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit}/><ScrollView ref={boardScroll} contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={[styles.mahjongSeat,computerTurn===3&&styles.mahjongSeatTurn]}>북 · 컴퓨터 3 · 전문가{computerTurn===3?" · 차례":""}</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===2&&styles.mahjongSeatTurn]}>서 · 컴퓨터 2 · 보통{computerTurn===2?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===1&&styles.mahjongSeatTurn]}>남 · 컴퓨터 1 · 쉬움{computerTurn===1?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
+  return <View style={styles.detailScreen}><ScreenHeader title={profile.title} onBack={quit} atStake={selectedBet} onForfeit={phase==="playing"?quit:undefined}/><ScrollView ref={boardScroll} contentContainerStyle={styles.mahjongPage}><View style={styles.mahjongTable}><View style={styles.mahjongOpponent}><Text style={[styles.mahjongSeat,computerTurn===3&&styles.mahjongSeatTurn]}>북 · 컴퓨터 3 · 전문가{computerTurn===3?" · 차례":""}</Text><View style={styles.mahjongBacks}>{Array.from({length:opponents[2]?.length??13},(_,i)=><View key={i} style={styles.mahjongBack}/>)}</View>{opponentMeldView(2)}</View><View style={styles.mahjongMiddle}><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===2&&styles.mahjongSeatTurn]}>서 · 컴퓨터 2 · 보통{computerTurn===2?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[2].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(1)}</View><View style={styles.mahjongCenter}><Text style={styles.mahjongRound}>{mode==='riichi'?riichiRoundLabel(matchState.roundIndex):mode==='hongkong'?hongKongRoundLabel(hkMatch.roundIndex):mode==='chinese'?chineseRoundLabel(cnMatch.roundIndex):`혈전 ${bloodState.winners.length}/3`}</Text><Text style={styles.mahjongWall}>{matchState.honba}본장 · 공탁 {matchState.riichiSticks}개</Text><Text style={styles.mahjongWall}>남은 패 {wall.length}</Text>{mode==='sichuan'&&<Text style={styles.mahjongVoidNote}>{choosingVoid?'정결 미선택':`정결 ${suitNames[voidSuits[0]]}`}</Text>}{mode==='hongkong'&&flowers[0].length>0&&<Text style={styles.mahjongVoidNote}>꽃패 {flowers[0].map((flower)=>flower.glyph).join('')}</Text>}<Text style={styles.mahjongPot}>{selectedBet.toLocaleString()} WC</Text>{mode==='riichi'&&<><Text style={styles.mahjongPoints}>{riichiPoints.toLocaleString()}점</Text><Text style={styles.mahjongWall}>나 {matchState.scores[0].toLocaleString()} · C1 {matchState.scores[1].toLocaleString()}</Text><Text style={styles.mahjongWall}>C2 {matchState.scores[2].toLocaleString()} · C3 {matchState.scores[3].toLocaleString()}</Text></>}{mode==='hongkong'&&<><Text style={styles.mahjongPoints}>{hkMatch.scores[0].toLocaleString()}점</Text><Text style={styles.mahjongWall}>C1 {hkMatch.scores[1]} · C2 {hkMatch.scores[2]} · C3 {hkMatch.scores[3]}</Text></>}{mode==='chinese'&&<><Text style={styles.mahjongPoints}>{cnMatch.scores[0]>0?'+':''}{cnMatch.scores[0]}점</Text><Text style={styles.mahjongWall}>C1 {cnMatch.scores[1]} · C2 {cnMatch.scores[2]} · C3 {cnMatch.scores[3]}</Text></>}{mode==='sichuan'&&<><Text style={styles.mahjongPoints}>{bloodState.scores[0]>0?'+':''}{bloodState.scores[0]}</Text><Text style={styles.mahjongWall}>C1 {bloodState.scores[1]} · C2 {bloodState.scores[2]} · C3 {bloodState.scores[3]}</Text></>}</View><View style={styles.mahjongSide}><Text style={[styles.mahjongSeat,computerTurn===1&&styles.mahjongSeatTurn]}>남 · 컴퓨터 1 · 쉬움{computerTurn===1?" · 차례":""}</Text><Text style={styles.mahjongRiver}>{rivers[1].slice(-8).map((tile)=>tile.glyph).join(' ')}</Text>{opponentMeldView(0)}</View></View><View style={styles.mahjongPlayerRiver}><Text style={styles.mahjongRiver}>{rivers[0].slice(-16).map((tile)=>tile.glyph).join(' ')}</Text>{riichiMarker!==''&&<Text style={styles.mahjongRiichiMarker}>↔ {rivers[0].find((tile)=>tile.id===riichiMarker)?.glyph} 리치 선언패</Text>}</View>{openMelds.length>0&&<View style={styles.mahjongMeldArea}><Text style={styles.mahjongMeldLabel}>내가 공개한 몸통</Text><View style={styles.mahjongMeldRow}>{openMelds.map((meld,index)=><View key={index} style={styles.mahjongOpenMeld}>{meld.map((tile)=><Text key={tile.id} style={styles.mahjongMeldGlyph}>{tile.glyph}</Text>)}</View>)}</View></View>}<Text style={styles.mahjongMessage}>{message}</Text>{phase!=='playing'&&<Pressable onPress={()=>setShowRules((value)=>!value)} style={styles.mahjongRulesToggle}><Text style={styles.mahjongRulesToggleText}>{showRules?'룰 설정 닫기':'⚙ 룰 설정'}</Text></Pressable>}
     {/* 요령 한 줄은 도움말을 폈을 때만 보입니다. 판이 화면에 들어오는 것이 먼저입니다. */}
     {/* ⚠️ 사천의 정결 고르기 상자가 떠 있을 때는 이 줄을 뺍니다 — 같은 말을 두 번 하는 데다
         둘을 같이 두면 판이 47만큼 넘쳐 아래가 잘렸습니다. */}
@@ -6609,7 +6660,7 @@ function GoStopGameScreen({mode,deckStyle,level,coins,selectedBet,onBack,onPlace
   const handCount=round?round.players[0].hand.length:0;
   const handStep=Math.min(55,handCount>1?(335-52)/(handCount-1):55);
 
-  return <View style={styles.detailScreen}><ScreenHeader title={title} onBack={onBack}/>
+  return <View style={styles.detailScreen}><ScreenHeader title={title} onBack={onBack} atStake={selectedBet} onForfeit={round&&!settled&&!round.finished?()=>{onSettle(selectedBet,selectedBet,"loss","중도 포기");onBack();}:undefined}/>
     {!round?<ScrollView contentContainerStyle={styles.holdemPage}>
       <View style={styles.sicboHero}><Text style={styles.sicboHeroDice}>{mode==='matgo'?'二 花':'花 GO'}</Text><Text style={styles.detailLead}>{mode==='matgo'?'두 명이 7점부터 고·스톱':'세 명이 3점부터 고·스톱'}</Text></View>
       <Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>패 돌리기 · {selectedBet.toLocaleString()} WC</Text></Pressable>
@@ -6779,7 +6830,7 @@ function MinhwatuGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coin
     let next=playMinhwatuTurn(round,card.id,automaticMinhwaChoice(round,card,selectedId));setPendingPlay(null);next=runComputer(next);setRound(next);if(next.finished)finish(next);
   };
   const mine=round?scoreMinhwatu(round.players[0].captured):null;const computer=round?scoreMinhwatu(round.players[1].captured):null;
-  return <View style={styles.detailScreen}><ScreenHeader title="민화투" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
+  return <View style={styles.detailScreen}><ScreenHeader title="민화투" onBack={onBack} atStake={selectedBet} onForfeit={round&&!settled?()=>{onSettle(selectedBet,selectedBet,'loss','중도 포기');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.holdemPage}>
     {!round?<><View style={styles.sicboHero}><Text style={styles.sicboHeroDice}>光 · 十 · 띠</Text><Text style={styles.detailLead}>피는 0점 · 그림과 약을 모으세요</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={start}><Text style={styles.primaryButtonText}>패 돌리기 · {selectedBet.toLocaleString()} WC</Text></Pressable></>:<>
       <View style={styles.panel}><Row title="차례" value={round.finished?'경기 종료':round.turn===0?'내 차례':'컴퓨터 차례'}/><View style={styles.separator}/><Row title="더미" value={`${round.deck.length}장`}/><View style={styles.separator}/><Row title="현재 기본 점수" value={`나 ${mine?.base??0} · 컴퓨터 ${computer?.base??0}`}/></View>
       <Text style={styles.sectionTitle}>컴퓨터가 모은 패</Text><Text style={styles.helperText}>광 {computer?.bright??0}점 · 열끗 {computer?.animal??0}점 · 띠 {computer?.ribbon??0}점 · 약 {computer?.medicines.map((item)=>item.name).join('·')||'없음'}</Text>
@@ -6828,7 +6879,7 @@ function YukbaekGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:{coins
   const computer=round?scoreYukbaek(round.players[1].captured):null;
   const yakuLabel=(score:ReturnType<typeof scoreYukbaek>|null)=>score?.yaku.map((item)=>`${item.name} ${item.points}`).join(' · ')||'아직 없음';
 
-  return <View style={styles.detailScreen}><ScreenHeader title="육백" onBack={onBack}/><ScrollView contentContainerStyle={styles.holdemPage}>
+  return <View style={styles.detailScreen}><ScreenHeader title="육백" onBack={onBack} atStake={selectedBet} onForfeit={round&&match.winner===null?()=>{onSettle(selectedBet,selectedBet,'loss','중도 포기');onBack();}:undefined}/><ScrollView contentContainerStyle={styles.holdemPage}>
     {!round?<><View style={styles.sicboHero}><Text style={styles.sicboHeroDice}>六百</Text><Text style={styles.detailLead}>한 판씩 점수를 쌓아 먼저 600점</Text></View><Pressable disabled={selectedBet>coins} style={[styles.primaryButton,styles.fullWidthButton,selectedBet>coins&&styles.disabledCard]} onPress={beginMatch}><Text style={styles.primaryButtonText}>육백 경기 시작 · {selectedBet.toLocaleString()} WC</Text></Pressable></>:<>
       <View style={styles.panel}><Row title="현재 판" value={`${Math.max(1,match.round-(round.finished?1:0))}번째`}/><View style={styles.separator}/><Row title="누적 점수" value={`나 ${match.totals[0]} · 컴퓨터 ${match.totals[1]} / 600`}/><View style={styles.separator}/><Row title="이번 판" value={`나 ${mine?.total??0} · 컴퓨터 ${computer?.total??0}`}/><View style={styles.separator}/><Row title="차례" value={round.finished?'판 종료':round.turn===0?'내 차례':'컴퓨터 차례'}/></View>
       <Text style={styles.sectionTitle}>컴퓨터가 모은 패</Text><Text style={styles.helperText}>패 점수 {computer?.cardPoints??0} · 역 점수 {computer?.yakuPoints??0} · {yakuLabel(computer)}</Text>
@@ -6962,7 +7013,7 @@ function DoriGameScreen({level,coins,selectedBet,onBack,onPlaceBet,onSettle}:{le
   };
   const label=(r:ReturnType<typeof evaluateDori>)=>r.kind==='hand'?`${r.hand.name} · ${r.hand.detail}`:'못 지음 · 세 장으로 10의 배수를 만들 수 없습니다';
 
-  return <View style={styles.detailScreen}><ScreenHeader title="도리짓고땡" onBack={onBack}/><View style={styles.fixedTableArea}>
+  return <View style={styles.detailScreen}><ScreenHeader title="도리짓고땡" onBack={onBack} atStake={betting.mine} onForfeit={phase==='bet'||phase==='reveal'?()=>{onSettle(betting.mine,betting.theirs,'loss','중도 포기 · 상대 패 비공개');onBack();}:undefined}/><View style={styles.fixedTableArea}>
     <View style={[styles.holdemTable,styles.fiveDrawTable]}>
       <Text style={styles.holdemSeat}>컴퓨터</Text>
       {round?handRow(round.opponent,showdown&&!pending?evaluateDori(round.opponent):null,!showdown,winnerSide('opponent'),pending?reveal.opened:undefined):null}
@@ -7126,7 +7177,7 @@ function SeotdaGameScreen({level,coins,selectedBet,rules,onBack,onPlaceBet,onSet
     return (side==='player')===(showdown.result==='win')?'winner':'dim';
   };
 
-  return <View style={styles.detailScreen}><ScreenHeader title="섰다" onBack={onBack}/><View style={styles.fixedTableArea}>
+  return <View style={styles.detailScreen}><ScreenHeader title="섰다" onBack={onBack} atStake={betting.mine} onForfeit={phase==='bet'||phase==='reveal'?()=>{onSettle(betting.mine,betting.theirs,'loss','중도 포기 · 상대 패 비공개');onBack();}:undefined}/><View style={styles.fixedTableArea}>
     <View style={[styles.holdemTable,styles.fiveDrawTable]}>
       <Text style={styles.holdemSeat}>컴퓨터</Text>
       <View style={styles.hwatuHand}>{round?round.opponent.map((card,index)=><HwatuCardView key={card.id} card={card} hidden={!showdown||index>=opened} emphasis={emphasis('opponent')} showMonth/>):null}</View>
@@ -7535,7 +7586,7 @@ function BlackjackGameScreen(props: {
         블랙잭만 오른쪽에 "나가기"를 따로 뒀었는데, 게임마다 나가는 자리가 다르면
         누를 곳을 매번 찾아야 합니다. 새 게임에도 `ScreenHeader`를 쓰세요.
       */}
-      <ScreenHeader title="블랙잭(Blackjack)" onBack={props.onExit} />
+      <ScreenHeader title="블랙잭(Blackjack)" onBack={props.onExit} atStake={totalBet} onForfeit={phase!=='result'?()=>{if(!settled.current){settled.current=true;props.onSettle('loss',totalBet);}props.onExit();}:undefined} />
       {/* ⚠️ 이 줄은 판 바깥이라 좌우 여백을 따로 줘야 합니다. 없으면 코인 숫자가 화면 끝에 붙습니다. */}
       <View style={[styles.rouletteStatusRow, styles.blackjackStatusRow]}>
         <Text style={styles.rouletteBalance}>{props.coins.toLocaleString()} WC</Text>
@@ -8131,7 +8182,7 @@ function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, on
   // 테이블을 위로 쓸면 주사위를 던집니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling);
   const shownDice=rolling?rollingDice:last?.dice??rollingDice;
-  return <View style={styles.crapsScreen}><ScreenHeader title="크랩스(Craps)" onBack={onBack} /><ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View><View {...panHandlers} style={[styles.crapsTable,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':point ? `POINT ${point}` : 'COME OUT'}</Text><View style={[styles.diceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{shownDice.map((value,index)=><Die key={index} value={value} rolling={rolling} index={index}/>)}</View><Text style={styles.crapsTotal}>{rolling?'주사위가 테이블 위를 구릅니다':pull>0?'놓으면 굴러갑니다':last ? `합계 ${last.total}` : '테이블을 위로 쓸어 던지세요'}</Text>{last?.outcome === 'continue' && <Text style={styles.crapsContinue}>포인트 {last.point} · 다시 굴리세요</Text>}{last && last.outcome !== 'continue' && <Text style={[styles.crapsOutcome, last.outcome === 'win' ? styles.positive : last.outcome === 'loss' ? styles.negative : null]}>{last.outcome === 'win' ? '승리' : last.outcome === 'loss' ? '패배' : '무승부'} · {crapsNet(bet, selectedBet, last) > 0 ? '+' : ''}{crapsNet(bet, selectedBet, last).toLocaleString()} WC</Text>}</View><Pressable disabled={rolling} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction,rolling&&styles.disabledCard]} onPress={() => roll()}><Text style={styles.primaryButtonText}>{rolling?'주사위 굴리는 중…':active ? `포인트 ${point} · 다시 굴리기` : `${names[bet]}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable><Text style={styles.sectionTitle}>베팅 위치</Text><View style={styles.crapsBetGrid}>{(['pass','dontPass','field'] as CrapsBet[]).map((item) => <Pressable key={item} disabled={active||rolling} style={[styles.crapsBetArea, bet === item && styles.baccaratBetActive]} onPress={() => { setBet(item); setLast(null); }} >{bet === item && !active && <CoinStack amount={selectedBet} compact />}<Text style={styles.baccaratBetTitle}>{names[item]}</Text><Text style={styles.baccaratOdds}>{item === 'field' ? '한 번 굴림' : '1:1'}</Text></Pressable>)}</View><Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={active||rolling} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>게임 전용 가상 코인 · 필드 2·12는 2배 수익</Text></ScrollView></View>;
+  return <View style={styles.crapsScreen}><ScreenHeader title="크랩스(Craps)" onBack={onBack} atStake={selectedBet} onForfeit={active&&point!==null?()=>{onSettle(bet,selectedBet,{dice:[1,1],total:2,point,outcome:'loss'});onBack();}:undefined} /><ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View><View {...panHandlers} style={[styles.crapsTable,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':point ? `POINT ${point}` : 'COME OUT'}</Text><View style={[styles.diceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{shownDice.map((value,index)=><Die key={index} value={value} rolling={rolling} index={index}/>)}</View><Text style={styles.crapsTotal}>{rolling?'주사위가 테이블 위를 구릅니다':pull>0?'놓으면 굴러갑니다':last ? `합계 ${last.total}` : '테이블을 위로 쓸어 던지세요'}</Text>{last?.outcome === 'continue' && <Text style={styles.crapsContinue}>포인트 {last.point} · 다시 굴리세요</Text>}{last && last.outcome !== 'continue' && <Text style={[styles.crapsOutcome, last.outcome === 'win' ? styles.positive : last.outcome === 'loss' ? styles.negative : null]}>{last.outcome === 'win' ? '승리' : last.outcome === 'loss' ? '패배' : '무승부'} · {crapsNet(bet, selectedBet, last) > 0 ? '+' : ''}{crapsNet(bet, selectedBet, last).toLocaleString()} WC</Text>}</View><Pressable disabled={rolling} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction,rolling&&styles.disabledCard]} onPress={() => roll()}><Text style={styles.primaryButtonText}>{rolling?'주사위 굴리는 중…':active ? `포인트 ${point} · 다시 굴리기` : `${names[bet]}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable><Text style={styles.sectionTitle}>베팅 위치</Text><View style={styles.crapsBetGrid}>{(['pass','dontPass','field'] as CrapsBet[]).map((item) => <Pressable key={item} disabled={active||rolling} style={[styles.crapsBetArea, bet === item && styles.baccaratBetActive]} onPress={() => { setBet(item); setLast(null); }} >{bet === item && !active && <CoinStack amount={selectedBet} compact />}<Text style={styles.baccaratBetTitle}>{names[item]}</Text><Text style={styles.baccaratOdds}>{item === 'field' ? '한 번 굴림' : '1:1'}</Text></Pressable>)}</View><Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={active||rolling} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>게임 전용 가상 코인 · 필드 2·12는 2배 수익</Text></ScrollView></View>;
 }
 
 function BaccaratRules({ compact = false }: { compact?: boolean }) {
@@ -10281,6 +10332,19 @@ const styles = StyleSheet.create({
   doubleButtonSubtext: { color: colors.muted, fontSize: 11, marginTop: 4 },
   gameActionText: { color: colors.text, fontSize: 18, fontWeight: '900' },
   gameActionSubtext: { color: '#D6D9DF', fontSize: 10, marginTop: 3 },
+  /**
+   * 뒤로가기를 눌렀을 때 뜨는 `포기 / 계속하기` 창(2026-09-28).
+   * ⚠️ **계속하기가 큰 버튼**입니다. 실수로 뒤로가기를 눌렀을 때 누르는 쪽이라 손가락 밑에 와야 합니다.
+   *   포기는 글씨만 둬서 한 번 더 생각하게 합니다 — 누르면 돈을 잃습니다.
+   */
+  quitBackdrop: { flex: 1, backgroundColor: 'rgba(8,4,10,0.72)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  quitSheet: { width: '100%', maxWidth: 340, padding: 22, borderRadius: 20, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.goldDeep, gap: 12 },
+  quitTitle: { color: colors.goldLight, fontSize: 17, fontWeight: '900', textAlign: 'center' },
+  quitBody: { color: colors.text, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  quitBodyStrong: { color: '#FFC9CF', fontWeight: '900' },
+  quitStake: { color: '#FFC9CF', fontSize: 15, fontWeight: '900', textAlign: 'center' },
+  quitGiveUp: { paddingVertical: 12, alignItems: 'center' },
+  quitGiveUpText: { color: colors.muted, fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
   resultPanel: { marginTop: 22, padding: 18, alignItems: 'center', borderRadius: 20, backgroundColor: '#0D1917', borderWidth: 1, borderColor: '#796126' },
   resultTitle: { color: colors.goldLight, fontSize: 30, fontWeight: '900' },
   resultNet: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 7 },
