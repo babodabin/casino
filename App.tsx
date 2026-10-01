@@ -3763,7 +3763,9 @@ function PredictGameScreen({group,coins,selectedBet,onBack,onPlaceBet,onSettle}:
 
     {!question?<View style={styles.holdemGuide}><Text style={styles.slotRulesTitle}>낼 문제가 없습니다</Text><Text style={styles.slotRuleText}>받아 둔 문제 중 이 갈래에 맞는 것이 없습니다. 다음 갱신 때 채워집니다.</Text></View>:<>
       <View style={styles.predictCard}>
-        <Text style={styles.predictWhen}>{closed} 마감 · {question.category}</Text>
+        {/* 스포츠는 `Sports` 대신 종목을 적고, 누구와 붙은 경기인지를 문제 바로 위에 둡니다(2026-10-01). */}
+        <Text style={styles.predictWhen}>{closed} 마감 · {question.league||question.category}</Text>
+        {question.matchup?<Text style={styles.predictMatchup}>{question.matchup}</Text>:null}
         <Text style={styles.predictTitle}>{question.title}</Text>
         {question.title!==question.sourceTitle&&<Text style={styles.predictSource}>{question.sourceTitle}</Text>}
         <Text style={styles.predictMarket}>끝나기 전 시장은 <Text style={styles.predictMarketStrong}>{predictFavourite(question)==='yes'?'예':'아니오'} {predictPercent(question,predictFavourite(question))}%</Text>로 봤습니다</Text>
@@ -9850,6 +9852,8 @@ const styles = StyleSheet.create({
   predictTabTextActive: { color: colors.gold },
   predictCard: { width: '100%', gap: 8, padding: 15, borderRadius: 14, backgroundColor: 'rgba(16,22,34,0.72)', borderWidth: 1, borderColor: '#3B2839' },
   predictWhen: { color: '#A08FA0', fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+  /** 누구와 붙은 경기인지(`Fulham vs Manchester United`). 문제 위에 한 줄로 둡니다(2026-10-01). */
+  predictMatchup: { color: '#F5DE8A', fontSize: 14, fontWeight: '800', lineHeight: 20 },
   predictTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900', lineHeight: 26 },
   predictSource: { color: '#6F7A8A', fontSize: 11, fontWeight: '600', lineHeight: 16 },
   predictMarket: { color: '#A08FA0', fontSize: 13, fontWeight: '700', marginTop: 2 },

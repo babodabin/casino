@@ -20,6 +20,12 @@ const SPORT_SERIES = [
   'KXUCLGAME', 'KXEPLGAME', 'KXLALIGAGAME', 'KXSERIEAGAME', 'KXBUNDESLIGAGAME',
   'KXNBAGAME', 'KXMLBGAME', 'KXNFLGAME', 'KXNHLGAME', 'KXATPMATCH', 'KXWTAMATCH',
 ];
+/** 화면에 적을 종목 이름. 문제 위에 `프리미어리그 · Fulham vs Manchester United`처럼 붙습니다. */
+const SPORT_LEAGUE = {
+  KXUCLGAME: '챔피언스리그', KXEPLGAME: '프리미어리그', KXLALIGAGAME: '라리가', KXSERIEAGAME: '세리에 A',
+  KXBUNDESLIGAGAME: '분데스리가', KXNBAGAME: 'NBA 농구', KXMLBGAME: 'MLB 야구', KXNFLGAME: 'NFL 미식축구',
+  KXNHLGAME: 'NHL 아이스하키', KXATPMATCH: 'ATP 남자 테니스', KXWTAMATCH: 'WTA 여자 테니스',
+};
 // 사회문제 쪽은 이 카테고리에서 고릅니다.
 // 날씨(Climate and Weather)는 뺐습니다. "8월 27일 최고기온이 99도 미만일까?"처럼
 // 도시 이름도 없이 기온만 묻는 문제가 대부분이라 문제로서 재미가 없습니다.
@@ -61,23 +67,43 @@ async function settledMarkets(seriesTicker) {
   return (data?.markets ?? []).filter(isSettled);
 }
 
-/** 영어 제목을 그대로 두면 한국어 앱에서 겉돌아, 흔한 스포츠 형식만 우리말로 바꿉니다. */
+/**
+ * 경기 이름(`Fulham vs Manchester United`). 마켓 제목은 `Fulham wins` 한 줄뿐이라
+ * **누구와 붙었는지가 없습니다.** 마켓이 속한 이벤트의 제목에 두 팀이 다 있어서 그걸 받아 옵니다.
+ * ⚠️ 2026-10-01 전에는 이걸 안 받아서 문제가 `Detroit이(가) 이겼을까?`처럼 상대도 종목도 없었습니다.
+ * 한 경기에 마켓이 둘셋(양 팀 · 무승부)이라 같은 이벤트는 한 번만 부릅니다.
+ */
+const eventTitles = new Map();
+async function matchupOf(market) {
+  const key = market.event_ticker;
+  if (!key) return '';
+  if (!eventTitles.has(key)) {
+    const data = await get(`/events/${key}`);
+    eventTitles.set(key, (data?.event?.title ?? '').trim());
+  }
+  return eventTitles.get(key);
+}
+
+/**
+ * 영어 제목을 그대로 두면 한국어 앱에서 겉돌아, 흔한 스포츠 형식만 우리말로 바꿉니다.
+ * ⚠️ 팀 이름이 영어라 받침을 알 수 없어서 `이(가)`가 붙었습니다. **조사가 바뀌지 않는 꼴**로 씁니다 —
+ *   `Fulham의 승리였을까?` · `무승부였을까?`. 누구와 붙었는지는 문제 위에 따로 적습니다(`matchup`).
+ */
 function koreanTitle(market, category) {
   const title = (market.title ?? '').trim();
-  // "A vs B Pro Football game: A wins?" 처럼 생긴 것. 팀 이름과 종목이 붙어 있어
-  // 둘을 갈라내기 어려우므로 앞부분은 그대로 두고 묻는 말만 우리말로 바꿉니다.
+  if (category !== 'Sports') return title;   // 사회문제는 문장이라 손대지 않고 그대로 둡니다.
+  // "A vs B Pro Football game: A wins?" 처럼 생긴 것. 묻는 말만 우리말로 바꿉니다.
   const gameAt = title.indexOf(' game: ');
   if (gameAt > 0 && /\s+wins\?$/i.test(title)) {
-    const matchup = title.slice(0, gameAt).trim();
     const who = title.slice(gameAt + 7).replace(/\s+wins\?$/i, '').trim();
-    if (matchup && who) return `${matchup} — ${who}이(가) 이겼을까?`;
+    if (who) return `${who}의 승리였을까?`;
   }
+  if (/^tie is the result$/i.test(title)) return '무승부였을까?';
   const winner = title.match(/^(.+?)\s+wins$/i);
-  if (winner) return `${winner[1]}이(가) 이겼을까?`;
+  if (winner) return `${winner[1]}의 승리였을까?`;
   const regTime = title.match(/^Reg Time:\s*(.+)$/i);
-  if (regTime) return regTime[1].toLowerCase() === 'tie' ? '정규시간에 비겼을까?' : `정규시간에 ${regTime[1]}이(가) 이겼을까?`;
-  if (category === 'Sports') return title;
-  return title;   // 사회문제는 문장이라 손대지 않고 그대로 둡니다.
+  if (regTime) return regTime[1].toLowerCase() === 'tie' ? '정규시간에 비겼을까?' : `정규시간에 ${regTime[1]}의 승리였을까?`;
+  return title;
 }
 
 // 스포츠는 최근 것이라야 재미가 있지만, 사회문제는 오래된 일도 문제로 성립합니다.
@@ -105,10 +131,14 @@ async function main() {
     const probability = await priceBeforeClose(seriesTicker, market);
     if (probability === null) return;
     seen.add(market.ticker);
+    const sports = category === 'Sports';
     picked.push({
       id: market.ticker,
       bucket,
       category,
+      // 스포츠만 붙입니다. 사회문제 제목은 이미 무엇을 묻는지 다 적힌 문장입니다.
+      league: sports ? (SPORT_LEAGUE[seriesTicker] ?? '') : '',
+      matchup: sports ? await matchupOf(market) : '',
       title: koreanTitle(market, category),
       sourceTitle: (market.title ?? '').trim(),
       yesLabel: (market.yes_sub_title ?? '예').trim(),

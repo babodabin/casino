@@ -621,6 +621,25 @@ const mayDecide = !noCards && scoreGoStop(players[actingPlayer].captured).total 
 
 # 지금까지 한 것
 
+## 2026-10-01 (이어서) — 예측 마켓 스포츠 문제에 경기 이름 붙이기
+
+문제가 `Detroit이(가) 이겼을까?` · `Tie is the result`처럼 **누구와 붙었는지도, 무슨 종목인지도 없었습니다.**
+kalshi 마켓 제목이 `Detroit wins` 한 줄뿐이라서입니다. 두 팀 이름은 마켓이 속한 **이벤트 제목**에 있습니다
+(`Fulham vs Manchester United` · `Fils vs Van Assche` · `Game 1: Chicago C vs San Diego`).
+
+- `scripts/fetch-kalshi.mjs` — 스포츠 마켓마다 `/events/{event_ticker}`의 제목을 받아 `matchup`에 넣습니다.
+  한 경기에 마켓이 둘셋(양 팀 · 무승부)이라 같은 이벤트는 한 번만 부릅니다(`eventTitles`)
+- 종목 이름표 `league` — `SPORT_LEAGUE`(프리미어리그 · MLB 야구 · ATP 남자 테니스 …)
+- 문장은 **조사가 안 바뀌는 꼴**로 바꿨습니다. 팀 이름이 영어라 받침을 알 수 없어 `이(가)`가 붙었습니다.
+  `Fulham의 승리였을까?` · `무승부였을까?` · `정규시간에 비겼을까?`
+- 화면은 `2026-09-20 마감 · 프리미어리그` → **`Fulham vs Manchester United`**(금색 한 줄) → 문제 순서입니다.
+  `Sports`라고만 적던 자리에 종목이 들어갑니다
+- `league` · `matchup`은 비워 둘 수 있게 했습니다(`?`). 사회문제는 제목이 이미 다 적힌 문장이라 안 붙입니다
+
+⚠️ 문제 파일(`src/predictdata.ts`)은 GitHub Actions가 매일 새로 만듭니다. **이 스크립트를 고쳐야 다음 날에도 이어집니다** —
+파일만 고치면 다음 날 아침에 원래대로 돌아갑니다.
+
+
 ## 2026-10-01 — 전체 점검: 32개 게임 한 바퀴
 
 **배포된 사이트**(babodabin.github.io/casino)에서 아이폰 크기로 32개 게임을 하나씩 열었습니다.

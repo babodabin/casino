@@ -17,6 +17,13 @@ export type PredictQuestion = {
   bucket: PredictBucket;
   /** kalshi가 붙인 갈래. Sports면 스포츠, 나머지는 전부 사회문제로 묶습니다. */
   category: string;
+  /**
+   * 스포츠만 — 종목(`프리미어리그`)과 경기 이름(`Fulham vs Manchester United`).
+   * ⚠️ 2026-10-01에 넣었습니다. 전에는 `Detroit이(가) 이겼을까?`처럼 상대도 종목도 없었습니다.
+   * 그 전에 받은 문제에는 없을 수 있어 비워 둘 수 있게 했습니다.
+   */
+  league?: string;
+  matchup?: string;
   /** 화면에 보여줄 문장. 스포츠는 우리말로 바꿔 두었고 사회문제는 원문 그대로입니다. */
   title: string;
   sourceTitle: string;
