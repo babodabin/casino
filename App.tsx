@@ -4983,11 +4983,12 @@ function SevenPokerGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
+          {/* 끝나면 낸 돈 줄 자리에 정산표를 작게 둡니다(2026-10-10). 앞줄에 두면 낮은 폰에서 내 패가 `다시 플레이` 밑으로 밀렸습니다. */}
+          {payoutRows?<TablePayoutTable rows={payoutRows} compact/>:<Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>}
         </View>
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
-      <View style={styles.tableFrontRow}>{payoutRows?<TablePayoutTable rows={payoutRows}/>:outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
+      <View style={styles.tableFrontRow}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
     </>:<Text style={styles.sevenPokerHint}>앞의 2장과 마지막 1장은 비공개입니다</Text>}
   </View>
@@ -5167,7 +5168,8 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
+          {/* 끝나면 낸 돈 줄 자리에 정산표를 작게 둡니다(2026-10-10). 앞줄에 두면 낮은 폰에서 내 패가 `다시 플레이` 밑으로 밀렸습니다. */}
+          {payoutRows?<TablePayoutTable rows={payoutRows} compact/>:<Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>}
         </View>
         <View style={[styles.tableSideSlot,styles.tableSideSlotTall]}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
@@ -5176,8 +5178,7 @@ function HighLowGameScreen({players,level,coins,selectedBet,onBack,onPlaceBet,on
         아래 버튼칸이 내 패를 덮었습니다. 세븐 포커처럼 **앞줄 하나**에 합칩니다. 승부 전에는 마지막 수를 적습니다.
       */}
       {/* 승부 직전의 `비공개 카드를 엽니다`는 바로 아래 `컴퓨터 카드 공개` 버튼과 같은 말이라 뺍니다 — 한 줄로 둡니다. */}
-      <View style={styles.tableFrontRow}>{payoutRows?<TablePayoutTable rows={payoutRows}/>
-        :street>=5?<Text style={styles.pokerInlineResult}>내 하이 {evaluateHoldem(hands[0]).label} · 내 로우 {myLow?myLow.label:'없음'}</Text>
+      <View style={styles.tableFrontRow}>{street>=5?<Text style={styles.pokerInlineResult}>내 하이 {evaluateHoldem(hands[0]).label} · 내 로우 {myLow?myLow.label:'없음'}</Text>
         :outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>
         :note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
@@ -5333,14 +5334,19 @@ const tablePayoutsByShares = (round: TableRound, shares: number[], labelOf?: (se
 };
 
 /** 위 표를 화면에 그립니다. 이긴 줄은 금색으로 두르고 증감은 빨강·파랑으로 적습니다. */
-function TablePayoutTable({ rows }: { rows: TablePayout[] }) {
+/**
+ * 판이 끝난 뒤 자리마다 족보와 증감.
+ * `compact`는 판 가운데 POT 아래 좁은 자리(약 180)에 넣을 때 씁니다 — 글자를 줄이고 `WC`를 뺍니다(2026-10-10).
+ * ⚠️ 전에는 판 앞줄에 넓게 넣었는데, 표 4줄이 늘어나며 낮은 폰에서 **내 패가 `다시 플레이` 밑으로 밀렸습니다.**
+ */
+function TablePayoutTable({ rows, compact = false }: { rows: TablePayout[]; compact?: boolean }) {
   return (
-    <View style={styles.payoutTable}>
+    <View style={[styles.payoutTable, compact && styles.payoutTableCompact]}>
       {rows.map((row) => (
-        <View key={row.seat} style={[styles.payoutRow, row.won && styles.payoutRowWon]}>
-          <Text style={[styles.payoutName, row.folded && styles.payoutDim]} numberOfLines={1}>{row.name}</Text>
-          <Text style={[styles.payoutHand, row.folded && styles.payoutDim]} numberOfLines={1}>{row.hand}</Text>
-          <Text style={[styles.payoutNet, row.net > 0 && styles.positive, row.net < 0 && styles.negative]}>{row.net > 0 ? '+' : ''}{row.net.toLocaleString()} WC</Text>
+        <View key={row.seat} style={[styles.payoutRow, compact && styles.payoutRowCompact, row.won && styles.payoutRowWon]}>
+          <Text style={[styles.payoutName, compact && styles.payoutNameCompact, row.folded && styles.payoutDim]} numberOfLines={1}>{row.name}</Text>
+          <Text style={[styles.payoutHand, compact && styles.payoutTextCompact, row.folded && styles.payoutDim]} numberOfLines={1}>{row.hand}</Text>
+          <Text style={[styles.payoutNet, compact && styles.payoutTextCompact, row.net > 0 && styles.positive, row.net < 0 && styles.negative]}>{row.net > 0 ? '+' : ''}{row.net.toLocaleString()}{compact ? '' : ' WC'}</Text>
         </View>
       ))}
     </View>
@@ -5556,11 +5562,12 @@ function PokerGameScreen({mode,players,level,coins,selectedBet,onBack,onPlaceBet
         <View style={styles.tableSideSlot}>{spots.left.map(seat=>seatRow(seat,'left'))}</View>
         <View style={styles.tableCenterSlot}>
           <Text style={styles.holdemPot}>POT {tablePot(round).toLocaleString()} WC</Text>
-          <Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>
+          {/* 끝나면 낸 돈 줄 자리에 정산표를 작게 둡니다(2026-10-10). 앞줄에 두면 낮은 폰에서 내 패가 `다시 플레이` 밑으로 밀렸습니다. */}
+          {payoutRows?<TablePayoutTable rows={payoutRows} compact/>:<Text style={styles.pokerContribution} numberOfLines={3}>{tableContributionLine(round)}</Text>}
         </View>
         <View style={styles.tableSideSlot}>{spots.right.map(seat=>seatRow(seat,'right'))}</View>
       </View>
-      <View style={styles.tableFrontRow}>{payoutRows?<TablePayoutTable rows={payoutRows}/>:outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
+      <View style={styles.tableFrontRow}>{outcome?<Text style={styles.holdemOutcome}>{outcome}</Text>:note?<Text style={styles.pokerOpponentNote}>{note}</Text>:null}</View>
       {seatRow(0,'mine')}
     </>:<Text style={styles.sevenPokerHint}>{omaha?'개인 카드 넉 장 중 두 장을 반드시 씁니다':'개인 카드 두 장과 공용 다섯 장으로 만듭니다'}</Text>}
   </View>
@@ -9445,6 +9452,11 @@ const styles = StyleSheet.create({
   payoutName: { width: 62, color: colors.text, fontSize: 11, fontWeight: '800' },
   payoutHand: { flex: 1, color: colors.muted, fontSize: 11 },
   payoutNet: { color: colors.text, fontSize: 11, fontWeight: '900', fontVariant: ['tabular-nums'] },
+  /** 판 가운데 좁은 자리용(2026-10-10). 폭 180 안에 이름 · 족보 · 증감이 들어가야 합니다. */
+  payoutTableCompact: { marginTop: 4, gap: 1 },
+  payoutRowCompact: { gap: 4, paddingVertical: 1, paddingHorizontal: 4, borderRadius: 6 },
+  payoutNameCompact: { width: 44, fontSize: 10 },
+  payoutTextCompact: { fontSize: 10 },
   payoutDim: { opacity: 0.55 },
   /** 손패 정렬 버튼. 손패 제목 줄 오른쪽에 붙는 작은 알약입니다. */
   handSortButton: { minHeight: 30, justifyContent: 'center', paddingHorizontal: 11, borderRadius: 15, borderWidth: 1, borderColor: colors.goldDeep, backgroundColor: 'rgba(0,0,0,0.3)' },
