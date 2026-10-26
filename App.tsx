@@ -2630,7 +2630,11 @@ function BalatroHardGameScreen({ coins, selectedBet, onBack, onPlaceBet, onSettl
  *
  * 판이 끝났거나 아직 시작 전이면 `onForfeit`을 넘기지 마세요 — 그때는 묻지 않고 바로 나갑니다.
  */
-function ScreenHeader({ title, onBack, onForfeit, atStake = 0 }: { title: string; onBack: () => void; onForfeit?: () => void; atStake?: number }) {
+/**
+ * `forfeitBody`는 나갈 때 무엇을 잃는지가 게임마다 다를 때만 씁니다(크랩스는 패스 라인 · 컴만 잃고 나머지는 돌려받습니다).
+ * 안 주면 '건 돈을 잃습니다'로 나옵니다.
+ */
+function ScreenHeader({ title, onBack, onForfeit, atStake = 0, forfeitBody }: { title: string; onBack: () => void; onForfeit?: () => void; atStake?: number; forfeitBody?: string }) {
   const [asking, setAsking] = useState(false);
   // 판이 끝나면 창을 닫습니다. 열어 둔 채로 판이 끝나는 일이 있습니다(컴퓨터가 이기는 등).
   useEffect(() => { if (!onForfeit && asking) setAsking(false); }, [onForfeit, asking]);
@@ -2642,7 +2646,7 @@ function ScreenHeader({ title, onBack, onForfeit, atStake = 0 }: { title: string
         <Pressable style={styles.quitBackdrop} onPress={() => setAsking(false)}>
           <Pressable style={styles.quitSheet} onPress={() => {}}>
             <Text style={styles.quitTitle}>판이 아직 안 끝났습니다</Text>
-            <Text style={styles.quitBody}>지금 나가면 <Text style={styles.quitBodyStrong}>포기</Text>가 되어 건 돈을 잃습니다. 기록에는 중도 포기로 남습니다.</Text>
+            {forfeitBody ? <Text style={styles.quitBody}>{forfeitBody}</Text> : <Text style={styles.quitBody}>지금 나가면 <Text style={styles.quitBodyStrong}>포기</Text>가 되어 건 돈을 잃습니다. 기록에는 중도 포기로 남습니다.</Text>}
             {atStake > 0 && <Text style={styles.quitStake}>잃는 금액 {atStake.toLocaleString()} WC</Text>}
             <Pressable style={[styles.primaryButton, styles.fullWidthButton]} onPress={() => setAsking(false)}>
               <Text style={styles.primaryButtonText}>계속하기</Text>
@@ -8354,7 +8358,7 @@ function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, on
   const ratio = (value: number) => (value === 9 / 5 ? '9:5' : value === 7 / 5 ? '7:5' : value === 7 / 6 ? '7:6' : value === 2 ? '2:1' : value === 3 / 2 ? '3:2' : '6:5');
 
   return <View style={styles.crapsScreen}>
-    <ScreenHeader title="크랩스(Craps)" onBack={leave} atStake={locked} onForfeit={locked > 0 ? leave : undefined} />
+    <ScreenHeader title="크랩스(Craps)" onBack={leave} atStake={locked} onForfeit={locked > 0 ? leave : undefined} forfeitBody="지금 나가면 패스 라인 · 컴에 건 원금은 잃습니다. 플레이스 · 하드웨이 · 오즈 · 돈트 패스는 내려서 돌려받습니다." />
     <ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}>
       <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View>
       <View {...panHandlers} style={[styles.crapsTable, rolling && styles.diceTableRolling, pull > 0 && styles.diceMatPulled]}>
