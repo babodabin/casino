@@ -126,12 +126,17 @@ import {
   type RoundResult,
 } from './src/blackjack';
 import {
+  rouletteBetLabel,
+  rouletteBetNumbers,
   rouletteBetWins,
   rouletteColor,
+  rouletteInsideOptions,
   rouletteNet,
   roulettePayout,
+  rouletteTargets,
   spinRoulette,
   type RouletteBet,
+  type RouletteInsideMode,
 } from './src/roulette';
 import {
   baccaratNet,
@@ -143,7 +148,7 @@ import {
   type BaccaratGuest,
   type BaccaratWinner,
 } from './src/baccarat';
-import { crapsNet, crapsPayout, resolveCrapsRoll, rollDice, type CrapsBet, type CrapsRollResult } from './src/craps';
+import { commitCrapsBets, crapsCannotBet, crapsHardNumbers, crapsHardOdds, crapsLockedStake, crapsPlaceNumbers, crapsPlaceOdds, crapsSpotLabel, crapsTrueOdds, leaveCrapsTable, newCrapsTable, rollCrapsTable, rollDice, type CrapsHardNumber, type CrapsPlaceNumber, type CrapsResolution, type CrapsSpot, type CrapsTable, type CrapsWager } from './src/craps';
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
 import { soundCues, vibrationFor, type SoundCue } from './src/sound';
@@ -409,14 +414,14 @@ const gameCategories: GameCategory[] = [
     { name: '바카라', icon: '◆', description: '플레이어와 뱅커 중 승리할 쪽을 선택', status: 'playable' },
     // ⚠️ 룰렛은 2026-10-10에 주사위에서 옮겨 왔습니다. 주사위를 안 쓰고 딜러가 공을 굴리는 게임이라서입니다.
     //   크랩스 · 식보도 실제로는 딜러가 있지만 이 앱에서는 **내가** 주사위를 던져서 주사위에 둡니다.
-    { name: '룰렛', icon: '◎', description: '숫자와 색상에 코인을 거는 휠 게임', status: 'playable' },
+    { name: '룰렛', icon: '◎', description: '숫자 · 스플릿 · 코너 · 색상까지 거는 유럽식 휠 게임', status: 'playable' },
     { name: '파이 고우', icon: '牌', description: '7장을 5장 하이와 2장 로우로 나누는 카드 게임', status: 'playable' },
     { name: '틴 파티', icon: '十', description: '인도권에서 사랑받는 세 장 카드 게임', status: 'playable' },
     { name: '발라트로', icon: 'J★', description: '조커를 끼고 포커 족보로 점수를 쌓는 게임 · 이지와 하드', status: 'playable' },
   ]},
   { name: '주사위', icon: '⚄', detail: '야찌 · 크랩스 · 식보', eyebrow: 'DICE & ARCADE', games: [
     { name: '야찌', icon: '⚅', description: '다섯 주사위를 굴려 목표 조합과 최고 점수를 만드는 게임', status: 'playable' },
-    { name: '크랩스', icon: '⚄', description: '두 개의 주사위 결과를 예측하는 게임', status: 'playable' },
+    { name: '크랩스', icon: '⚄', description: '패스 라인 · 오즈 · 컴 · 플레이스 · 하드웨이를 같이 거는 주사위 판', status: 'playable' },
     { name: '식보', icon: '⚂', description: '세 개의 주사위 조합을 예측하는 게임', status: 'playable' },
     { name: '물고기 룰렛', icon: '魚', description: '둥근 바다에 푼 열두 마리와 문어 한 마리가 어느 자리로 들어가는지 지켜보기', status: 'playable' },
   ]},
@@ -1087,12 +1092,18 @@ function CasinoApp() {
     }
   };
 
-  const settleCraps = (bet: CrapsBet, stake: number, result: CrapsRollResult) => {
-    const payout = crapsPayout(bet, stake, result);
-    const net = crapsNet(bet, stake, result);
+  /**
+   * 크랩스는 한 번 굴릴 때 여러 베팅이 같이 끝날 수 있어서 **그 굴림 하나를 한 판**으로 적습니다(2026-10-26).
+   * 판을 떠나며 돌려받기만 한 것(무승부만)은 기록에 안 남깁니다 — 이기고 진 것이 없습니다.
+   */
+  const settleCraps = (resolutions: CrapsResolution[], detail: string) => {
+    const payout = resolutions.reduce((sum, item) => sum + item.payout, 0);
+    const stake = resolutions.reduce((sum, item) => sum + item.stake, 0);
     if (payout > 0) setCoins((current) => current + payout);
-    const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
-    addRecord((count) => ({ id: `${Date.now()}-craps-${count}`, game: '크랩스', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${names[bet]} · 주사위 합 ${result.total}` }));
+    if (resolutions.every((item) => item.outcome === 'push')) return;
+    const net = payout - stake;
+    const marks = resolutions.map((item) => `${item.label} ${item.outcome === 'win' ? '승' : item.outcome === 'loss' ? '패' : '무'}`).join(' · ');
+    addRecord((count) => ({ id: `${Date.now()}-craps-${count}`, game: '크랩스', result: net > 0 ? 'win' : net < 0 ? 'loss' : 'push', difficulty, bet: stake, net, playedAt: new Date().toISOString(), detail: `${marks} · ${detail}` }));
   };
 
   const settleSlot = (stake: number, result: SlotResult, usedFreeSpin: boolean) => {
@@ -1378,8 +1389,9 @@ function CasinoApp() {
             lead="숫자와 색상에 코인을 거는 휠 게임"
             rules={[
               '1. 0이 하나뿐인 유럽식 휠(37칸)을 씁니다.',
-              '2. 빨강·검정·홀·짝·구간은 1:1, 12개 묶음은 2:1입니다.',
-              '3. 숫자 하나를 맞히면 35:1로 돌려받습니다.',
+              '2. 빨강·검정·홀·짝·구간은 1:1, 12개 묶음(다즌)과 세로 한 줄(컬럼)은 2:1입니다.',
+              '3. 숫자 하나 35:1 · 스플릿(붙은 두 숫자) 17:1 · 스트리트(가로 한 줄) 11:1 · 코너(네 칸) 8:1 · 식스 라인(가로 두 줄) 5:1.',
+              '4. 어느 칸에 걸어도 0 하나 때문에 환급률은 97.3%로 같습니다.',
             ]}
             startLabel="룰렛 시작"
             coins={coins}
@@ -7832,7 +7844,7 @@ function BlackjackGameScreen(props: {
 }
 
 function CrapsRules() {
-  return <View style={styles.baccaratRules}><Text style={styles.baccaratRulesTitle}>처음에는 세 가지 베팅만 알면 돼요</Text><Text style={styles.baccaratRuleText}>패스 라인: 첫 굴림 7·11 승리, 2·3·12 패배. 그 외에는 포인트가 됩니다.</Text><Text style={styles.baccaratRuleText}>돈트 패스: 패스 라인의 반대이며, 첫 굴림 12는 무승부입니다.</Text><Text style={styles.baccaratRuleText}>필드: 한 번만 굴려 2·3·4·9·10·11·12면 승리합니다.</Text><Text style={styles.baccaratRuleText}>포인트가 정해지면 같은 숫자가 7보다 먼저 나오면 패스 라인이 이깁니다.</Text></View>;
+  return <View style={styles.baccaratRules}><Text style={styles.baccaratRulesTitle}>처음에는 패스 라인 하나만 알아도 돼요</Text><Text style={styles.baccaratRuleText}>패스 라인: 첫 굴림 7·11 승리, 2·3·12 패배. 그 외 숫자는 포인트가 되고, 포인트가 7보다 먼저 다시 나오면 승리합니다.</Text><Text style={styles.baccaratRuleText}>돈트 패스: 패스 라인의 반대이며, 첫 굴림 12는 무승부입니다.</Text><Text style={styles.baccaratRuleText}>오즈: 포인트가 정해진 뒤 패스 라인 뒤에 더 얹는 돈. 하우스 몫이 0인 유일한 베팅입니다(건 돈의 3배까지).</Text><Text style={styles.baccaratRuleText}>컴: 포인트가 정해진 뒤에 거는 패스 라인. 다음 굴림이 그 베팅의 첫 굴림입니다.</Text><Text style={styles.baccaratRuleText}>플레이스: 4·5·6·8·9·10 중 고른 숫자가 7보다 먼저 나오면 승리합니다.</Text><Text style={styles.baccaratRuleText}>하드웨이: 4·6·8·10이 같은 눈 두 개(예: 3+3)로 나오면 승리. 다른 조합이나 7이 먼저면 패배합니다.</Text><Text style={styles.baccaratRuleText}>필드: 한 번만 굴려 2·3·4·9·10·11·12면 승리합니다.</Text><Text style={styles.baccaratRuleText}>여러 자리에 같이 걸 수 있습니다.</Text></View>;
 }
 
 function CrapsSetupScreen(props: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onDifficultyChange: (value: string) => void; onBetChange: (value: number) => void; onStart: () => void }) {
@@ -8255,27 +8267,142 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
   </View></View>;
 }
 
-function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (bet: CrapsBet, stake: number, result: CrapsRollResult) => void }) {
-  const [bet, setBet] = useState<CrapsBet>('pass'); const [point, setPoint] = useState<number | null>(null); const [last, setLast] = useState<CrapsRollResult | null>(null); const [active, setActive] = useState(false); const [rolling,setRolling]=useState(false); const [rollingDice,setRollingDice]=useState<[number,number]>([1,6]); const option = difficultyOptions.find((item) => item.name === savedTier) ?? difficultyOptions[2]; const difficulty = betTierName(savedTier);
-  const names = { pass: '패스 라인', dontPass: '돈트 패스', field: '필드' } as const;
+/**
+ * 크랩스. 실제 판처럼 **여러 자리에 같이** 겁니다(2026-10-26 — 전에는 패스 · 돈트 · 필드 중 하나만).
+ *
+ * 자리를 누를 때마다 고른 금액만큼 칩이 **올라가기만** 하고, 돈은 **굴릴 때** 빠집니다.
+ * 그래서 굴리기 전에는 '올린 것 지우기'로 물릴 수 있습니다. 한 번 굴리면 판에 붙습니다.
+ * 판정은 전부 `src/craps.ts`의 `rollCrapsTable`이 합니다.
+ */
+function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (resolutions: CrapsResolution[], detail: string) => void }) {
+  const [table, setTable] = useState<CrapsTable>(newCrapsTable);
+  const [pending, setPending] = useState<Partial<Record<CrapsSpot, number>>>({});
+  const [last, setLast] = useState<{ total: number; resolutions: CrapsResolution[] } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [rolling, setRolling] = useState(false);
+  const [rollingDice, setRollingDice] = useState<[number, number]>([1, 6]);
+  // 굴리는 도중에 뒤로 나가면 굴림 끝의 정산을 건너뜁니다. 나갈 때 이미 정산했습니다.
+  const leftRef = useRef(false);
+  const option = difficultyOptions.find((item) => item.name === savedTier) ?? difficultyOptions[2];
+  const difficulty = betTierName(savedTier);
+  const pendingTotal = Object.values(pending).reduce((sum, value) => sum + (value ?? 0), 0);
+  const onTable = table.wagers.reduce((sum, wager) => sum + wager.stake + wager.odds, 0);
+  const canRoll = !rolling && (pendingTotal > 0 || table.wagers.length > 0);
+  const locked = crapsLockedStake(table);
+
+  const wagerOf = (kind: CrapsWager['kind'], number?: number) => table.wagers.find((wager) => wager.kind === kind && wager.number === number);
+  /** 판에 붙어 있는 금액. 오즈 자리는 그 밑 베팅의 오즈입니다. */
+  const activeOn = (spot: CrapsSpot): number => {
+    if (spot === 'passOdds') return wagerOf('pass')?.odds ?? 0;
+    if (spot.startsWith('comeOdds')) return wagerOf('come', Number(spot.slice(8)))?.odds ?? 0;
+    if (spot.startsWith('place')) return wagerOf('place', Number(spot.slice(5)))?.stake ?? 0;
+    if (spot.startsWith('hard')) return wagerOf('hard', Number(spot.slice(4)))?.stake ?? 0;
+    return wagerOf(spot as CrapsWager['kind'])?.stake ?? 0;
+  };
+
+  const put = (spot: CrapsSpot) => {
+    if (rolling) return;
+    const reason = crapsCannotBet(table, spot, selectedBet, pending[spot] ?? 0);
+    if (reason) { setNotice(`${crapsSpotLabel(spot)} · ${reason}`); return; }
+    if (pendingTotal + selectedBet > coins) { setNotice('코인이 모자랍니다'); return; }
+    setNotice(null);
+    setPending((current) => ({ ...current, [spot]: (current[spot] ?? 0) + selectedBet }));
+  };
+
   const roll = (power = 0) => {
-    if(rolling)return;
-    if (!active && !onPlaceBet(selectedBet)) return;
-    setRolling(true);setLast(null);
-    shakeDice(spinFor(power,1300),
-      ()=>setRollingDice(rollDice()),
-      ()=>{
-        const dice=rollDice();setRollingDice(dice);
-        const result = resolveCrapsRoll(bet, point, dice);
-        setLast(result);setRolling(false);
-        if (result.outcome === 'continue') { setPoint(result.point); setActive(true); }
-        else { setPoint(null); setActive(false); onSettle(bet, selectedBet, result); }
+    if (!canRoll) return;
+    if (pendingTotal > 0 && !onPlaceBet(pendingTotal)) { setNotice('코인이 모자랍니다'); return; }
+    const committed = commitCrapsBets(table, pending);
+    setTable(committed); setPending({}); setNotice(null);
+    setRolling(true); setLast(null);
+    shakeDice(spinFor(power, 1300),
+      () => setRollingDice(rollDice()),
+      () => {
+        if (leftRef.current) return;
+        const dice = rollDice(); setRollingDice(dice);
+        const { table: next, resolutions } = rollCrapsTable(committed, dice);
+        setTable(next); setLast({ total: dice[0] + dice[1], resolutions }); setRolling(false);
+        if (resolutions.length) onSettle(resolutions, `주사위 ${dice[0]}+${dice[1]}`);
       });
   };
   // 테이블을 위로 쓸면 주사위를 던집니다.
   const { pull, panHandlers, spinFor } = useThrowGesture((power) => roll(power), rolling);
-  const shownDice=rolling?rollingDice:last?.dice??rollingDice;
-  return <View style={styles.crapsScreen}><ScreenHeader title="크랩스(Craps)" onBack={onBack} atStake={selectedBet} onForfeit={active&&point!==null?()=>{onSettle(bet,selectedBet,{dice:[1,1],total:2,point,outcome:'loss'});onBack();}:undefined} /><ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}><View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View><View {...panHandlers} style={[styles.crapsTable,rolling&&styles.diceTableRolling,pull>0&&styles.diceMatPulled]}><Text style={styles.crapsPointLabel}>{rolling?'ROLLING…':point ? `POINT ${point}` : 'COME OUT'}</Text><View style={[styles.diceRow,{transform:[{translateY:-Math.round(pull*14)}]}]}>{shownDice.map((value,index)=><Die key={index} value={value} rolling={rolling} index={index}/>)}</View><Text style={styles.crapsTotal}>{rolling?'주사위가 테이블 위를 구릅니다':pull>0?'놓으면 굴러갑니다':last ? `합계 ${last.total}` : '테이블을 위로 쓸어 던지세요'}</Text>{last?.outcome === 'continue' && <Text style={styles.crapsContinue}>포인트 {last.point} · 다시 굴리세요</Text>}{last && last.outcome !== 'continue' && <Text style={[styles.crapsOutcome, last.outcome === 'win' ? styles.positive : last.outcome === 'loss' ? styles.negative : null]}>{last.outcome === 'win' ? '승리' : last.outcome === 'loss' ? '패배' : '무승부'} · {crapsNet(bet, selectedBet, last) > 0 ? '+' : ''}{crapsNet(bet, selectedBet, last).toLocaleString()} WC</Text>}</View><Pressable disabled={rolling} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction,rolling&&styles.disabledCard]} onPress={() => roll()}><Text style={styles.primaryButtonText}>{rolling?'주사위 굴리는 중…':active ? `포인트 ${point} · 다시 굴리기` : `${names[bet]}에 ${selectedBet.toLocaleString()} WC 베팅`}</Text></Pressable><Text style={styles.sectionTitle}>베팅 위치</Text><View style={styles.crapsBetGrid}>{(['pass','dontPass','field'] as CrapsBet[]).map((item) => <Pressable key={item} disabled={active||rolling} style={[styles.crapsBetArea, bet === item && styles.baccaratBetActive]} onPress={() => { setBet(item); setLast(null); }} >{bet === item && !active && <CoinStack amount={selectedBet} compact />}<Text style={styles.baccaratBetTitle}>{names[item]}</Text><Text style={styles.baccaratOdds}>{item === 'field' ? '한 번 굴림' : '1:1'}</Text></Pressable>)}</View><Text style={styles.sectionTitle}>베팅 금액</Text><View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={active||rolling} onPress={() => onBetChange(amount)} />)}</View><Text style={styles.disclaimer}>게임 전용 가상 코인 · 필드 2·12는 2배 수익</Text></ScrollView></View>;
+
+  /** 나가기. 내릴 수 있는 베팅은 돌려받고 패스 라인 · 컴 원금만 잃습니다. 올리기만 한 칩은 돈이 안 빠졌으니 그냥 사라집니다. */
+  const leave = () => {
+    leftRef.current = true;
+    if (table.wagers.length) onSettle(leaveCrapsTable(table), '판을 떠남');
+    onBack();
+  };
+
+  const net = last ? last.resolutions.reduce((sum, item) => sum + item.payout - item.stake, 0) : 0;
+  const resultLine = last?.resolutions.map((item) => `${item.label} ${item.outcome === 'win' ? `+${(item.payout - item.stake).toLocaleString()}` : item.outcome === 'loss' ? `-${(item.stake - item.payout).toLocaleString()}` : '±0'}`).join(' · ');
+
+  const spot = (key: CrapsSpot, name: string, odds: string, wide = false, extra?: string) => {
+    const active = activeOn(key); const added = pending[key] ?? 0;
+    const closed = crapsCannotBet(table, key, 0) !== null;
+    return <Pressable key={key} disabled={rolling} onPress={() => put(key)} style={[styles.crapsSpot, wide && styles.crapsSpotWide, closed && !active && styles.crapsSpotClosed, (active > 0 || added > 0) && styles.crapsSpotBet]}>
+      <Text style={styles.crapsSpotName}>{name}</Text>
+      <Text style={styles.crapsSpotOdds}>{odds}</Text>
+      {extra ? <Text style={styles.crapsSpotExtra}>{extra}</Text> : null}
+      {/* 금액 줄은 늘 자리를 잡습니다. 걸 때만 생기면 칸 높이가 바뀌어 판이 흔들립니다. */}
+      <Text style={styles.crapsSpotAmount} numberOfLines={1}>{active > 0 ? active.toLocaleString() : ''}{added > 0 ? <Text style={styles.crapsSpotPending}>{active > 0 ? ' ' : ''}+{added.toLocaleString()}</Text> : null}</Text>
+    </Pressable>;
+  };
+  const comeNumbers = table.wagers.filter((wager) => wager.kind === 'come' && wager.number !== undefined).map((wager) => wager.number as CrapsPlaceNumber);
+  const hardFaces: Record<CrapsHardNumber, string> = { 4: '⚁⚁', 6: '⚂⚂', 8: '⚃⚃', 10: '⚄⚄' };
+  const ratio = (value: number) => (value === 9 / 5 ? '9:5' : value === 7 / 5 ? '7:5' : value === 7 / 6 ? '7:6' : value === 2 ? '2:1' : value === 3 / 2 ? '3:2' : '6:5');
+
+  return <View style={styles.crapsScreen}>
+    <ScreenHeader title="크랩스(Craps)" onBack={leave} atStake={locked} onForfeit={locked > 0 ? leave : undefined} />
+    <ScrollView contentContainerStyle={styles.crapsPage} showsVerticalScrollIndicator={false}>
+      <View style={styles.rouletteStatusRow}><View><Text style={styles.eyebrow}>CRAPS</Text><Text style={styles.rouletteBalance}>{coins.toLocaleString()} WC</Text></View><View style={styles.difficultyBadge}><Text style={styles.difficultyBadgeText}>{difficulty}</Text></View></View>
+      <View {...panHandlers} style={[styles.crapsTable, rolling && styles.diceTableRolling, pull > 0 && styles.diceMatPulled]}>
+        <Text style={styles.crapsPointLabel}>{rolling ? 'ROLLING…' : table.point ? `POINT ${table.point}` : 'COME OUT'}</Text>
+        <View style={[styles.diceRow, { transform: [{ translateY: -Math.round(pull * 14) }] }]}>{rollingDice.map((value, index) => <Die key={index} value={value} rolling={rolling} index={index} />)}</View>
+        <Text style={styles.crapsTotal}>{rolling ? '주사위가 테이블 위를 구릅니다' : pull > 0 ? '놓으면 굴러갑니다' : last ? `합계 ${last.total}` : canRoll ? '테이블을 위로 쓸어 던지세요' : '아래 자리를 눌러 거세요'}</Text>
+        {last && last.resolutions.length > 0
+          ? <Text style={[styles.crapsResultLine, net > 0 ? styles.positive : net < 0 ? styles.negative : null]} numberOfLines={3}>{resultLine}</Text>
+          : last ? <Text style={styles.crapsContinue}>{table.point ? `포인트 ${table.point} · 끝난 베팅 없음` : '끝난 베팅 없음'}</Text> : null}
+      </View>
+      <Pressable disabled={!canRoll} style={[styles.primaryButton, styles.rouletteSpinButton, styles.gameResultAction, !canRoll && styles.disabledCard]} onPress={() => roll()}>
+        <Text style={styles.primaryButtonText}>{rolling ? '주사위 굴리는 중…' : pendingTotal > 0 ? `${pendingTotal.toLocaleString()} WC 걸고 굴리기` : table.wagers.length ? '다시 굴리기' : '자리를 눌러 거세요'}</Text>
+      </Pressable>
+      <View style={styles.crapsStatusRow}>
+        <Text style={[styles.crapsNotice, notice ? styles.negative : null]} numberOfLines={1}>{notice ?? `판에 걸린 돈 ${onTable.toLocaleString()} WC${pendingTotal ? ` · 새로 올림 ${pendingTotal.toLocaleString()}` : ''}`}</Text>
+        {pendingTotal > 0 && !rolling ? <Pressable onPress={() => { setPending({}); setNotice(null); }} hitSlop={8}><Text style={styles.crapsClear}>올린 것 지우기</Text></Pressable> : null}
+      </View>
+
+      <Text style={styles.sectionTitle}>라인</Text>
+      <View style={styles.crapsRow}>
+        {spot('pass', '패스 라인', '1:1')}
+        {spot('dontPass', '돈트 패스', '1:1 · 12 무')}
+        {spot('come', '컴', '1:1')}
+        {spot('field', '필드', '2·12는 2:1')}
+      </View>
+      <View style={styles.crapsRow}>
+        {spot('passOdds', '패스 라인 오즈', table.point ? `포인트 ${table.point} · ${ratio(crapsTrueOdds[table.point as CrapsPlaceNumber])} · 하우스 몫 0` : '포인트가 정해지면 · 하우스 몫 0', true)}
+      </View>
+      {comeNumbers.length > 0 && <View style={styles.crapsRow}>{comeNumbers.map((number) => spot(`comeOdds${number}`, `컴 ${number} 오즈`, ratio(crapsTrueOdds[number])))}</View>}
+
+      <Text style={styles.sectionTitle}>플레이스 · 숫자가 7보다 먼저</Text>
+      <View style={styles.crapsRow}>
+        {crapsPlaceNumbers.map((number) => {
+          const come = wagerOf('come', number);
+          return spot(`place${number}`, String(number), ratio(crapsPlaceOdds[number]), false, come ? `컴 ${(come.stake + come.odds).toLocaleString()}` : undefined);
+        })}
+      </View>
+
+      <Text style={styles.sectionTitle}>하드웨이 · 같은 눈 두 개로</Text>
+      <View style={styles.crapsRow}>
+        {crapsHardNumbers.map((number) => spot(`hard${number}`, `${hardFaces[number]} ${number}`, `${crapsHardOdds[number]}:1`))}
+      </View>
+
+      <Text style={styles.sectionTitle}>칩 하나의 금액</Text>
+      <View style={styles.betGrid}>{option.bets.map((amount, index) => <BetOptionCoin key={amount} amount={amount} level={index + 1} selected={selectedBet === amount} disabled={rolling} onPress={() => onBetChange(amount)} />)}</View>
+      <Text style={styles.disclaimer}>자리를 누를 때마다 칩 하나 · 플레이스와 하드웨이는 포인트가 없을 때 쉽니다 · 오즈는 건 돈의 3배까지 · 나가면 패스 라인과 컴만 잃고 나머지는 돌려받습니다</Text>
+    </ScrollView>
+  </View>;
 }
 
 function BaccaratRules({ compact = false }: { compact?: boolean }) {
@@ -8482,6 +8609,16 @@ function BaccaratGameScreen({
   );
 }
 
+/** 안쪽 베팅 종류. 배당은 원금을 뺀 값으로 적습니다(판에 적힌 그대로). */
+const rouletteInsideOdds: Record<RouletteInsideMode, string> = { straight: '35:1', split: '17:1', street: '11:1', corner: '8:1', sixline: '5:1' };
+const rouletteInsideModes: { mode: RouletteInsideMode; name: string; hint: string }[] = [
+  { mode: 'straight', name: '숫자 하나', hint: '숫자 하나를 누르세요' },
+  { mode: 'split', name: '스플릿', hint: '붙어 있는 두 숫자 · 먼저 하나를 누르세요' },
+  { mode: 'street', name: '스트리트', hint: '가로 한 줄 세 숫자 · 그 줄의 아무 숫자나 누르세요' },
+  { mode: 'corner', name: '코너', hint: '네 칸이 만나는 곳 · 먼저 하나를 누르세요' },
+  { mode: 'sixline', name: '식스 라인', hint: '가로 두 줄 여섯 숫자 · 먼저 하나를 누르세요' },
+];
+
 function RouletteGameScreen({
   coins,
   difficulty,
@@ -8526,8 +8663,33 @@ function RouletteGameScreen({
     { label: '2번째 12', bet: { type: 'dozen2' } },
     { label: '3번째 12', bet: { type: 'dozen3' } },
   ];
-  const betLabel = bet.type === 'straight' ? `숫자 ${bet.number}` : outsideBets.find((item) => item.bet.type === bet.type)?.label ?? '';
+  const betLabel = rouletteBetLabel(bet) || (outsideBets.find((item) => item.bet.type === bet.type)?.label ?? '');
   const won = resultNumber !== null && rouletteBetWins(bet, resultNumber);
+  /**
+   * 안쪽 베팅. 실제 판은 칸 **경계**에 칩을 올리지만 휴대폰에서 경계를 정확히 누르기는 어렵습니다.
+   * 그래서 **종류를 먼저 고르고 숫자를 누릅니다.** 하나로 정해지지 않으면(스플릿 · 코너 · 식스 라인)
+   * 첫 숫자를 잡아 두고, 함께 묶일 수 있는 칸을 빛내서 **두 번째 숫자**를 누르게 합니다.
+   */
+  const [insideMode, setInsideMode] = useState<RouletteInsideMode>('straight');
+  const [anchor, setAnchor] = useState<number | null>(null);
+  const targets = anchor === null ? new Map<number, number[]>() : rouletteTargets(insideMode, anchor);
+  const covered = new Set(bet.type in rouletteInsideOdds || bet.type.startsWith('column') ? rouletteBetNumbers(bet) : []);
+  const coinOn = bet.type in rouletteInsideOdds ? Math.min(...rouletteBetNumbers(bet)) : null;
+  const choose = (next: RouletteBet) => { setBet(next); setAnchor(null); setPhase('betting'); };
+  const tapNumber = (number: number) => {
+    const picked = anchor !== null ? targets.get(number) : undefined;
+    if (picked) { choose({ type: insideMode, numbers: picked }); return; }
+    if (anchor === number) { setAnchor(null); return; }
+    if (insideMode === 'straight') { choose({ type: 'straight', number }); return; }
+    const options = rouletteInsideOptions(insideMode, number);
+    if (options.length === 1) choose({ type: insideMode, numbers: options[0] });
+    else if (options.length > 1) setAnchor(number);
+  };
+  const insideHint = anchor !== null
+    ? insideMode === 'split' ? `${anchor} 옆에서 빛나는 숫자를 하나 더 누르세요`
+      : insideMode === 'corner' ? `${anchor}에서 대각선으로 빛나는 숫자를 누르세요`
+        : `${anchor}의 위나 아래 줄에서 빛나는 숫자를 누르세요`
+    : rouletteInsideModes.find((item) => item.mode === insideMode)?.hint ?? '';
 
   // 스핀을 누르는 순간 코인이 빠지므로, 회전 애니메이션이 끝나든 중간에 화면을 벗어나든
   // 정산은 반드시 한 번 실행되어야 합니다. 결과 숫자는 이미 정해져 있습니다.
@@ -8707,13 +8869,34 @@ function RouletteGameScreen({
           })}
         </View>
 
-        <Text style={styles.sectionTitle}>숫자 하나 선택 · 35:1</Text>
-        <View style={styles.numberGrid}>
-          {Array.from({ length: 37 }, (_, number) => {
-            const active = bet.type === 'straight' && bet.number === number;
-            const color = rouletteColor(number);
-            return <Pressable key={number} disabled={phase === 'spinning'} onPress={() => { setBet({ type: 'straight', number }); setPhase('betting'); }} style={[styles.numberCell, color === 'red' ? styles.numberRed : color === 'black' ? styles.numberBlack : styles.numberGreen, active && styles.numberActive]}>{active && <View style={styles.numberCoin}><Text style={styles.numberCoinText}>{selectedBet.toLocaleString()}</Text><Text style={styles.numberCoinUnit}>WC</Text></View>}<Text style={[styles.numberText, active && styles.numberTextWithCoin]}>{number}</Text></Pressable>;
-          })}
+        <Text style={styles.sectionTitle}>숫자 베팅</Text>
+        <View style={styles.rouletteModeRow}>
+          {rouletteInsideModes.map((item) => <Pressable key={item.mode} disabled={phase === 'spinning'} onPress={() => { setInsideMode(item.mode); setAnchor(null); }} style={[styles.rouletteModeChip, insideMode === item.mode && styles.rouletteModeChipActive]}>
+            <Text style={styles.rouletteModeName}>{item.name}</Text>
+            <Text style={styles.rouletteOdds}>{rouletteInsideOdds[item.mode]}</Text>
+          </Pressable>)}
+        </View>
+        <Text style={[styles.rouletteInsideHint, anchor !== null && styles.rouletteInsideHintWaiting]}>{insideHint}</Text>
+        {/*
+          판은 실제 룰렛 판을 세운 모양입니다 — 가로 한 줄이 1·2·3, 4·5·6 …이고 0은 맨 위에 따로 있습니다.
+          스플릿 · 코너 · 식스 라인은 이 모양에서 붙어 있는 칸끼리라, 모양이 진짜와 같아야 고르기가 맞습니다.
+        */}
+        <View style={styles.rouletteTable}>
+          {[[0], ...Array.from({ length: 12 }, (_, row) => [row * 3 + 1, row * 3 + 2, row * 3 + 3])].map((cells) => <View key={cells[0]} style={styles.rouletteTableRow}>
+            {cells.map((number) => {
+              const color = rouletteColor(number);
+              return <Pressable key={number} disabled={phase === 'spinning'} onPress={() => tapNumber(number)} style={[styles.rouletteTableCell, color === 'red' ? styles.numberRed : color === 'black' ? styles.numberBlack : styles.numberGreen, (bet.type === 'straight' && rouletteBetNumbers(bet)[0] === number || covered.has(number)) && styles.numberActive, targets.has(number) && styles.rouletteCellTarget, anchor === number && styles.rouletteCellAnchor]}>
+                <Text style={styles.numberText}>{number}</Text>
+                {(bet.type === 'straight' ? rouletteBetNumbers(bet)[0] === number : coinOn === number) && <View style={styles.rouletteCellCoin}><Text style={styles.numberCoinText}>{selectedBet.toLocaleString()}</Text></View>}
+              </Pressable>;
+            })}
+          </View>)}
+          <View style={styles.rouletteTableRow}>
+            {(['column1', 'column2', 'column3'] as const).map((type) => <Pressable key={type} disabled={phase === 'spinning'} onPress={() => choose({ type })} style={[styles.rouletteColumnButton, bet.type === type && styles.rouletteBetActive]}>
+              <Text style={styles.rouletteBetText}>세로 {type.slice(-1)}줄</Text>
+              <Text style={styles.rouletteOdds}>2:1</Text>
+            </Pressable>)}
+          </View>
         </View>
 
         <Text style={styles.sectionTitle}>베팅 금액</Text>
@@ -8721,7 +8904,7 @@ function RouletteGameScreen({
           {difficultyOption.bets.map((amount) => <BetOptionCoin key={amount} amount={amount} selected={selectedBet === amount} disabled={phase === 'spinning'} onPress={() => onBetChange(amount)} />)}
         </View>
 
-        <Text style={styles.disclaimer}>유럽식 단일 0 룰렛 · 게임 전용 코인</Text>
+        <Text style={styles.disclaimer}>유럽식 단일 0 룰렛 · 어느 칸에 걸어도 환급률 97.3% · 게임 전용 코인</Text>
       </ScrollView>
     </View>
   );
@@ -10960,6 +11143,21 @@ const styles = StyleSheet.create({
   crapsOutcome: { fontSize: 16, fontWeight: '900', marginTop: 7 },
   crapsBetGrid: { flexDirection: 'row', gap: 8 },
   crapsBetArea: { flex: 1, minHeight: 105, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: '#173328', borderWidth: 1, borderColor: '#4B665B' },
+  crapsRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
+  crapsSpot: { flex: 1, minHeight: 64, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 6, borderRadius: 12, backgroundColor: '#173328', borderWidth: 1, borderColor: '#4B665B' },
+  crapsSpotWide: { minHeight: 52 },
+  // 지금은 못 거는 자리. 눌러 보면 왜 안 되는지 아래 줄에 나옵니다.
+  crapsSpotClosed: { opacity: 0.42 },
+  crapsSpotBet: { borderColor: colors.goldLight, borderWidth: 2 },
+  crapsSpotName: { color: colors.text, fontSize: 13, fontWeight: '900', textAlign: 'center' },
+  crapsSpotOdds: { color: '#BFD3C8', fontSize: 9, fontWeight: '700', marginTop: 2, textAlign: 'center' },
+  crapsSpotExtra: { color: '#8FD3FF', fontSize: 9, fontWeight: '900', marginTop: 2 },
+  crapsSpotAmount: { minHeight: 14, color: colors.goldLight, fontSize: 11, fontWeight: '900', marginTop: 3 },
+  crapsSpotPending: { color: '#8FD3FF' },
+  crapsStatusRow: { minHeight: 26, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 8 },
+  crapsNotice: { flex: 1, color: '#CDD3D8', fontSize: 12, fontWeight: '700' },
+  crapsClear: { color: '#8FD3FF', fontSize: 12, fontWeight: '900' },
+  crapsResultLine: { fontSize: 13, fontWeight: '900', marginTop: 7, textAlign: 'center', color: colors.text },
   baccaratSetupIcon: { width: 70, textAlign: 'center', color: colors.goldLight, fontSize: 44 },
   baccaratSetupCopy: { flex: 1, marginLeft: 12 },
   baccaratRules: { marginTop: 18, padding: 17, borderRadius: 18, backgroundColor: '#111E25', borderWidth: 1, borderColor: '#47616B' },
@@ -11089,6 +11287,21 @@ const styles = StyleSheet.create({
   numberCoin: { width: 32, height: 22, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#D9A928', borderWidth: 2, borderColor: '#FFE69A' },
   numberCoinText: { color: '#241803', fontSize: 7, fontWeight: '900', lineHeight: 8 },
   numberCoinUnit: { color: '#493306', fontSize: 5, fontWeight: '900', lineHeight: 6 },
+  rouletteModeRow: { flexDirection: 'row', gap: 5 },
+  rouletteModeChip: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
+  rouletteModeChipActive: { borderColor: colors.goldLight, borderWidth: 2, backgroundColor: '#2A2412' },
+  rouletteModeName: { color: colors.text, fontSize: 11, fontWeight: '900' },
+  // 안내 줄은 **늘 한 줄 자리**를 잡습니다. 글이 바뀔 때마다 판이 위아래로 움직이면 누르려던 칸이 도망갑니다.
+  rouletteInsideHint: { minHeight: 34, marginTop: 8, color: '#CDD3D8', fontSize: 12, fontWeight: '700', textAlign: 'center', textAlignVertical: 'center', lineHeight: 34 },
+  rouletteInsideHintWaiting: { color: '#8FD3FF', fontWeight: '900' },
+  rouletteTable: { gap: 5 },
+  rouletteTableRow: { flexDirection: 'row', gap: 5 },
+  rouletteTableCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 7, borderWidth: 1, borderColor: '#59616A' },
+  // 첫 숫자를 잡은 뒤 **두 번째로 누를 수 있는 칸**. 금색(건 자리)과 헷갈리지 않게 하늘색입니다.
+  rouletteCellTarget: { borderColor: '#8FD3FF', borderWidth: 3 },
+  rouletteCellAnchor: { borderColor: '#FFFFFF', borderWidth: 3 },
+  rouletteCellCoin: { position: 'absolute', right: 6, minWidth: 34, height: 20, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#D9A928', borderWidth: 2, borderColor: '#FFE69A' },
+  rouletteColumnButton: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.border },
   rouletteSpinButton: { width: '100%', marginTop: 24 },
   gameResultAction: { marginTop: 14 },
   balanceCard: { minHeight: 235, backgroundColor: '#111A24', borderRadius: 20, padding: 20, borderWidth: 1, borderColor: '#6D5520' },
