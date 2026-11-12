@@ -148,6 +148,7 @@ import {
   type BaccaratGuest,
   type BaccaratWinner,
 } from './src/baccarat';
+import { addAtRisk, interruptedRecord, readAtRisk, type AtRisk } from './src/interrupted';
 import { commitCrapsBets, crapsCannotBet, crapsHardNumbers, crapsHardOdds, crapsLockedStake, crapsPlaceNumbers, crapsPlaceOdds, crapsSpotLabel, crapsTrueOdds, leaveCrapsTable, newCrapsTable, rollCrapsTable, rollDice, type CrapsHardNumber, type CrapsPlaceNumber, type CrapsResolution, type CrapsSpot, type CrapsTable, type CrapsWager } from './src/craps';
 import { createHwatuDeck, monthNames, type HwatuCard } from './src/hwatu';
 import { hwatuCardImages } from './src/hwatuimages';
@@ -383,7 +384,7 @@ const englishGameNames: Record<string, string> = {
   '텍사스 홀덤': 'Texas Hold’em', '오마하': 'Omaha', '세븐 포커': 'Seven-card Poker',
   '파이브 카드 드로우': 'Five-card Draw', '비디오 포커': 'Video Poker', '하이로우': 'High–Low',
 };
-const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '파이 고우': '牌九, Pai Gow', '차이니즈 포커': '十三水, Chinese Poker', '투전': '鬪箋' };
+const chineseGameNames: Record<string, string> = { '식보': '骰寶, Sic Bo', '파이 고우': 'Pai Gow Poker', '차이니즈 포커': '十三水, Chinese Poker', '투전': '鬪箋' };
 const gameDisplayName = (name: string) => chineseGameNames[name] ? `${name}(${chineseGameNames[name]})` : englishGameNames[name] ? `${name}(${englishGameNames[name]})` : name;
 
 const gameCategories: GameCategory[] = [
@@ -508,6 +509,8 @@ const STORAGE_KEYS = {
   totalPlays: 'world-casino.total-plays',
   lastGame: 'world-casino.last-game',
   favorites: 'world-casino.favorites',
+  // 아직 정산되지 않은 돈. 앱이 열릴 때 남아 있으면 끊긴 판입니다(`src/interrupted.ts`).
+  atRisk: 'world-casino.at-risk',
   // 코인 푸셔의 판은 실제 기계처럼 이어집니다. 새로 열 때마다 동전을 다시 깔아 주면
   // 조금만 넣고 나가기를 반복하는 것이 이득이 되기 때문입니다.
   pusherField: 'world-casino.pusher-field',
@@ -759,7 +762,8 @@ function CasinoApp() {
       AsyncStorage.getItem(STORAGE_KEYS.missionClaimed),
       AsyncStorage.getItem(STORAGE_KEYS.totalPlays),
       AsyncStorage.getItem(STORAGE_KEYS.lastGame),
-    ]).then(([savedCoins, savedDifficulty, savedRecords, testGrant, savedPreferences, savedMissionDay, savedTotalPlays, savedLastGame]) => {
+      AsyncStorage.getItem(STORAGE_KEYS.atRisk),
+    ]).then(([savedCoins, savedDifficulty, savedRecords, testGrant, savedPreferences, savedMissionDay, savedTotalPlays, savedLastGame, savedAtRisk]) => {
       if (savedLastGame) setLastGame(savedLastGame as GameRecord['game']);
       if (savedMissionDay) setMissionClaimedDay(savedMissionDay);
       if (savedTotalPlays && Number.isFinite(Number(savedTotalPlays))) setTotalPlays(Math.max(0, Number(savedTotalPlays)));
@@ -774,14 +778,26 @@ function CasinoApp() {
       }
       if (savedDifficulty) setDifficulty(savedDifficulty);
       // 저장된 기록이 깨져 있어도 앱이 시작되지 못하는 일은 없어야 합니다.
+      let restoredRecords: GameRecord[] = [];
       if (savedRecords) {
         try {
           const parsed = JSON.parse(savedRecords);
-          if (Array.isArray(parsed)) setRecords(parsed);
+          if (Array.isArray(parsed)) restoredRecords = parsed;
         } catch {
           AsyncStorage.removeItem(STORAGE_KEYS.records).catch(() => {});
         }
       }
+      /**
+       * 끊긴 판. 돈을 걸어 둔 채로 화면이 다시 열렸으면 **패배로 적습니다**(2026-11-11에 정함).
+       * 코인은 걸 때 이미 빠졌으므로 여기서는 기록만 만듭니다.
+       */
+      const cut = readAtRisk(savedAtRisk);
+      if (cut) {
+        restoredRecords = [interruptedRecord(cut) as GameRecord, ...restoredRecords].slice(0, 100);
+        setTotalPlays((current) => current + 1);
+        AsyncStorage.removeItem(STORAGE_KEYS.atRisk).catch(() => {});
+      }
+      if (restoredRecords.length) setRecords(restoredRecords);
       // 설정도 기록과 같은 이유로, 깨져 있으면 기본값으로 시작합니다.
       if (savedPreferences) {
         try {
@@ -961,6 +977,7 @@ function CasinoApp() {
     setTotalPlays(data.totalPlays);
     setDifficulty(data.difficulty);
     setRecords(data.records as GameRecord[]);
+    clearAtRisk();
     const preferences = data.preferences as Partial<{ sound: boolean; vibration: boolean; gameSpeed: GameSpeed; accessibility: Partial<AccessibilityOptions> }> | undefined;
     if (preferences) {
       if (typeof preferences.sound === 'boolean') setSound(preferences.sound);
@@ -994,10 +1011,33 @@ function CasinoApp() {
   coinsRef.current = coins;
 
   /** `quiet`을 주면 칩 소리를 내지 않습니다. 예측 마켓처럼 **읽고 고르는 게임**에 씁니다. */
+  /**
+   * 지금 걸려 있는(아직 정산 안 된) 돈. 걸 때 적고 정산되면 지웁니다.
+   * ⚠️ 상태가 아니라 **저장소에 바로** 씁니다 — 화면이 죽기 직전의 값이 남아 있어야 하기 때문입니다.
+   */
+  const atRiskRef = useRef<AtRisk | null>(null);
+  const lastGameRef = useRef(lastGame);
+  lastGameRef.current = lastGame;
+  const saveAtRisk = (next: AtRisk | null) => {
+    atRiskRef.current = next;
+    if (next) AsyncStorage.setItem(STORAGE_KEYS.atRisk, JSON.stringify(next)).catch(() => {});
+    else AsyncStorage.removeItem(STORAGE_KEYS.atRisk).catch(() => {});
+  };
+  /** 판이 정산됐습니다. 기록을 남기는 길은 전부 이것을 부릅니다. */
+  const clearAtRisk = () => { if (atRiskRef.current) saveAtRisk(null); };
+  /**
+   * 크랩스 전용. 한 번 굴려 일부만 끝나도 나머지는 판에 남아 있어서, 화면이 판에 남은 금액을 직접 알려 줍니다.
+   */
+  const setCrapsAtRisk = (amount: number) => {
+    if (amount <= 0) { clearAtRisk(); return; }
+    saveAtRisk({ amount, game: '크랩스', difficulty, at: atRiskRef.current?.at ?? new Date().toISOString() });
+  };
+
   const placeBet = (stake: number, quiet = false) => {
     if (stake > coinsRef.current) return false;
     coinsRef.current -= stake;
     setCoins((current) => current - stake);
+    if (stake > 0 && lastGameRef.current) saveAtRisk(addAtRisk(atRiskRef.current, stake, lastGameRef.current, difficulty, new Date().toISOString()));
     if (!quiet) playCue('chip');
     return true;
   };
@@ -1011,6 +1051,7 @@ function CasinoApp() {
   const doubleBlackjack = () => placeBet(selectedBet);
 
   const settleBlackjack = (result: RoundResult, roundBet = selectedBet) => {
+    clearAtRisk();
     const payout = payoutForResult(roundBet, result);
     setCoins((currentCoins) => currentCoins + payout);
 
@@ -1030,6 +1071,7 @@ function CasinoApp() {
   };
 
   const settleRoulette = (bet: RouletteBet, stake: number, number: number, label: string) => {
+    clearAtRisk();
     const payout = roulettePayout(bet, stake, number);
     const won = rouletteBetWins(bet, number);
     if (payout > 0) {
@@ -1052,6 +1094,7 @@ function CasinoApp() {
   };
 
   const settleBaccarat = (bet: BaccaratBet, stake: number, winner: BaccaratWinner) => {
+    clearAtRisk();
     const payout = baccaratPayout(bet, stake, winner);
     const net = baccaratNet(bet, stake, winner);
     if (payout > 0) {
@@ -1080,6 +1123,7 @@ function CasinoApp() {
    * 두 가지를 같이 갱신합니다.
    */
   const addRecord = (make: (count: number) => GameRecord) => {
+    clearAtRisk();
     const record = make(records.length);
     setRecords((current) => [record, ...current].slice(0, 100));
     setTotalPlays((current) => current + 1);
@@ -1097,6 +1141,8 @@ function CasinoApp() {
    * 판을 떠나며 돌려받기만 한 것(무승부만)은 기록에 안 남깁니다 — 이기고 진 것이 없습니다.
    */
   const settleCraps = (resolutions: CrapsResolution[], detail: string) => {
+    // 돌려받기만 하고 떠날 때도(기록 없음) 걸린 돈은 없어집니다. 판에 남은 것은 화면이 `onAtRisk`로 다시 알려 줍니다.
+    clearAtRisk();
     const payout = resolutions.reduce((sum, item) => sum + item.payout, 0);
     const stake = resolutions.reduce((sum, item) => sum + item.stake, 0);
     if (payout > 0) setCoins((current) => current + payout);
@@ -1451,7 +1497,7 @@ function CasinoApp() {
           <BaccaratSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('baccaratGame')} />
         )}
         {appScreen === 'crapsSetup' && <CrapsSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('crapsGame')} />}
-        {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('crapsSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleCraps} />}
+        {appScreen === 'crapsGame' && <CrapsGameScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} onBack={() => setAppScreen('crapsSetup')} onBetChange={setSelectedBet} onPlaceBet={placeBet} onSettle={settleCraps} onAtRisk={setCrapsAtRisk} />}
         {/* ⚠️ 슬롯과 일본식 슬롯은 **목록에서 따로** 들어옵니다(2026-10-10). 준비 화면은 하나를 같이 쓰고 방식만 박아 넘깁니다. */}
         {appScreen === 'slotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} mode="classic" onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('slotGame')} />}
         {appScreen === 'pachislotSetup' && <SlotSetupScreen coins={coins} difficulty={difficulty} selectedBet={selectedBet} mode="pachislot" onBack={() => setAppScreen('categoryCatalog')} onDifficultyChange={saveDifficulty} onBetChange={setSelectedBet} onStart={() => setAppScreen('pachislotGame')} />}
@@ -2278,7 +2324,7 @@ function HomeScreen({ difficulty, records, lastGame, favorites, onOpenGameList, 
         <View style={styles.heroCopy}>
           <Text style={styles.muted}>마지막에 고른 게임</Text>
           <Text style={styles.cardTitle}>{gameDisplayName(continueGame)}</Text>
-          <Text style={styles.smallText}>{continueDifficulty} · 베팅 {continueBet.toLocaleString()} WC</Text>
+          <Text style={styles.smallText}>{betTierName(continueDifficulty)} · 베팅 {continueBet.toLocaleString()} WC</Text>
         </View>
         <Pressable style={styles.smallButton} onPress={() => onContinue(continueGame)}><Text style={styles.smallButtonText}>계속</Text></Pressable>
       </View>
@@ -3192,7 +3238,8 @@ function SimpleSetupScreen(props: {
   const option = difficultyOptions.find((item) => item.name === props.difficulty) ?? difficultyOptions[2];
   return (
     <View style={styles.detailScreen}>
-      <ScreenHeader title={`${props.title} 설정`} onBack={props.onBack} />
+      {/* 제목이 이미 '준비'로 끝나면 '설정'을 또 붙이지 않습니다 — `투전 준비 설정`처럼 말이 겹쳤습니다(2026-11-11). */}
+      <ScreenHeader title={props.title.endsWith('준비') ? props.title : `${props.title} 설정`} onBack={props.onBack} />
       <ScrollView {...useScrollMemory('SimpleSetupScreen')} contentContainerStyle={styles.detailPage} showsVerticalScrollIndicator={false}>
         <View style={styles.sicboHero}>
           <Text style={styles.sicboHeroDice}>{props.hero}</Text>
@@ -8278,7 +8325,7 @@ function ScreenFishingGameScreen({coins,selectedBet,onBack,onPlaceBet,onSettle}:
  * 그래서 굴리기 전에는 '올린 것 지우기'로 물릴 수 있습니다. 한 번 굴리면 판에 붙습니다.
  * 판정은 전부 `src/craps.ts`의 `rollCrapsTable`이 합니다.
  */
-function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (resolutions: CrapsResolution[], detail: string) => void }) {
+function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, onBetChange, onPlaceBet, onSettle, onAtRisk }: { coins: number; difficulty: string; selectedBet: number; onBack: () => void; onBetChange: (value: number) => void; onPlaceBet: (stake: number) => boolean; onSettle: (resolutions: CrapsResolution[], detail: string) => void; onAtRisk: (amount: number) => void }) {
   const [table, setTable] = useState<CrapsTable>(newCrapsTable);
   const [pending, setPending] = useState<Partial<Record<CrapsSpot, number>>>({});
   const [last, setLast] = useState<{ total: number; resolutions: CrapsResolution[] } | null>(null);
@@ -8293,6 +8340,11 @@ function CrapsGameScreen({ coins, difficulty: savedTier, selectedBet, onBack, on
   const onTable = table.wagers.reduce((sum, wager) => sum + wager.stake + wager.odds, 0);
   const canRoll = !rolling && (pendingTotal > 0 || table.wagers.length > 0);
   const locked = crapsLockedStake(table);
+  /**
+   * 판에 남아 있는 돈을 알려 둡니다. 화면이 끊기면 이만큼이 패배로 적힙니다(`src/interrupted.ts`).
+   * ⚠️ 다른 게임은 기록이 남을 때 걸린 돈이 다 정산되지만, 크랩스는 **한 번 굴려 일부만 끝나고 나머지는 남습니다.**
+   */
+  useEffect(() => { if (!leftRef.current) onAtRisk(table.wagers.reduce((sum, wager) => sum + wager.stake + wager.odds, 0)); }, [table]);
 
   const wagerOf = (kind: CrapsWager['kind'], number?: number) => table.wagers.find((wager) => wager.kind === kind && wager.number === number);
   /** 판에 붙어 있는 금액. 오즈 자리는 그 밑 베팅의 오즈입니다. */
